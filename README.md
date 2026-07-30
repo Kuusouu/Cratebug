@@ -6,7 +6,7 @@ The project is a fresh implementation built with Go, Wails, React, and TypeScrip
 
 ## Project status
 
-Cratebug is in Phase 0: repository and toolchain foundation. The application has a minimal development shell, a verified frontend-to-Go binding, and canonical validation. Production build, installation, and uninstall instructions will be added during the remaining Phase 0 tasks.
+Cratebug has completed its approved Phase 0 repository and toolchain foundation. Phase 1 has not started. The application currently contains only a minimal shell and one frontend-to-Go connectivity check; mod-management behavior begins in later phases.
 
 See:
 
@@ -16,7 +16,32 @@ See:
 - [Contributor and agent guidance](AGENTS.md)
 - [Toolchain baseline](docs/decisions/0001-toolchain-baseline.md)
 
-## Toolchain setup
+## Prerequisites
+
+Development currently targets 64-bit Windows 10 version 1909 or newer and Windows 11. Install:
+
+- Git
+- [`mise`](https://mise.jdx.dev/installing-mise.html)
+- Microsoft WebView2 Runtime
+- NSIS 3 when building the installer
+
+Install `mise` and NSIS with Windows Package Manager:
+
+```powershell
+winget install jdx.mise
+winget install NSIS.NSIS --silent
+```
+
+Restart the terminal after installing system tools so their updated paths are available.
+
+## Setup
+
+Clone the repository:
+
+```powershell
+git clone https://github.com/Kuusouu/Cratebug.git
+Set-Location Cratebug
+```
 
 Install the pinned Go and Bun versions through `mise`:
 
@@ -28,6 +53,15 @@ Install the pinned Wails CLI:
 
 ```powershell
 mise exec -c "go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0"
+$env:Path = "$(mise exec -c "go env GOPATH")\bin;$env:Path"
+```
+
+Install frontend dependencies from the committed Bun lockfile:
+
+```powershell
+Push-Location frontend
+mise exec -c "bun install --frozen-lockfile"
+Pop-Location
 ```
 
 Verify the installed versions:
@@ -77,6 +111,28 @@ mise exec -c "go fmt ./..."
 mise exec -c "go vet ./..."
 mise exec -c "go test ./..."
 ```
+
+## Production build
+
+Build the production Windows AMD64 application from the repository root:
+
+```powershell
+mise exec -c "wails build -clean -platform windows/amd64 -nopackage -nocolour"
+```
+
+The production executable is written to `build/bin/Cratebug.exe`. The generated `build` directory is intentionally ignored by Git.
+
+## Windows installer
+
+After installing NSIS, build the per-user Windows AMD64 installer:
+
+```powershell
+mise exec -c "wails build -clean -platform windows/amd64 -nsis -installscope user -nocolour"
+```
+
+The installer is written to `build/bin/Cratebug-amd64-installer.exe`. A default installation uses `%LOCALAPPDATA%\Programs\Cratebug`, creates Start menu and desktop shortcuts, and can be removed from Windows Settings or with the installed `uninstall.exe`.
+
+Phase 0 packages are unsigned, so Windows may display an unrecognized-app warning. Signing, upgrades, and release publishing are deferred to release hardening.
 
 ## Continuous integration
 
