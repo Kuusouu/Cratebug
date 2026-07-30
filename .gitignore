@@ -2,6 +2,15 @@
 Thumbs.db
 Desktop.ini
 
+# Compiled binaries and test output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
 # Editors and IDEs
 .idea/
 .vscode/
@@ -19,10 +28,8 @@ Desktop.ini
 *.cover
 coverage.out
 
-# Wails build output
-/build/bin/
-/build/darwin/
-/build/windows/installer/tmp/
+# Wails generated output and packaging assets
+/build/
 
 # Frontend dependencies and build output
 /node_modules/
