@@ -6,7 +6,7 @@ The project is a fresh implementation built with Go, Wails, React, and TypeScrip
 
 ## Project status
 
-Cratebug is in Phase 0: repository and toolchain foundation. The toolchain baseline is established, but the application has not been scaffolded yet, so development and build commands are not available. Canonical validation, build, installation, and uninstall instructions will be added during the remaining Phase 0 tasks.
+Cratebug is in Phase 0: repository and toolchain foundation. The application now has a minimal development shell and a verified frontend-to-Go binding. Canonical validation, production build, installation, and uninstall instructions will be added during the remaining Phase 0 tasks.
 
 See:
 
@@ -15,8 +15,6 @@ See:
 - [Active tasks](TASKS.md)
 - [Contributor and agent guidance](AGENTS.md)
 - [Toolchain baseline](docs/decisions/0001-toolchain-baseline.md)
-
-If a hosted GitHub repository is created, it belongs under the `Kuusouu` organization. CI is intended to use the organization's existing Blacksmith integration where applicable.
 
 ## Toolchain setup
 
@@ -29,18 +27,28 @@ mise install
 Install the pinned Wails CLI:
 
 ```powershell
-mise exec -- go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+mise exec -c "go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0"
 ```
 
 Verify the installed versions:
 
 ```powershell
-mise exec -- go version
-mise exec -- bun --version
-mise exec -- wails version
+mise exec -c "go version"
+mise exec -c "bun --version"
+mise exec -c "wails version"
 ```
 
 See the [toolchain decision](docs/decisions/0001-toolchain-baseline.md) for exact versions and the upgrade policy.
+
+## Development
+
+Start the Wails development application from the repository root:
+
+```powershell
+mise exec -c "wails dev"
+```
+
+Wails installs frontend dependencies from `frontend/bun.lock`, starts Vite through Bun, generates typed application bindings, and launches the desktop window.
 
 ## License
 

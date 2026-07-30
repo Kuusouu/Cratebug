@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Cratebug",
+  "outputfilename": "Cratebug",
+  "frontend:install": "bun install --frozen-lockfile",
+  "frontend:build": "bun run build",
+  "frontend:dev:watcher": "bun run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Omar",
+    "email": "90123670+mewclouds@users.noreply.github.com"
+  }
+}
