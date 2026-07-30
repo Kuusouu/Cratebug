@@ -6,11 +6,11 @@ import "./style.css";
 const root = document.getElementById("root");
 
 if (!root) {
-  throw new Error("Cratebug root element was not found");
+	throw new Error("Cratebug root element was not found");
 }
 
 createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+	<StrictMode>
+		<App />
+	</StrictMode>,
 );

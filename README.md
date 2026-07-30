@@ -6,7 +6,7 @@ The project is a fresh implementation built with Go, Wails, React, and TypeScrip
 
 ## Project status
 
-Cratebug is in Phase 0: repository and toolchain foundation. The application now has a minimal development shell and a verified frontend-to-Go binding. Canonical validation, production build, installation, and uninstall instructions will be added during the remaining Phase 0 tasks.
+Cratebug is in Phase 0: repository and toolchain foundation. The application has a minimal development shell, a verified frontend-to-Go binding, and canonical validation. Production build, installation, and uninstall instructions will be added during the remaining Phase 0 tasks.
 
 See:
 
@@ -49,6 +49,34 @@ mise exec -c "wails dev"
 ```
 
 Wails installs frontend dependencies from `frontend/bun.lock`, starts Vite through Bun, generates typed application bindings, and launches the desktop window.
+
+## Validation
+
+Run every required frontend and Go check from the repository root:
+
+```powershell
+.\check.ps1
+```
+
+The frontend scripts are run from `frontend`:
+
+| Command | Purpose |
+| --- | --- |
+| `mise exec -c "bun run dev"` | Start the Vite development server |
+| `mise exec -c "bun run build"` | Type-check and build the frontend |
+| `mise exec -c "bun run format"` | Apply Biome formatting |
+| `mise exec -c "bun run format:check"` | Check Biome formatting without changes |
+| `mise exec -c "bun run lint"` | Run Biome lint rules |
+| `mise exec -c "bun run typecheck"` | Run TypeScript without emitting files |
+| `mise exec -c "bun run check"` | Run all frontend checks and the build |
+
+Canonical Go commands are run from the repository root:
+
+```powershell
+mise exec -c "go fmt ./..."
+mise exec -c "go vet ./..."
+mise exec -c "go test ./..."
+```
 
 ## License
 
