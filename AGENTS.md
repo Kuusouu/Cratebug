@@ -71,6 +71,13 @@ For user-visible changes:
 
 If visual verification cannot be performed, say so clearly.
 
+### Windows screenshots
+
+- Capture the application window, not the full desktop.
+- Wait for a nonzero `MainWindowHandle`, then use Win32 `PrintWindow` through PowerShell/.NET. Avoid `CopyFromScreen`, which can clip windows under display scaling.
+- Save screenshots as `docs/screenshots/<phase>/task-<number>-<state>.png`.
+- Inspect the saved PNG and close only the process launched for verification.
+
 ## Git
 
 - Review `git status` and the relevant diff before reporting completion.

@@ -6,6 +6,13 @@
   "frontend:build": "bun run build",
   "frontend:dev:watcher": "bun run dev",
   "frontend:dev:serverUrl": "auto",
+  "info": {
+    "companyName": "Kuusouu",
+    "productName": "Cratebug",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 Omar",
+    "comments": "Windows-first mod manager for Marvel Rivals"
+  },
   "author": {
     "name": "Omar",
     "email": "90123670+mewclouds@users.noreply.github.com"

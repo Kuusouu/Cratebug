@@ -22,7 +22,7 @@ coverage.out
 # Wails build output
 /build/bin/
 /build/darwin/
-/build/windows/
+/build/windows/installer/tmp/
 
 # Frontend dependencies and build output
 /node_modules/
