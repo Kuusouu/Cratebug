@@ -1,0 +1,52 @@
+name: CI
+
+on:
+    push:
+        branches:
+            - master
+    pull_request:
+        branches:
+            - master
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    windows:
+        name: Windows
+        runs-on: blacksmith-2vcpu-windows-2025
+        timeout-minutes: 20
+
+        steps:
+            - name: Check out repository
+              uses: actions/checkout@v6
+
+            - name: Install pinned toolchain
+              uses: jdx/mise-action@v4.2.3
+
+            - name: Verify toolchain
+              shell: pwsh
+              run: |
+                  mise exec -c "go version"
+                  mise exec -c "bun --version"
+
+            - name: Install frontend dependencies
+              shell: pwsh
+              working-directory: frontend
+              run: mise exec -c "bun install --frozen-lockfile"
+
+            - name: Run canonical checks
+              shell: pwsh
+              run: .\check.ps1
+
+            - name: Build Windows application
+              shell: pwsh
+              run: |
+                  mise exec -c "go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -platform windows/amd64 -nopackage -nocolour"
+                  if (-not (Test-Path "build/bin/Cratebug.exe")) {
+                      throw "Wails did not produce build/bin/Cratebug.exe"
+                  }

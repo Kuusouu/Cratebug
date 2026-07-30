@@ -78,6 +78,10 @@ mise exec -c "go vet ./..."
 mise exec -c "go test ./..."
 ```
 
+## Continuous integration
+
+GitHub Actions runs the canonical checks and a clean Windows application build on Blacksmith for pushes and pull requests to `master`. CI verifies the application without publishing packages or build artifacts.
+
 ## License
 
 Cratebug is licensed under the GNU General Public License version 3. See [LICENSE](LICENSE).
