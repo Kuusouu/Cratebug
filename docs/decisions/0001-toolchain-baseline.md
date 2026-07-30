@@ -44,7 +44,7 @@ mise install
 Install the pinned Wails CLI:
 
 ```powershell
-mise exec -- go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+mise exec -c "go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0"
 ```
 
 Task 0.3 will add the frontend installation command after `package.json` exists. It will use Bun and the committed lockfile.
@@ -54,9 +54,9 @@ Task 0.3 will add the frontend installation command after `package.json` exists.
 Run from the repository root:
 
 ```powershell
-mise exec -- go version
-mise exec -- bun --version
-mise exec -- wails version
+mise exec -c "go version"
+mise exec -c "bun --version"
+mise exec -c "wails version"
 ```
 
 Expected version values are:
