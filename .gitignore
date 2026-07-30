@@ -1,0 +1,29 @@
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Go
+/bin/
+*.cover
+coverage.out
+
+# Wails build output
+/build/bin/
+
+# Frontend dependencies and build output
+/node_modules/
+/dist/
+/frontend/node_modules/
+/frontend/dist/
