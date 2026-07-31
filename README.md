@@ -6,7 +6,11 @@ The project is a fresh implementation built with Go, Wails, React, and TypeScrip
 
 ## Project status
 
-Cratebug has completed its approved Phase 0 repository and toolchain foundation. Phase 1 has not started. The application currently contains only a minimal shell and one frontend-to-Go connectivity check; mod-management behavior begins in later phases.
+Cratebug has completed its Phase 0 repository and toolchain foundation and
+Phase 1 read-only discovery scanner. Phase 2 read-only library UI work has not
+started. The application currently contains a minimal shell and one
+frontend-to-Go connectivity check while the discovery behavior is being
+integrated into the interface.
 
 See:
 

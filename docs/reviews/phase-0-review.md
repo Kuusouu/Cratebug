@@ -97,7 +97,6 @@ Phase 0 did not introduce:
 ## Review approval
 
 **Decision:** Approved  
-**Reviewer:** Omar  
 **Approval date:** 2026-07-30  
 **Notes:** Phase 0 foundation approved. Phase 1 may begin when explicitly requested.
 
