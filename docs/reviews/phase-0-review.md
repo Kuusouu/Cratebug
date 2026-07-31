@@ -94,11 +94,11 @@ Phase 0 did not introduce:
 - Microsoft WebView2 Runtime remains a runtime prerequisite.
 - Cratebug intentionally has no mod-management behavior yet.
 
-## Human approval
+## Review approval
 
 **Decision:** Approved  
 **Reviewer:** Omar  
 **Approval date:** 2026-07-30  
 **Notes:** Phase 0 foundation approved. Phase 1 may begin when explicitly requested.
 
-Approval of this review grants permission to replace the active task list and begin Phase 1. Do not begin Phase 1 without explicit human approval.
+Approval of this review grants permission to replace the active task list and begin Phase 1. Do not begin Phase 1 without explicit approval.

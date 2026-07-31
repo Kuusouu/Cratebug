@@ -8,7 +8,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 - Each phase delivers one coherent capability.
 - Later-phase work does not enter early phases "just in case."
-- Automated evidence and human review are both required where appropriate.
+- Automated evidence and project review are both required where appropriate.
 - A phase ends in a working, reviewable repository state.
 - Compilation alone is not completion.
 
@@ -36,7 +36,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Production build succeeds.
 - Installer installs, launches, and uninstalls.
 - A clean checkout reproduces the workflow.
-- Human review approves the foundation.
+- Review approves the foundation.
 
 ## Phase 1 - Read-only mod discovery
 
@@ -62,7 +62,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Nested folders and legacy disabled forms work.
 - Unusual bundles remain visible instead of crashing.
 - Scanner code is independent of Wails and React.
-- Human review approves terminology and fixtures.
+- Review approves terminology and fixtures.
 
 ## Phase 2 - Read-only library UI
 
@@ -85,7 +85,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Search and folder selection work without unnecessary rescans.
 - Scanning does not freeze the interface.
 - Migrated components are understandable and refactored.
-- Running-app screenshots receive human approval.
+- Running-app screenshots receive review approval.
 
 ## Phase 3 - Safe enable and disable
 
@@ -110,7 +110,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Unsafe paths and collisions fail before mutation.
 - Failures never produce false success.
 - Final filesystem state is reported accurately.
-- Human review approves success and failure flows.
+- Review approves success and failure flows.
 
 ## Phase 4 - Organization and recoverable deletion
 
@@ -136,7 +136,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Folder operations remain inside the mod root.
 - Deletion is recoverable and never silently becomes permanent.
 - Partial failures are reconciled and reported.
-- Human review covers destructive edge cases.
+- Review covers destructive edge cases.
 
 ## Phase 5 - Metadata and persistence
 
@@ -159,7 +159,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Tags survive controlled rename and move.
 - Corrupt data does not destroy the library.
 - Failed writes preserve valid prior state.
-- Human review approves stored data and recovery behavior.
+- Review approves stored data and recovery behavior.
 
 ## Phase 6 - UAssetToolRivals boundary
 
@@ -182,7 +182,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Representative failures do not corrupt or crash Cratebug unexpectedly.
 - Production packaging works.
 - Licensing and notices are documented.
-- Human review approves the boundary before archive mutation begins.
+- Review approves the boundary before archive mutation begins.
 
 ## Phase 7 - Installation and archive safety
 
@@ -207,7 +207,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Existing mods are never overwritten without a decision.
 - Failed installs do not leave partial bundles presented as installed.
 - Representative classic and IoStore fixtures work.
-- Human review covers success and major failure paths.
+- Review covers success and major failure paths.
 
 ## Phase 8 - Asset conflict inspection
 
@@ -229,7 +229,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Disabled mods are handled appropriately.
 - Tool failures produce clear unavailable or partial states.
 - Large scans remain responsive.
-- Human review approves terminology and presentation.
+- Review approves terminology and presentation.
 
 ## Phase 9 - BentoMod migration
 
@@ -250,7 +250,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Malformed state fails safely.
 - Ambiguous filename-based tags are surfaced.
 - Repeated imports do not duplicate data unpredictably.
-- Human review uses disposable copies of representative real state.
+- Review uses disposable copies of representative real state.
 
 ## Phase 10 - Release hardening
 

@@ -20,7 +20,7 @@ Cratebug should:
 - Make filesystem operations safe, predictable, and recoverable.
 - Preserve compatibility with existing BentoMod libraries where practical.
 - Report failures clearly instead of silently leaving partially modified mods.
-- Remain understandable and maintainable for a small open-source project using AI-assisted development.
+- Remain understandable and maintainable for a small open-source project.
 - Reuse and improve useful parts of BentoMod's frontend without inheriting its structure wholesale.
 - Ship as a conventional Windows application with an installer and uninstaller.
 

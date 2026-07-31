@@ -96,4 +96,4 @@ Report:
 - Deferred findings outside the task
 - A concise suggested commit message
 
-Stop at human review gates. Do not begin the next task or phase automatically.
+Stop at review gates. Do not begin the next task or phase automatically.

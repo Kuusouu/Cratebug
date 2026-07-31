@@ -1,109 +1,176 @@
 # Cratebug Active Tasks
 
-**Phase:** 0 - Repository and toolchain foundation  
-**Status:** Complete - approved
+**Phase:** 1 - Read-only mod discovery
+**Status:** Not started
 
-This file contains only the active phase. Replace it when Phase 0 is complete.
+This file contains only the active phase. Replace it when Phase 1 is complete.
 
 ## Phase objective
 
-Create a clean, reproducible repository and prove that Cratebug can develop, validate, build, install, launch, and uninstall on Windows.
+Build a deterministic, read-only Go scanner that can describe a Marvel Rivals mod library without changing any files.
 
-No mod-management behavior belongs in this phase.
+The scanner must remain independent of Wails and React.
 
 ## Exit criteria
 
-- Development app launches.
-- Canonical Go and frontend checks pass.
-- Production build succeeds.
-- NSIS installer installs, launches, and uninstalls.
-- CI passes from a clean environment.
-- A clean checkout reproduces the documented workflow.
-- Human review approves the foundation.
+* Recursive scans recognize supported primary and sidecar formats.
+* Classic, IoStore, disabled, incomplete, and orphaned entries are represented clearly.
+* Nested physical folders are supported.
+* Filename-based priority is parsed using verified compatibility fixtures.
+* Repeated scans of the same directory return equivalent results.
+* Scanning never modifies files.
+* Automated tests use temporary directories and synthetic fixtures.
+* Review approves the discovered behavior and terminology.
 
-## 0.1 Initialize the repository
+## Out of scope
 
-- Create a fresh Git repository.
-- If a hosted GitHub repository is created, create it under the `Kuusouu` organization.
-- Add `README.md`, `LICENSE`, `SPEC.md`, `ROADMAP.md`, `TASKS.md`, and `AGENTS.md`.
-- Add an appropriate `.gitignore`.
-- Confirm that no Pakkit, WinUI, BentoMod, local-cache, or build-output files were copied accidentally.
+Phase 1 does not include:
 
-**Verify:** Review the repository tree and `git status`.
+* Wails bindings or library UI
+* File mutations
+* Enable or disable operations
+* Rename, move, priority changes, or deletion
+* Settings or metadata persistence
+* Filesystem watching
+* UAssetToolRivals integration
+* Archive installation
+* Asset conflict inspection
 
-## 0.2 Pin the toolchain
+## 1.1 Establish discovery fixtures
 
-- Select current stable, non-preview versions of Go, Wails v2, Bun, React, TypeScript, Vite 8, and Biome.
-- Record the exact versions and upgrade policy in `docs/decisions/0001-toolchain-baseline.md`.
-- Record installation and version-check commands.
-- Use exact versions or lockfiles in project configuration and CI.
+* Create synthetic fixtures representing known BentoMod-compatible layouts.
+* Include:
 
-**Verify:** Version commands, package declarations, and the Bun lockfile match the decision record.
+  * Enabled `.pak`
+  * `.pak_crateoff`
+  * `.bak_bento`
+  * `.pak_disabled`
+  * Classic `.pak` without sidecars
+  * `.pak`, `.utoc`, and `.ucas` IoStore bundle
+  * Nested folders
+  * Leading `!` priority
+  * Trailing-nine priority patterns
+  * Unrecognized priority names
+  * Partial sidecar combinations
+  * Orphaned `.utoc` and `.ucas`
+  * Same stems in different folders
+  * Enabled and disabled primaries with the same stem
+* Record which expectations come from confirmed BentoMod behavior and which remain Cratebug decisions.
+* Do not include copyrighted game or mod files.
 
-## 0.3 Scaffold the application
+**Verify:** Fixture contents are small, readable, deterministic, and contain no real user data.
 
-- Initialize the Go module and Wails v2 project.
-- Use React and TypeScript with Vite 8.
-- Configure Bun for frontend installation and scripts.
-- Remove demo behavior and branding.
-- Add only a minimal Cratebug shell and one small frontend-to-Go call.
-- Do not add mod logic or migrate BentoMod UI yet.
+## 1.2 Define the minimal scan result
 
-**Verify:** Development mode launches, the Go call succeeds, and a screenshot shows the minimal Cratebug window without template branding.
+* Define only the data needed to describe a read-only library.
+* Represent:
 
-## 0.4 Configure validation
+  * Primary path
+  * Relative folder path
+  * Display or clean name
+  * Enabled or disabled state
+  * Disabled format
+  * Classic or IoStore classification
+  * Recognized sidecars
+  * Parsed priority
+  * Incomplete or unusual status
+  * Read-only diagnostics
+* Keep paths and bundle information independent of Wails.
+* Do not add persistence IDs, tags, mutation plans, UI models, or future installation fields.
+* Document any naming or classification decision that is not already settled by `SPEC.md`.
 
-- Configure Biome formatting and linting.
-- Enable appropriate TypeScript strictness.
-- Add clear Bun scripts for development, build, formatting, linting, type checking, and combined checks.
-- Add canonical Go formatting, `go vet`, and `go test` commands.
-- Add at least one small Go test.
-- Provide one root-level command or script that runs all required checks.
+**Verify:** Types are sufficient for all Phase 1 fixtures without containing later-phase concerns.
 
-**Verify:** All checks pass, and deliberate sample failures are detected before being reverted.
+## 1.3 Implement recursive file discovery
 
-## 0.5 Add continuous integration
+* Scan a supplied mod-root path recursively.
+* Return a clear error when the root is missing, inaccessible, or not a directory.
+* Discover only files relevant to Phase 1 classification.
+* Preserve physical nested-folder information.
+* Ignore unrelated files without failing the scan.
+* Ensure discovery performs no writes, renames, directory creation, or metadata changes.
+* Use deterministic ordering for returned files and folders.
 
-- Use clean Windows CI.
-- Use the `Kuusouu` GitHub organization's existing Blacksmith CI integration where applicable.
-- Install the pinned Go and Bun versions.
-- Install frontend dependencies from the lockfile.
-- Run all canonical frontend and Go checks.
-- Build the frontend and Windows application where supported.
-- Do not publish releases or artifacts automatically in Phase 0.
+**Verify:** Temporary-directory tests cover empty, nested, missing, inaccessible where practical, and mixed-content roots.
 
-**Verify:** CI passes and correctly rejects a deliberate temporary failure.
+## 1.4 Group primary files and sidecars
 
-## 0.6 Build and package
+* Recognize supported primary formats:
 
-- Configure application metadata and temporary branding.
-- Produce a Windows AMD64 production build.
-- Confirm the app runs without a development server or unexpected console.
-- Configure Wails NSIS packaging.
-- Install, launch, and uninstall in a disposable Windows environment where practical.
-- Do not finalize signing, upgrade migration, or release branding yet.
+  * `.pak`
+  * `.pak_crateoff`
+  * `.bak_bento`
+  * `.pak_disabled`
+* Associate same-stem `.utoc` and `.ucas` sidecars within the same physical folder.
+* Classify complete classic and IoStore bundles.
+* Preserve separate entries for same-named mods in different folders.
+* Do not add `.sig` bundle handling.
+* Do not silently merge ambiguous primary files that share a stem.
 
-**Verify:** Production app and installer work; installed files are removed on uninstall; unrelated files remain untouched. Capture production and installed-app screenshots.
+**Verify:** Table-driven tests cover every supported primary form and representative sidecar combinations.
 
-## 0.7 Document and review
+## 1.5 Parse state, names, and priority
 
-- Document prerequisites, setup, development, checks, production build, and installer commands in `README.md`.
-- Reproduce the workflow from a clean checkout.
-- Create `docs/reviews/phase-0-review.md` with versions, commands, CI result, installer result, screenshot paths, limitations, and human approval.
-- Confirm that no mod logic, persistence, UAssetToolRivals integration, or BentoMod UI migration entered Phase 0.
+* Determine enabled or disabled state from the primary filename.
+* Preserve which disabled format was discovered.
+* Parse verified BentoMod-compatible priority patterns.
+* Support leading `!` and trailing runs of nines.
+* Keep ambiguous or unrecognized filenames visible.
+* Avoid using cleaned filenames as persistent mod identity.
+* Do not normalize away information required to display or diagnose the original filename.
 
-**Verify:** Human approval grants permission to begin Phase 1.
+**Verify:** Compatibility tests cover normal, ambiguous, malformed, and collision-prone filename cases.
 
-## Phase 0 completion report
+## 1.6 Report incomplete and orphaned entries
+
+* Represent partial sidecar combinations without crashing or hiding files.
+* Report `.utoc` or `.ucas` files that have no supported primary.
+* Distinguish:
+
+  * Complete classic mod
+  * Complete IoStore mod
+  * Incomplete bundle
+  * Orphaned sidecar
+  * Ambiguous primary grouping
+* Keep diagnostics descriptive and read-only.
+* Do not decide whether incomplete bundles may be mutated; that belongs to later phases after further investigation.
+
+**Verify:** Tests demonstrate that every relevant discovered file appears either in a bundle or in a diagnostic result.
+
+## 1.7 Validate rescanning and complete the review
+
+* Test repeated scans of an unchanged temporary library.
+* Modify disposable fixture directories between scans and confirm new results reflect the filesystem.
+* Confirm the scanner does not require cached state to produce correct results.
+* Run the canonical repository validation command.
+* Optionally perform a read-only scan of a real mod directory only with explicit user permission.
+* Document findings that affect later phases without implementing them.
+* Create `docs/reviews/phase-1-review.md`.
+
+The review should record:
+
+* Fixture coverage
+* Classification rules
+* Priority parsing behavior
+* Incomplete and orphaned behavior
+* Commands and tests run
+* Any real-library read-only observations
+* Known limitations
+* Deferred questions
+* Review approval
+
+**Verify:** Review approval grants permission to begin Phase 2.
+
+## Phase 1 completion report
 
 For each task, report:
 
-- What changed
-- Files changed
-- Validation and results
-- Manual checks and screenshot paths
-- Known limitations
-- Deferred findings
-- Suggested commit message
+* What changed
+* Files changed
+* Validation and results
+* Manual checks performed
+* Known limitations
+* Deferred findings
+* Suggested commit message
 
 Do not begin the next task or phase automatically.
