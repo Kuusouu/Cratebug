@@ -163,22 +163,23 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 ## Phase 6 - UAssetToolRivals boundary
 
-**Outcome:** Cratebug has a reviewed, testable integration for required Unreal archive operations.
+**Outcome:** Cratebug has a reviewed, testable integration for the small subset of Unreal archive operations it actually needs, behind a narrow typed boundary around a pinned UAssetToolRivals revision.
 
 **Includes:**
 
-- External review
-- Small FFI and helper-process prototypes
-- Crash, packaging, performance, and complexity comparison
-- Narrow typed adapter
+- Pinned UAssetToolRivals revision
+- Narrow typed archive-tool adapter
+- Supervised helper-process prototype as the default integration direction
+- FFI comparison only when a concrete performance, packaging, or operational reason exists
+- Crash, packaging, performance, and complexity validation for the selected boundary
 - Version checks, structured errors, logging, and test doubles
-- One representative read-only operation
+- Representative read-only archive operations from the Cratebug subset
 
-**Excludes:** Full installation, VFX updating, and exposing the complete tool surface.
+**Excludes:** Full installation, VFX updating, exposing the complete UAssetToolRivals surface, and making the UAssetToolRivals JSON contract part of Cratebug's domain API.
 
 **Exit criteria:**
 
-- A written decision selects FFI or helper process.
+- A written decision selects a supervised helper process by default, or documents the concrete reason to pursue FFI instead.
 - Representative failures do not corrupt or crash Cratebug unexpectedly.
 - Production packaging works.
 - Licensing and notices are documented.
@@ -217,6 +218,8 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 - Same-priority conflict detection
 - Cross-priority overlap inspection
+- UAssetToolRivals supplies archive facts such as internal paths; Cratebug owns enabled/disabled filtering, priority comparison, overlap rules, caching and invalidation, and user-facing conflict results.
+- UAssetToolRivals does not decide whether two mods conflict.
 - Clear distinction among asset conflict, destination collision, invalid bundle, and duplicate priority
 - Conflict details UI
 - Progress, cancellation, and justified caching
