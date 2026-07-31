@@ -163,13 +163,14 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 ## Phase 6 - UAssetToolRivals boundary
 
-**Outcome:** Cratebug has a reviewed, testable integration for the small subset of Unreal archive operations it actually needs, behind a narrow typed boundary around a pinned UAssetToolRivals revision.
+**Outcome:** Cratebug has a reviewed, testable integration for the small subset of Unreal archive operations it actually needs, behind a narrow typed boundary around a pinned prebuilt UAssetToolRivals worker release tied to a known source revision.
 
 **Includes:**
 
-- Pinned UAssetToolRivals revision
+- Pinned prebuilt UAssetToolRivals worker release tied to a known source revision
 - Narrow typed archive-tool adapter
 - Supervised helper-process prototype as the default integration direction
+- Worker distributed as a versioned release artifact from the maintained UAssetToolRivals fork; normal Cratebug development and builds do not require the .NET toolchain unless the worker is explicitly rebuilt from source
 - FFI comparison only when a concrete performance, packaging, or operational reason exists
 - Crash, packaging, performance, and complexity validation for the selected boundary
 - Version checks, structured errors, logging, and test doubles
@@ -180,6 +181,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 **Exit criteria:**
 
 - A written decision selects a supervised helper process by default, or documents the concrete reason to pursue FFI instead.
+- Worker release version, source revision, and checksum are pinned and documented.
 - Representative failures do not corrupt or crash Cratebug unexpectedly.
 - Production packaging works.
 - Licensing and notices are documented.
