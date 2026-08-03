@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 
 type FolderNode = {
@@ -41,7 +41,7 @@ function buildFolderTree(folders: string[]): FolderNode[] {
 }
 
 // FolderNavigation renders the physical directory hierarchy reported by discovery.
-export function FolderNavigation({
+export const FolderNavigation = memo(function FolderNavigation({
 	folders,
 	selectedFolder,
 	onSelect,
@@ -51,7 +51,7 @@ export function FolderNavigation({
 	const tree = useMemo(() => buildFolderTree(folders), [folders]);
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
 
-	function toggleFolder(path: string) {
+	const toggleFolder = useCallback((path: string) => {
 		setExpandedFolders((current) => {
 			const next = new Set(current);
 			if (next.has(path)) {
@@ -61,7 +61,7 @@ export function FolderNavigation({
 			}
 			return next;
 		});
-	}
+	}, []);
 
 	return (
 		<nav className="folder-navigation">
@@ -87,23 +87,50 @@ export function FolderNavigation({
 			))}
 		</nav>
 	);
-}
+});
 
-function FolderTreeItem({
-	node,
-	selectedFolder,
-	expandedFolders,
-	entryCounts,
-	onSelect,
-	onToggle,
-}: {
+type FolderTreeItemProps = {
 	node: FolderNode;
 	selectedFolder: string;
 	expandedFolders: ReadonlySet<string>;
 	entryCounts: ReadonlyMap<string, number>;
 	onSelect: (folder: string) => void;
 	onToggle: (folder: string) => void;
-}) {
+};
+
+function selectionTouchesBranch(selectedFolder: string, folderPath: string): boolean {
+	return selectedFolder === folderPath || selectedFolder.startsWith(`${folderPath}/`);
+}
+
+function sameFolderTreeItemProps(
+	previous: FolderTreeItemProps,
+	next: FolderTreeItemProps,
+): boolean {
+	if (
+		previous.node !== next.node ||
+		previous.expandedFolders !== next.expandedFolders ||
+		previous.entryCounts !== next.entryCounts ||
+		previous.onSelect !== next.onSelect ||
+		previous.onToggle !== next.onToggle
+	)
+		return false;
+
+	if (previous.selectedFolder === next.selectedFolder) return true;
+
+	return (
+		!selectionTouchesBranch(previous.selectedFolder, previous.node.path) &&
+		!selectionTouchesBranch(next.selectedFolder, next.node.path)
+	);
+}
+
+const FolderTreeItem = memo(function FolderTreeItem({
+	node,
+	selectedFolder,
+	expandedFolders,
+	entryCounts,
+	onSelect,
+	onToggle,
+}: FolderTreeItemProps) {
 	const hasChildren = node.children.length > 0;
 	const expanded = expandedFolders.has(node.path);
 
@@ -149,4 +176,4 @@ function FolderTreeItem({
 			)}
 		</div>
 	);
-}
+}, sameFolderTreeItemProps);

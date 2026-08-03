@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { discovery } from "../../wailsjs/go/models";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
@@ -86,7 +87,7 @@ export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: 
 	);
 }
 
-function ModCard({
+const ModCard = memo(function ModCard({
 	entry,
 	viewMode,
 }: {
@@ -138,4 +139,4 @@ function ModCard({
 			{issues}
 		</article>
 	);
-}
+});

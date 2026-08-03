@@ -8,6 +8,12 @@ import { ModCatalog } from "./ModCatalog";
 
 type Theme = "system" | "light" | "dark";
 
+type LibraryIndex = {
+	folders: string[];
+	folderEntries: ReadonlyMap<string, discovery.Entry[]>;
+	folderEntryCounts: ReadonlyMap<string, number>;
+};
+
 const viewModeIcons = {
 	compact: Grid2X2,
 	large: PanelsTopLeft,
@@ -16,6 +22,32 @@ const viewModeIcons = {
 
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+// Build subtree lookups once per scan so folder navigation does not repeatedly scan the library.
+function indexLibrary(entries: discovery.Entry[]): LibraryIndex {
+	const folderEntries = new Map<string, discovery.Entry[]>();
+
+	for (const entry of entries) {
+		const segments = entry.relativeFolder.split("/").filter(Boolean);
+		for (let index = 1; index <= segments.length; index += 1) {
+			const folder = segments.slice(0, index).join("/");
+			const entriesInFolder = folderEntries.get(folder);
+			if (entriesInFolder) {
+				entriesInFolder.push(entry);
+			} else {
+				folderEntries.set(folder, [entry]);
+			}
+		}
+	}
+
+	return {
+		folders: [...folderEntries.keys()].sort((left, right) => left.localeCompare(right)),
+		folderEntries,
+		folderEntryCounts: new Map(
+			[...folderEntries].map(([folder, entriesInFolder]) => [folder, entriesInFolder.length]),
+		),
+	};
 }
 
 // LibraryScreen owns local browsing state; scanning remains behind the Go binding.
@@ -29,47 +61,24 @@ export function LibraryScreen() {
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 
-	const folders = useMemo(() => {
-		const paths = new Set<string>();
-		for (const entry of library?.entries ?? []) {
-			// Include ancestors so a parent folder can represent its full subtree.
-			const segments = entry.relativeFolder.split("/").filter(Boolean);
-			for (let index = 1; index <= segments.length; index += 1) {
-				paths.add(segments.slice(0, index).join("/"));
-			}
-		}
-		return [...paths].sort((left, right) => left.localeCompare(right));
-	}, [library]);
-
-	const folderEntryCounts = useMemo(() => {
-		const counts = new Map<string, number>();
-		for (const entry of library?.entries ?? []) {
-			const segments = entry.relativeFolder.split("/").filter(Boolean);
-			for (let index = 1; index <= segments.length; index += 1) {
-				const folder = segments.slice(0, index).join("/");
-				// Match the catalog's subtree filter, including entries beneath this folder.
-				counts.set(folder, (counts.get(folder) ?? 0) + 1);
-			}
-		}
-		return counts;
-	}, [library]);
+	const libraryIndex = useMemo(() => indexLibrary(library?.entries ?? []), [library]);
 
 	const displayedEntries = useMemo(() => {
 		const normalizedSearch = search.trim().toLocaleLowerCase();
-		return (library?.entries ?? []).filter((entry) => {
-			// Folder navigation filters the current catalog locally, including descendants.
-			const inFolder =
-				selectedFolder === "all" ||
-				entry.relativeFolder === selectedFolder ||
-				entry.relativeFolder.startsWith(`${selectedFolder}/`);
+		const scopedEntries =
+			selectedFolder === "all"
+				? (library?.entries ?? [])
+				: (libraryIndex.folderEntries.get(selectedFolder) ?? []);
+		if (normalizedSearch === "") return scopedEntries;
+
+		return scopedEntries.filter((entry) => {
 			const matchesSearch =
-				normalizedSearch === "" ||
 				entry.displayName.toLocaleLowerCase().includes(normalizedSearch) ||
 				entry.primaryPath?.toLocaleLowerCase().includes(normalizedSearch) ||
 				entry.relativeFolder.toLocaleLowerCase().includes(normalizedSearch);
-			return inFolder && matchesSearch;
+			return matchesSearch;
 		});
-	}, [library, search, selectedFolder]);
+	}, [library, libraryIndex, search, selectedFolder]);
 
 	async function scan(event?: FormEvent) {
 		event?.preventDefault();
@@ -154,11 +163,11 @@ export function LibraryScreen() {
 						{library && <span>{library.entries?.length ?? 0}</span>}
 					</div>
 					<FolderNavigation
-						folders={folders}
+						folders={libraryIndex.folders}
 						selectedFolder={selectedFolder}
 						onSelect={setSelectedFolder}
 						entryCount={library?.entries?.length ?? 0}
-						folderEntryCounts={folderEntryCounts}
+						folderEntryCounts={libraryIndex.folderEntryCounts}
 					/>
 				</aside>
 
