@@ -85,6 +85,11 @@ func TestScanEmptyRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if library.Entries == nil {
+		t.Fatal("entries = nil, want an empty slice")
+	}
+
 	if len(library.Entries) != 0 {
 		t.Fatalf("entry count = %d, want 0", len(library.Entries))
 	}

@@ -151,13 +151,13 @@ export function LibraryScreen() {
 				<aside className="library-sidebar" aria-label="Library folders">
 					<div className="sidebar-heading">
 						<span>Folders</span>
-						{library && <span>{library.entries.length}</span>}
+						{library && <span>{library.entries?.length ?? 0}</span>}
 					</div>
 					<FolderNavigation
 						folders={folders}
 						selectedFolder={selectedFolder}
 						onSelect={setSelectedFolder}
-						entryCount={library?.entries.length ?? 0}
+						entryCount={library?.entries?.length ?? 0}
 						folderEntryCounts={folderEntryCounts}
 					/>
 				</aside>

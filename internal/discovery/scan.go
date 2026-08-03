@@ -168,7 +168,7 @@ func Scan(root string) (Library, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	result := Library{Root: root}
+	result := Library{Root: root, Entries: []Entry{}}
 	for _, key := range keys {
 		records := files[key]
 		sort.Slice(records, func(i, j int) bool { return records[i].path < records[j].path })

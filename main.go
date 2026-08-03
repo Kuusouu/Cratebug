@@ -28,6 +28,9 @@ func main() {
 		Bind: []interface{}{
 			app,
 		},
+		Debug: options.Debug{
+			OpenInspectorOnStartup: true,
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
