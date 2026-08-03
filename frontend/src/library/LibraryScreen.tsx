@@ -44,7 +44,12 @@ export function LibraryScreen() {
 	const folderEntryCounts = useMemo(() => {
 		const counts = new Map<string, number>();
 		for (const entry of library?.entries ?? []) {
-			counts.set(entry.relativeFolder, (counts.get(entry.relativeFolder) ?? 0) + 1);
+			const segments = entry.relativeFolder.split("/").filter(Boolean);
+			for (let index = 1; index <= segments.length; index += 1) {
+				const folder = segments.slice(0, index).join("/");
+				// Match the catalog's subtree filter, including entries beneath this folder.
+				counts.set(folder, (counts.get(folder) ?? 0) + 1);
+			}
 		}
 		return counts;
 	}, [library]);
