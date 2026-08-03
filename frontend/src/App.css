@@ -418,6 +418,7 @@ button:disabled {
 
 .mod-card {
 	display: flex;
+	min-width: 0;
 	min-height: 9.6rem;
 	flex-direction: column;
 	gap: 0.85rem;
@@ -439,21 +440,29 @@ button:disabled {
 	gap: 0.55rem;
 }
 
+.mod-card-heading > div {
+	min-width: 0;
+}
+
 .mod-card-heading h3 {
+	display: -webkit-box;
 	overflow: hidden;
 	margin: 0 0 0.25rem;
 	font-size: 0.95rem;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 }
 
 .mod-card-heading p {
+	display: -webkit-box;
 	overflow: hidden;
 	margin-bottom: 0;
 	color: var(--muted);
 	font-size: 0.75rem;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 }
 
 .status-dot {
@@ -515,6 +524,7 @@ button:disabled {
 
 .list-mod-row {
 	display: block;
+	min-width: 0;
 	min-height: 3.75rem;
 	padding: 0.7rem 1rem;
 	border: 1px solid var(--line);
