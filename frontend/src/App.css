@@ -416,6 +416,38 @@ button:disabled {
 	padding-top: 1rem;
 }
 
+.library-sidebar,
+.mod-grid {
+	/* Keep the scroll affordance visible without creating a bright track on dark surfaces. */
+	scrollbar-color: color-mix(in srgb, var(--muted), var(--panel) 55%) transparent;
+	scrollbar-width: thin;
+}
+
+.library-sidebar::-webkit-scrollbar,
+.mod-grid::-webkit-scrollbar {
+	width: 0.6rem;
+	height: 0.6rem;
+}
+
+.library-sidebar::-webkit-scrollbar-track,
+.mod-grid::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.library-sidebar::-webkit-scrollbar-thumb,
+.mod-grid::-webkit-scrollbar-thumb {
+	border: 0.15rem solid transparent;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--muted), var(--panel) 55%);
+	background-clip: padding-box;
+}
+
+.library-sidebar::-webkit-scrollbar-thumb:hover,
+.mod-grid::-webkit-scrollbar-thumb:hover {
+	background: color-mix(in srgb, var(--muted), var(--panel) 25%);
+	background-clip: padding-box;
+}
+
 .mod-card {
 	display: flex;
 	min-width: 0;
