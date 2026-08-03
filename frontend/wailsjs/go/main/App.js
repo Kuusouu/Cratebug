@@ -5,3 +5,7 @@
 export function RuntimeStatus() {
   return window['go']['main']['App']['RuntimeStatus']();
 }
+
+export function ScanLibrary(arg1) {
+  return window['go']['main']['App']['ScanLibrary'](arg1);
+}

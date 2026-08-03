@@ -17,10 +17,10 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "Cratebug",
-		Width:     960,
-		Height:    640,
-		MinWidth:  720,
-		MinHeight: 480,
+		Width:     1400,
+		Height:    950,
+		MinWidth:  1200,
+		MinHeight: 800,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
