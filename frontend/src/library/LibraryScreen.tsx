@@ -2,7 +2,8 @@ import { type FormEvent, useMemo, useState } from "react";
 import { ScanLibrary } from "../../wailsjs/go/main/App";
 import type { discovery } from "../../wailsjs/go/models";
 import { FolderNavigation } from "./FolderNavigation";
-import { type LibraryState, type ViewMode, viewModes } from "./libraryTypes";
+import { ViewModeIcon } from "./LibraryIcons";
+import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
 
 type Theme = "system" | "light" | "dark";
@@ -32,6 +33,14 @@ export function LibraryScreen() {
 			}
 		}
 		return [...paths].sort((left, right) => left.localeCompare(right));
+	}, [library]);
+
+	const folderEntryCounts = useMemo(() => {
+		const counts = new Map<string, number>();
+		for (const entry of library?.entries ?? []) {
+			counts.set(entry.relativeFolder, (counts.get(entry.relativeFolder) ?? 0) + 1);
+		}
+		return counts;
 	}, [library]);
 
 	const displayedEntries = useMemo(() => {
@@ -138,6 +147,7 @@ export function LibraryScreen() {
 						selectedFolder={selectedFolder}
 						onSelect={setSelectedFolder}
 						entryCount={library?.entries.length ?? 0}
+						folderEntryCounts={folderEntryCounts}
 					/>
 				</aside>
 
@@ -164,12 +174,12 @@ export function LibraryScreen() {
 									type="button"
 									className={viewMode === mode ? "selected" : ""}
 									onClick={() => setViewMode(mode)}
+									title={`${viewModeLabels[mode]} view`}
 								>
-									{mode === "compact"
-										? "Compact"
-										: mode === "large"
-											? "Large"
-											: "List"}
+									<span className="visually-hidden">
+										{viewModeLabels[mode]} view
+									</span>
+									<ViewModeIcon mode={mode} />
 								</button>
 							))}
 						</fieldset>
