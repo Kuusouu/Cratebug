@@ -1,4 +1,5 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useId, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 
 type FolderNode = {
@@ -13,6 +14,13 @@ type FolderNavigationProps = {
 	onSelect: (folder: string) => void;
 	entryCount: number;
 	folderEntryCounts: ReadonlyMap<string, number>;
+};
+
+type TooltipState = {
+	content: string;
+	container: HTMLElement;
+	x: number;
+	y: number;
 };
 
 function buildFolderTree(folders: string[]): FolderNode[] {
@@ -50,6 +58,8 @@ export const FolderNavigation = memo(function FolderNavigation({
 }: FolderNavigationProps) {
 	const tree = useMemo(() => buildFolderTree(folders), [folders]);
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
+	const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+	const tooltipID = useId();
 
 	const toggleFolder = useCallback((path: string) => {
 		setExpandedFolders((current) => {
@@ -62,6 +72,16 @@ export const FolderNavigation = memo(function FolderNavigation({
 			return next;
 		});
 	}, []);
+
+	const showTooltip = useCallback((content: string, target: HTMLElement) => {
+		const container = target.closest<HTMLElement>(".app-shell");
+		if (!container) return;
+
+		const { right, top, height } = target.getBoundingClientRect();
+		setTooltip({ content, container, x: right, y: top + height / 2 });
+	}, []);
+
+	const hideTooltip = useCallback(() => setTooltip(null), []);
 
 	return (
 		<nav className="folder-navigation">
@@ -81,10 +101,24 @@ export const FolderNavigation = memo(function FolderNavigation({
 					key={node.path}
 					node={node}
 					onSelect={onSelect}
+					onHideTooltip={hideTooltip}
+					onShowTooltip={showTooltip}
 					onToggle={toggleFolder}
 					selectedFolder={selectedFolder}
 				/>
 			))}
+			{tooltip &&
+				createPortal(
+					<div
+						className="app-tooltip"
+						id={tooltipID}
+						role="tooltip"
+						style={{ left: tooltip.x, top: tooltip.y }}
+					>
+						{tooltip.content}
+					</div>,
+					tooltip.container,
+				)}
 		</nav>
 	);
 });
@@ -95,6 +129,8 @@ type FolderTreeItemProps = {
 	expandedFolders: ReadonlySet<string>;
 	entryCounts: ReadonlyMap<string, number>;
 	onSelect: (folder: string) => void;
+	onHideTooltip: () => void;
+	onShowTooltip: (content: string, target: HTMLElement) => void;
 	onToggle: (folder: string) => void;
 };
 
@@ -111,6 +147,8 @@ function sameFolderTreeItemProps(
 		previous.expandedFolders !== next.expandedFolders ||
 		previous.entryCounts !== next.entryCounts ||
 		previous.onSelect !== next.onSelect ||
+		previous.onHideTooltip !== next.onHideTooltip ||
+		previous.onShowTooltip !== next.onShowTooltip ||
 		previous.onToggle !== next.onToggle
 	)
 		return false;
@@ -129,6 +167,8 @@ const FolderTreeItem = memo(function FolderTreeItem({
 	expandedFolders,
 	entryCounts,
 	onSelect,
+	onHideTooltip,
+	onShowTooltip,
 	onToggle,
 }: FolderTreeItemProps) {
 	const hasChildren = node.children.length > 0;
@@ -153,7 +193,15 @@ const FolderTreeItem = memo(function FolderTreeItem({
 				) : (
 					<span className="folder-toggle-placeholder" aria-hidden="true" />
 				)}
-				<button className="folder-select" type="button" onClick={() => onSelect(node.path)}>
+				<button
+					className="folder-select"
+					type="button"
+					onBlur={onHideTooltip}
+					onFocus={(event) => onShowTooltip(node.name, event.currentTarget)}
+					onClick={() => onSelect(node.path)}
+					onMouseEnter={(event) => onShowTooltip(node.name, event.currentTarget)}
+					onMouseLeave={onHideTooltip}
+				>
 					<Folder aria-hidden="true" className="folder-icon" />
 					<span className="folder-name">{node.name}</span>
 					<span className="folder-count">{entryCounts.get(node.path) ?? 0}</span>
@@ -168,6 +216,8 @@ const FolderTreeItem = memo(function FolderTreeItem({
 							key={child.path}
 							node={child}
 							onSelect={onSelect}
+							onHideTooltip={onHideTooltip}
+							onShowTooltip={onShowTooltip}
 							onToggle={onToggle}
 							selectedFolder={selectedFolder}
 						/>
