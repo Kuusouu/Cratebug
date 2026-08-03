@@ -131,6 +131,11 @@ input {
 	color: var(--text);
 }
 
+select:hover,
+input:hover {
+	border-color: color-mix(in srgb, var(--muted), var(--line) 45%);
+}
+
 select {
 	padding: 0.4rem 0.55rem;
 }
@@ -271,10 +276,21 @@ button:disabled {
 	padding: 0.4rem 0.35rem;
 }
 
+.folder-navigation > .folder-row:hover:not(:disabled),
+.folder-select:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 91%);
+	filter: none;
+}
+
 .folder-navigation > .folder-row.selected,
 .folder-row.selected .folder-select {
 	background: color-mix(in srgb, var(--accent), transparent 84%);
 	color: var(--accent);
+}
+
+.folder-navigation > .folder-row.selected:hover:not(:disabled),
+.folder-row.selected .folder-select:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 78%);
 }
 
 .folder-toggle,
@@ -345,6 +361,24 @@ button:disabled {
 	padding-left: 0.25rem;
 }
 
+.app-tooltip {
+	position: fixed;
+	z-index: 10;
+	max-width: min(28rem, calc(100vw - 1rem));
+	margin-left: 0.5rem;
+	padding: 0.4rem 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: color-mix(in srgb, var(--panel-raised), var(--page) 18%);
+	box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.24);
+	color: var(--text);
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.25;
+	pointer-events: none;
+	transform: translateY(-50%);
+}
+
 .catalog-panel {
 	display: flex;
 	min-height: 0;
@@ -385,6 +419,17 @@ button:disabled {
 
 .view-mode-controls button.selected {
 	background: color-mix(in srgb, var(--accent), transparent 82%);
+	color: var(--accent);
+}
+
+.view-mode-controls button:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 90%);
+	color: var(--text);
+	filter: none;
+}
+
+.view-mode-controls button.selected:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 76%);
 	color: var(--accent);
 }
 
