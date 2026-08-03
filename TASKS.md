@@ -13,6 +13,8 @@ Phase 1 scanner.
 The UI must remain independent of filesystem mutations and preserve the
 scanner's read-only behavior.
 
+Use the existing BentoMod populated library screen as the primary structural reference where applicable, while refactoring rather than blindly copying its component structure.
+
 ## Exit criteria
 
 * Synthetic and real read-only libraries render correctly.
@@ -52,6 +54,7 @@ the initial library view.
 * Add a mod list or grid showing name, enabled state, priority, and bundle type.
 * Preserve nested folder information from discovery results.
 * Refactor migrated components into understandable boundaries.
+* Use the existing BentoMod populated library screen as the primary structural reference where applicable, while refactoring rather than blindly copying its component structure.
 
 **Verify:** The UI renders a synthetic discovered library with nested folders,
 disabled entries, incomplete bundles, and orphan diagnostics visible.
@@ -88,6 +91,7 @@ application without clipping or inaccessible controls.
 * Fix visible layout, clipping, spacing, typography, color, and state issues.
 * Create `docs/reviews/phase-2-review.md` with validation results, screenshot
   paths, limitations, and deferred findings.
+* Use the existing BentoMod populated library screen as the primary structural reference where applicable, while refactoring rather than blindly copying its component structure.
 
 The review should record:
 
@@ -115,4 +119,4 @@ For each task, report:
 * Deferred findings
 * Suggested commit message
 
-Do not begin the next task or phase automatically.
+Proceed through Phase 2 as one bounded implementation pass unless a material design decision or explicit review gate is encountered. Stop before Phase 3.

@@ -76,7 +76,7 @@ screenshot was required.
 
 ## Review approval
 
-**Decision:** Pending
-**Approval date:**
-**Notes:** Review of terminology, fixtures, and read-only behavior is
-required before Phase 2 begins.
+**Decision:** Approved
+**Approval date:** 2026-08-02
+**Notes:** Terminology, fixtures, and read-only behavior are approved. Phase 2
+may begin.
