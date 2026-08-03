@@ -43,6 +43,7 @@ var expectedFixturePaths = []string{
 	"priority/Example_weirdpriority_P.pak",
 }
 
+// Ensures fixture files remain tiny, synthetic, and complete.
 func TestFixtureLibraryIntegrity(t *testing.T) {
 	t.Parallel()
 

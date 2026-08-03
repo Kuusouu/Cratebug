@@ -119,6 +119,7 @@ func Scan(root string) (Library, error) {
 	if err != nil {
 		return Library{}, fmt.Errorf("stat mod root: %w", err)
 	}
+
 	if !info.IsDir() {
 		return Library{}, fmt.Errorf("mod root is not a directory: %s", root)
 	}
@@ -128,29 +129,34 @@ func Scan(root string) (Library, error) {
 		if walkErr != nil {
 			return walkErr
 		}
+
 		if entry.IsDir() {
 			return nil
 		}
+
 		if !entry.Type().IsRegular() {
 			return nil
 		}
+
 		kind, ok := classifyExtension(entry.Name())
 		if !ok {
 			return nil
 		}
+
 		relative, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
 		}
+
 		relative = filepath.ToSlash(relative)
-		directory := filepath.ToSlash(filepath.Dir(relative))
-		if directory == "." {
-			directory = ""
-		}
 		baseName := filepath.Base(relative)
 		stem := baseName[:len(baseName)-len(kind)]
-		key := strings.ToLower(directory) + groupKeySeparator + strings.ToLower(stem)
-		files[key] = append(files[key], fileRecord{path: relative, stem: stem, kind: kind})
+		groupKey := fileGroupKey(relative, stem)
+		files[groupKey] = append(files[groupKey], fileRecord{
+			path: relative,
+			stem: stem,
+			kind: kind,
+		})
 		return nil
 	})
 	if err != nil {
@@ -162,22 +168,11 @@ func Scan(root string) (Library, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	result := Library{Root: root}
+	result := Library{Root: root, Entries: []Entry{}}
 	for _, key := range keys {
 		records := files[key]
 		sort.Slice(records, func(i, j int) bool { return records[i].path < records[j].path })
-		var primaries []fileRecord
-		var sidecars Sidecars
-		for _, record := range records {
-			switch record.kind {
-			case extensionPrimaryPak, extensionCrateoff, extensionBento, extensionLegacy:
-				primaries = append(primaries, record)
-			case extensionUTOC:
-				sidecars.UTOC = record.path
-			case extensionUCAS:
-				sidecars.UCAS = record.path
-			}
-		}
+		primaries, sidecars := splitRecords(records)
 
 		if len(primaries) == 0 {
 			result.Entries = append(result.Entries, orphanEntry(records[0].stem, records[0].path, sidecars))
@@ -190,9 +185,7 @@ func Scan(root string) (Library, error) {
 		}
 	}
 	sort.Slice(result.Entries, func(i, j int) bool {
-		left := result.Entries[i].RelativeFolder + groupKeySeparator + result.Entries[i].PrimaryPath + groupKeySeparator + result.Entries[i].DisplayName
-		right := result.Entries[j].RelativeFolder + groupKeySeparator + result.Entries[j].PrimaryPath + groupKeySeparator + result.Entries[j].DisplayName
-		return left < right
+		return entrySortKey(result.Entries[i]) < entrySortKey(result.Entries[j])
 	})
 	return result, nil
 }
@@ -214,6 +207,46 @@ type fileRecord struct {
 	kind extension
 }
 
+// Groups case-insensitively while retaining original path casing for display.
+func fileGroupKey(path, stem string) string {
+	return strings.ToLower(relativeFolder(path)) + groupKeySeparator + strings.ToLower(stem)
+}
+
+// Normalizes a root-level file to an empty relative directory.
+func relativeFolder(path string) string {
+	folder := filepath.ToSlash(filepath.Dir(path))
+	if folder == "." {
+		return ""
+	}
+
+	return folder
+}
+
+// Shares sidecars with every primary in an ambiguous same-stem group.
+func splitRecords(records []fileRecord) ([]fileRecord, Sidecars) {
+	var primaries []fileRecord
+	var sidecars Sidecars
+
+	for _, record := range records {
+		switch record.kind {
+		case extensionPrimaryPak, extensionCrateoff, extensionBento, extensionLegacy:
+			primaries = append(primaries, record)
+		case extensionUTOC:
+			sidecars.UTOC = record.path
+		case extensionUCAS:
+			sidecars.UCAS = record.path
+		}
+	}
+
+	return primaries, sidecars
+}
+
+// Keeps the public scan result deterministic across filesystem orderings.
+func entrySortKey(entry Entry) string {
+	return entry.RelativeFolder + groupKeySeparator + entry.PrimaryPath + groupKeySeparator + entry.DisplayName
+}
+
+// Checks longer disabled suffixes before the shared .pak suffix.
 func classifyExtension(name string) (extension, bool) {
 	lower := strings.ToLower(name)
 	for _, candidate := range []extension{extensionCrateoff, extensionLegacy, extensionBento, extensionPrimaryPak, extensionUTOC, extensionUCAS} {
@@ -224,11 +257,9 @@ func classifyExtension(name string) (extension, bool) {
 	return "", false
 }
 
+// Derives an entry's enabled state, bundle format, and diagnostics.
 func primaryEntry(primary fileRecord, sidecars Sidecars, ambiguous bool) Entry {
-	folder := filepath.ToSlash(filepath.Dir(primary.path))
-	if folder == "." {
-		folder = ""
-	}
+	folder := relativeFolder(primary.path)
 	state := StateEnabled
 	disabledFormat := DisabledFormatNone
 	switch primary.kind {
@@ -239,6 +270,7 @@ func primaryEntry(primary fileRecord, sidecars Sidecars, ambiguous bool) Entry {
 	case extensionLegacy:
 		state, disabledFormat = StateDisabled, DisabledFormatLegacy
 	}
+
 	format := BundleFormatClassic
 	var issues []Issue
 	if sidecars.UTOC != "" || sidecars.UCAS != "" {
@@ -250,27 +282,41 @@ func primaryEntry(primary fileRecord, sidecars Sidecars, ambiguous bool) Entry {
 			issues = append(issues, Issue{Code: IssueMissingUCAS, Message: "IoStore bundle is missing its .ucas sidecar"})
 		}
 	}
+
 	if ambiguous {
 		issues = append(issues, Issue{Code: IssueAmbiguousPrimary, Message: "Multiple supported primaries share this folder and filename stem"})
 	}
+
 	return Entry{
-		PrimaryPath: primary.path, RelativeFolder: folder, DisplayName: cleanDisplayName(primary.stem), State: state,
-		DisabledFormat: disabledFormat, Kind: EntryMod, BundleFormat: format, Sidecars: sidecars, Priority: parsePriority(primary.stem), Issues: issues,
+		PrimaryPath:    primary.path,
+		RelativeFolder: folder,
+		DisplayName:    cleanDisplayName(primary.stem),
+		State:          state,
+		DisabledFormat: disabledFormat,
+		Kind:           EntryMod,
+		BundleFormat:   format,
+		Sidecars:       sidecars,
+		Priority:       parsePriority(primary.stem),
+		Issues:         issues,
 	}
 }
 
+// Preserves a sidecar group that has no supported primary file.
 func orphanEntry(stem, path string, sidecars Sidecars) Entry {
-	folder := filepath.ToSlash(filepath.Dir(path))
-	if folder == "." {
-		folder = ""
-	}
+	folder := relativeFolder(path)
+
 	return Entry{
-		RelativeFolder: folder, DisplayName: cleanDisplayName(stem), Kind: EntryOrphanedSidecar, BundleFormat: BundleFormatNone, Sidecars: sidecars,
-		Priority: parsePriority(stem),
-		Issues:   []Issue{{Code: IssueOrphanedSidecar, Message: "Sidecar has no supported primary file"}},
+		RelativeFolder: folder,
+		DisplayName:    cleanDisplayName(stem),
+		Kind:           EntryOrphanedSidecar,
+		BundleFormat:   BundleFormatNone,
+		Sidecars:       sidecars,
+		Priority:       parsePriority(stem),
+		Issues:         []Issue{{Code: IssueOrphanedSidecar, Message: "Sidecar has no supported primary file"}},
 	}
 }
 
+// Removes filename-only priority conventions for presentation.
 func cleanDisplayName(stem string) string {
 	name := strings.TrimPrefix(stem, "!")
 	if suffixStart := trailingNinesSuffixStart(name); suffixStart >= 0 {
@@ -279,21 +325,25 @@ func cleanDisplayName(stem string) string {
 	return strings.TrimSuffix(name, "_")
 }
 
+// Applies the explicit leading-bang convention before trailing nines.
 func parsePriority(stem string) Priority {
 	raw := stem
 	if strings.HasPrefix(stem, "!") {
 		return Priority{Kind: PriorityLeadingBang, Raw: raw, TrailingNines: trailingNineCount(stem)}
 	}
+
 	if suffixStart := trailingNinesSuffixStart(stem); suffixStart >= 0 {
 		nines := len(stem[suffixStart+1 : len(stem)-2])
 		return Priority{Value: nines - trailingNinePriorityOffset, Kind: PriorityTrailingNine, Raw: raw, TrailingNines: nines}
 	}
+
 	if strings.HasSuffix(stem, prioritySuffix) {
 		return Priority{Kind: PriorityUnrecognized, Raw: raw}
 	}
 	return Priority{Kind: PriorityNone, Raw: raw}
 }
 
+// Returns the separator before a recognized trailing-nines priority.
 func trailingNinesSuffixStart(stem string) int {
 	if !strings.HasSuffix(stem, prioritySuffix) {
 		return -1
@@ -314,6 +364,7 @@ func trailingNinesSuffixStart(stem string) int {
 	return separator
 }
 
+// Returns the valid trailing-nine run length, if one exists.
 func trailingNineCount(stem string) int {
 	end := strings.LastIndex(stem, prioritySuffix)
 	if end < 0 {
