@@ -321,6 +321,10 @@ button:disabled {
 	transition: transform 120ms ease;
 }
 
+.chevron-icon.expanded {
+	transform: rotate(90deg);
+}
+
 .folder-name {
 	min-width: 0;
 	flex: 1;
