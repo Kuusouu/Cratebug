@@ -17,16 +17,19 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "Cratebug",
-		Width:     960,
-		Height:    640,
-		MinWidth:  720,
-		MinHeight: 480,
+		Width:     1400,
+		Height:    950,
+		MinWidth:  1000,
+		MinHeight: 650,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 12, G: 16, B: 24, A: 1},
 		Bind: []interface{}{
 			app,
+		},
+		Debug: options.Debug{
+			OpenInspectorOnStartup: true,
 		},
 	})
 	if err != nil {

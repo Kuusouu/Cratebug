@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// Verifies supported formats and fixture-specific diagnostics.
 func TestScanFixtureLibrary(t *testing.T) {
 	root := copyFixtureLibrary(t)
 	library, err := Scan(root)
@@ -67,6 +68,7 @@ func TestScanFixtureLibrary(t *testing.T) {
 	}
 }
 
+// Rejects missing paths and files passed as scan roots.
 func TestScanRejectsInvalidRoots(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "file")
@@ -80,16 +82,23 @@ func TestScanRejectsInvalidRoots(t *testing.T) {
 	}
 }
 
+// Returns an empty, non-nil catalog for an empty directory.
 func TestScanEmptyRoot(t *testing.T) {
 	library, err := Scan(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if library.Entries == nil {
+		t.Fatal("entries = nil, want an empty slice")
+	}
+
 	if len(library.Entries) != 0 {
 		t.Fatalf("entry count = %d, want 0", len(library.Entries))
 	}
 }
 
+// Keeps relevant relative paths intact while ignoring unrelated files.
 func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "A", "B"), 0o700); err != nil {
@@ -111,6 +120,7 @@ func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
 	}
 }
 
+// Associates case-insensitive sidecars without changing display casing.
 func TestScanGroupsMixedCaseNames(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"Example.pak", "example.utoc"} {
@@ -131,6 +141,7 @@ func TestScanGroupsMixedCaseNames(t *testing.T) {
 	}
 }
 
+// Reports incomplete and ambiguous conditions together.
 func TestScanPreservesSimultaneousIssues(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"Example.pak", "Example.pak_crateoff", "Example.utoc"} {
@@ -152,6 +163,7 @@ func TestScanPreservesSimultaneousIssues(t *testing.T) {
 	}
 }
 
+// Proves the read-only scanner leaves fixtures unchanged.
 func TestScanDoesNotModifyFiles(t *testing.T) {
 	root := copyFixtureLibrary(t)
 	before := snapshotFiles(t, root)
@@ -164,6 +176,7 @@ func TestScanDoesNotModifyFiles(t *testing.T) {
 	}
 }
 
+// Verifies deterministic fresh snapshots after filesystem changes.
 func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
 	root := copyFixtureLibrary(t)
 	first, err := Scan(root)
@@ -193,6 +206,7 @@ func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
 	}
 }
 
+// Checks that filesystem enumeration cannot affect output order.
 func TestScanOrderingIsDeterministic(t *testing.T) {
 	root := t.TempDir()
 	for _, name := range []string{"Z_9999999_P.pak", "A_9999999_P.pak", "M_9999999_P.pak"} {
@@ -224,6 +238,7 @@ type entryExpectation struct {
 	issues         []IssueCode
 }
 
+// Compares every scanner field covered by a fixture expectation.
 func assertExpectedEntry(t *testing.T, entries map[string]Entry, want entryExpectation) {
 	t.Helper()
 	entry, ok := entries[want.path]
@@ -236,6 +251,7 @@ func assertExpectedEntry(t *testing.T, entries map[string]Entry, want entryExpec
 	}
 }
 
+// Confirms that a sidecar-only group remains visible as an orphaned entry.
 func assertOrphan(t *testing.T, entries []Entry, sidecars Sidecars) {
 	t.Helper()
 	for _, entry := range entries {
@@ -246,6 +262,7 @@ func assertOrphan(t *testing.T, entries []Entry, sidecars Sidecars) {
 	t.Errorf("missing orphan entry with sidecars %#v", sidecars)
 }
 
+// Reports whether an entry includes a specific discovery issue.
 func hasIssue(issues []Issue, code IssueCode) bool {
 	for _, issue := range issues {
 		if issue.Code == code {
@@ -255,6 +272,7 @@ func hasIssue(issues []Issue, code IssueCode) bool {
 	return false
 }
 
+// Extracts issue codes for concise test comparisons.
 func issueCodes(issues []Issue) []IssueCode {
 	if len(issues) == 0 {
 		return nil
@@ -266,6 +284,7 @@ func issueCodes(issues []Issue) []IssueCode {
 	return codes
 }
 
+// Copies the fixture library so tests can safely mutate an isolated directory.
 func copyFixtureLibrary(t *testing.T) string {
 	t.Helper()
 	source := filepath.Join("testdata", "library")
@@ -300,6 +319,7 @@ type fileSnapshot struct {
 	modTime  int64
 }
 
+// Captures file contents and metadata for the scanner's read-only assertion.
 func snapshotFiles(t *testing.T, root string) map[string]fileSnapshot {
 	t.Helper()
 	snapshot := make(map[string]fileSnapshot)
