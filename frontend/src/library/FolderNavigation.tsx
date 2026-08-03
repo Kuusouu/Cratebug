@@ -1,4 +1,4 @@
-import { memo, useCallback, useId, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 
@@ -23,6 +23,7 @@ type TooltipState = {
 	y: number;
 };
 
+// Turns flat relative paths into the expandable sidebar hierarchy.
 function buildFolderTree(folders: string[]): FolderNode[] {
 	const nodes = new Map<string, FolderNode>();
 	const roots: FolderNode[] = [];
@@ -48,7 +49,7 @@ function buildFolderTree(folders: string[]): FolderNode[] {
 	return roots;
 }
 
-// FolderNavigation renders the physical directory hierarchy reported by discovery.
+// Renders the physical directory hierarchy reported by discovery.
 export const FolderNavigation = memo(function FolderNavigation({
 	folders,
 	selectedFolder,
@@ -59,7 +60,6 @@ export const FolderNavigation = memo(function FolderNavigation({
 	const tree = useMemo(() => buildFolderTree(folders), [folders]);
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
 	const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-	const tooltipID = useId();
 
 	const toggleFolder = useCallback((path: string) => {
 		setExpandedFolders((current) => {
@@ -82,6 +82,18 @@ export const FolderNavigation = memo(function FolderNavigation({
 	}, []);
 
 	const hideTooltip = useCallback(() => setTooltip(null), []);
+
+	// Fixed-position tooltips must disappear when their source row moves.
+	useEffect(() => {
+		if (!tooltip) return;
+
+		window.addEventListener("scroll", hideTooltip, true);
+		window.addEventListener("resize", hideTooltip);
+		return () => {
+			window.removeEventListener("scroll", hideTooltip, true);
+			window.removeEventListener("resize", hideTooltip);
+		};
+	}, [hideTooltip, tooltip]);
 
 	return (
 		<nav className="folder-navigation">
@@ -110,9 +122,8 @@ export const FolderNavigation = memo(function FolderNavigation({
 			{tooltip &&
 				createPortal(
 					<div
+						aria-hidden="true"
 						className="app-tooltip"
-						id={tooltipID}
-						role="tooltip"
 						style={{ left: tooltip.x, top: tooltip.y }}
 					>
 						{tooltip.content}
@@ -134,10 +145,12 @@ type FolderTreeItemProps = {
 	onToggle: (folder: string) => void;
 };
 
+// Identifies the small part of the tree that must update on selection.
 function selectionTouchesBranch(selectedFolder: string, folderPath: string): boolean {
 	return selectedFolder === folderPath || selectedFolder.startsWith(`${folderPath}/`);
 }
 
+// Limits selection updates to the old and new folder branches.
 function sameFolderTreeItemProps(
 	previous: FolderTreeItemProps,
 	next: FolderTreeItemProps,
@@ -161,6 +174,7 @@ function sameFolderTreeItemProps(
 	);
 }
 
+// Renders one expandable folder branch while preserving memoized siblings.
 const FolderTreeItem = memo(function FolderTreeItem({
 	node,
 	selectedFolder,

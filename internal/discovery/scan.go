@@ -207,11 +207,12 @@ type fileRecord struct {
 	kind extension
 }
 
-// fileGroupKey groups case-insensitively while retaining original path casing for display.
+// Groups case-insensitively while retaining original path casing for display.
 func fileGroupKey(path, stem string) string {
 	return strings.ToLower(relativeFolder(path)) + groupKeySeparator + strings.ToLower(stem)
 }
 
+// Normalizes a root-level file to an empty relative directory.
 func relativeFolder(path string) string {
 	folder := filepath.ToSlash(filepath.Dir(path))
 	if folder == "." {
@@ -221,7 +222,7 @@ func relativeFolder(path string) string {
 	return folder
 }
 
-// splitRecords shares sidecars with every primary in an ambiguous same-stem group.
+// Shares sidecars with every primary in an ambiguous same-stem group.
 func splitRecords(records []fileRecord) ([]fileRecord, Sidecars) {
 	var primaries []fileRecord
 	var sidecars Sidecars
@@ -240,10 +241,12 @@ func splitRecords(records []fileRecord) ([]fileRecord, Sidecars) {
 	return primaries, sidecars
 }
 
+// Keeps the public scan result deterministic across filesystem orderings.
 func entrySortKey(entry Entry) string {
 	return entry.RelativeFolder + groupKeySeparator + entry.PrimaryPath + groupKeySeparator + entry.DisplayName
 }
 
+// Checks longer disabled suffixes before the shared .pak suffix.
 func classifyExtension(name string) (extension, bool) {
 	lower := strings.ToLower(name)
 	for _, candidate := range []extension{extensionCrateoff, extensionLegacy, extensionBento, extensionPrimaryPak, extensionUTOC, extensionUCAS} {
@@ -254,6 +257,7 @@ func classifyExtension(name string) (extension, bool) {
 	return "", false
 }
 
+// Derives an entry's enabled state, bundle format, and diagnostics.
 func primaryEntry(primary fileRecord, sidecars Sidecars, ambiguous bool) Entry {
 	folder := relativeFolder(primary.path)
 	state := StateEnabled
@@ -297,6 +301,7 @@ func primaryEntry(primary fileRecord, sidecars Sidecars, ambiguous bool) Entry {
 	}
 }
 
+// Preserves a sidecar group that has no supported primary file.
 func orphanEntry(stem, path string, sidecars Sidecars) Entry {
 	folder := relativeFolder(path)
 
@@ -311,6 +316,7 @@ func orphanEntry(stem, path string, sidecars Sidecars) Entry {
 	}
 }
 
+// Removes filename-only priority conventions for presentation.
 func cleanDisplayName(stem string) string {
 	name := strings.TrimPrefix(stem, "!")
 	if suffixStart := trailingNinesSuffixStart(name); suffixStart >= 0 {
@@ -319,7 +325,7 @@ func cleanDisplayName(stem string) string {
 	return strings.TrimSuffix(name, "_")
 }
 
-// parsePriority applies the explicit leading-bang convention before trailing nines.
+// Applies the explicit leading-bang convention before trailing nines.
 func parsePriority(stem string) Priority {
 	raw := stem
 	if strings.HasPrefix(stem, "!") {
@@ -337,7 +343,7 @@ func parsePriority(stem string) Priority {
 	return Priority{Kind: PriorityNone, Raw: raw}
 }
 
-// trailingNinesSuffixStart returns the separator before a recognized trailing-nines priority.
+// Returns the separator before a recognized trailing-nines priority.
 func trailingNinesSuffixStart(stem string) int {
 	if !strings.HasSuffix(stem, prioritySuffix) {
 		return -1
@@ -358,6 +364,7 @@ func trailingNinesSuffixStart(stem string) int {
 	return separator
 }
 
+// Returns the valid trailing-nine run length, if one exists.
 func trailingNineCount(stem string) int {
 	end := strings.LastIndex(stem, prioritySuffix)
 	if end < 0 {
