@@ -16,17 +16,19 @@ type CatalogMessage = {
 	isError?: boolean;
 };
 
+// Presents orphaned sidecars differently from primary-backed entries.
 function stateLabel(entry: discovery.Entry): string {
 	if (entry.kind === "orphaned_sidecar") return "Orphaned sidecar";
 
 	return entry.state === "disabled" ? "Disabled" : "Enabled";
 }
 
+// Produces a stable key when orphaned entries lack a primary path.
 function entryKey(entry: discovery.Entry): string {
-	// Orphans have no primary path, so their sidecar path distinguishes sibling entries.
 	return entry.primaryPath ?? entry.sidecars.ucas ?? entry.sidecars.utoc ?? entry.relativeFolder;
 }
 
+// Centralizes catalog states so they cannot diverge visually.
 function scanStateMessage(state: LibraryState, scanError: string): CatalogMessage | null {
 	switch (state) {
 		case "initial":
@@ -56,6 +58,7 @@ function scanStateMessage(state: LibraryState, scanError: string): CatalogMessag
 	}
 }
 
+// Renders a concise catalog state without duplicating its visual structure.
 function CatalogState({ heading, message, isError = false }: CatalogMessage) {
 	return (
 		<div className={`catalog-state${isError ? " error" : ""}`}>
@@ -65,7 +68,7 @@ function CatalogState({ heading, message, isError = false }: CatalogMessage) {
 	);
 }
 
-// ModCatalog is presentation-only: it receives already-scanned, locally-filtered entries.
+// Renders already-scanned, locally-filtered entries without filesystem access.
 export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: ModCatalogProps) {
 	const stateMessage = scanStateMessage(state, scanError);
 	if (stateMessage) return <CatalogState {...stateMessage} />;
@@ -87,6 +90,7 @@ export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: 
 	);
 }
 
+// Avoids work for retained entries during local navigation changes.
 const ModCard = memo(function ModCard({
 	entry,
 	viewMode,

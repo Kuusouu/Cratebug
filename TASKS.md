@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 2 - Read-only library UI
-**Status:** Not started
+**Status:** Ready for review
 
 This file contains only the active phase. Replace it when Phase 2 is complete.
 

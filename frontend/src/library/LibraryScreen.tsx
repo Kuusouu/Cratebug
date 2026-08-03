@@ -20,6 +20,7 @@ const viewModeIcons = {
 	list: List,
 } satisfies Record<ViewMode, typeof Grid2X2>;
 
+// Converts unknown Wails failures into displayable scan errors.
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
@@ -48,6 +49,32 @@ function indexLibrary(entries: discovery.Entry[]): LibraryIndex {
 			[...folderEntries].map(([folder, entriesInFolder]) => [folder, entriesInFolder.length]),
 		),
 	};
+}
+
+// Keeps live announcements concise when the catalog changes.
+function libraryStatusMessage(
+	state: LibraryState,
+	scanError: string,
+	entryCount: number,
+	selectedFolder: string,
+	search: string,
+	viewMode: ViewMode,
+): string {
+	switch (state) {
+		case "initial":
+			return "Choose a mod library.";
+		case "loading":
+			return "Scanning library.";
+		case "error":
+			return `Scan failed: ${scanError}`;
+		case "empty":
+			return "No supported mods found.";
+		case "populated": {
+			const scope = selectedFolder === "all" ? "library" : selectedFolder;
+			const matchesSearch = search.trim() !== "" ? " matching" : "";
+			return `${viewModeLabels[viewMode]} view. ${entryCount}${matchesSearch} mods shown in ${scope}.`;
+		}
+	}
 }
 
 // LibraryScreen owns local browsing state; scanning remains behind the Go binding.
@@ -79,11 +106,24 @@ export function LibraryScreen() {
 			return matchesSearch;
 		});
 	}, [library, libraryIndex, search, selectedFolder]);
+	const statusMessage = libraryStatusMessage(
+		libraryState,
+		scanError,
+		displayedEntries.length,
+		selectedFolder,
+		search,
+		viewMode,
+	);
 
+	// scan replaces the current read-only library only after the Wails binding resolves.
 	async function scan(event?: FormEvent) {
 		event?.preventDefault();
 		const root = modRoot.trim();
 		if (!root) {
+			setLibrary(null);
+			setScanError("");
+			setSearch("");
+			setSelectedFolder("all");
 			setLibraryState("initial");
 			return;
 		}
@@ -156,7 +196,10 @@ export function LibraryScreen() {
 				)}
 			</section>
 
-			<section className="library-layout" aria-live="polite">
+			<section className="library-layout">
+				<p className="visually-hidden" role="status">
+					{statusMessage}
+				</p>
 				<aside className="library-sidebar" aria-label="Library folders">
 					<div className="sidebar-heading">
 						<span>Folders</span>
@@ -211,6 +254,7 @@ export function LibraryScreen() {
 	);
 }
 
+// Keeps the accessible name alongside an icon-only control.
 function ViewModeButton({
 	active,
 	mode,
@@ -226,6 +270,7 @@ function ViewModeButton({
 	return (
 		<button
 			type="button"
+			aria-pressed={active}
 			className={active ? "selected" : ""}
 			onClick={() => onSelect(mode)}
 			title={`${label} view`}
