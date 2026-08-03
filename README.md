@@ -6,11 +6,14 @@ The project is a fresh implementation built with Go, Wails, React, and TypeScrip
 
 ## Project status
 
-Cratebug has completed its Phase 0 repository and toolchain foundation and
-Phase 1 read-only discovery scanner. Phase 2 read-only library UI work has not
-started. The application currently contains a minimal shell and one
-frontend-to-Go connectivity check while the discovery behavior is being
-integrated into the interface.
+Cratebug has completed its Phase 0 repository and toolchain foundation, Phase
+1 read-only discovery scanner, and Phase 2 read-only library UI. The
+application can scan a selected mod root, report empty and inaccessible
+directories, browse the discovered folder hierarchy, search locally, and switch
+between compact, large, and list catalog views.
+
+Phase 3 will add the first safe filesystem mutations: enabling and disabling
+discovered mods while preserving sidecars and enforcing backend safety checks.
 
 See:
 
