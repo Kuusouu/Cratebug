@@ -1,12 +1,18 @@
 import { type FormEvent, useMemo, useState } from "react";
+import { Grid2X2, List, PanelsTopLeft } from "lucide-react";
 import { ScanLibrary } from "../../wailsjs/go/main/App";
 import type { discovery } from "../../wailsjs/go/models";
 import { FolderNavigation } from "./FolderNavigation";
-import { ViewModeIcon } from "./LibraryIcons";
 import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
 
 type Theme = "system" | "light" | "dark";
+
+const viewModeIcons = {
+	compact: Grid2X2,
+	large: PanelsTopLeft,
+	list: List,
+} satisfies Record<ViewMode, typeof Grid2X2>;
 
 function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
@@ -169,18 +175,12 @@ export function LibraryScreen() {
 						<fieldset className="view-mode-controls">
 							<legend className="visually-hidden">Catalog view</legend>
 							{viewModes.map((mode) => (
-								<button
+								<ViewModeButton
+									active={viewMode === mode}
 									key={mode}
-									type="button"
-									className={viewMode === mode ? "selected" : ""}
-									onClick={() => setViewMode(mode)}
-									title={`${viewModeLabels[mode]} view`}
-								>
-									<span className="visually-hidden">
-										{viewModeLabels[mode]} view
-									</span>
-									<ViewModeIcon mode={mode} />
-								</button>
+									mode={mode}
+									onSelect={setViewMode}
+								/>
 							))}
 						</fieldset>
 					</div>
@@ -194,5 +194,30 @@ export function LibraryScreen() {
 				</section>
 			</section>
 		</main>
+	);
+}
+
+function ViewModeButton({
+	active,
+	mode,
+	onSelect,
+}: {
+	active: boolean;
+	mode: ViewMode;
+	onSelect: (mode: ViewMode) => void;
+}) {
+	const Icon = viewModeIcons[mode];
+	const label = viewModeLabels[mode];
+
+	return (
+		<button
+			type="button"
+			className={active ? "selected" : ""}
+			onClick={() => onSelect(mode)}
+			title={`${label} view`}
+		>
+			<span className="visually-hidden">{label} view</span>
+			<Icon aria-hidden="true" />
+		</button>
 	);
 }

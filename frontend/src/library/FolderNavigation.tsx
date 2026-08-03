@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AllModsIcon, ChevronIcon, FolderIcon } from "./LibraryIcons";
+import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 
 type FolderNode = {
 	path: string;
@@ -70,7 +70,7 @@ export function FolderNavigation({
 				className={`folder-row${selectedFolder === "all" ? " selected" : ""}`}
 				onClick={() => onSelect("all")}
 			>
-				<AllModsIcon className="folder-icon" />
+				<LibraryBig aria-hidden="true" className="folder-icon" />
 				<span className="folder-name">All mods</span>
 				<span className="folder-count">{entryCount}</span>
 			</button>
@@ -118,13 +118,16 @@ function FolderTreeItem({
 						type="button"
 						onClick={() => onToggle(node.path)}
 					>
-						<ChevronIcon className="chevron-icon" expanded={expanded} />
+						<ChevronRight
+							aria-hidden="true"
+							className={`chevron-icon${expanded ? " expanded" : ""}`}
+						/>
 					</button>
 				) : (
 					<span className="folder-toggle-placeholder" aria-hidden="true" />
 				)}
 				<button className="folder-select" type="button" onClick={() => onSelect(node.path)}>
-					<FolderIcon className="folder-icon" />
+					<Folder aria-hidden="true" className="folder-icon" />
 					<span className="folder-name">{node.name}</span>
 					<span className="folder-count">{entryCounts.get(node.path) ?? 0}</span>
 				</button>
