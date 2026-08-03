@@ -1,115 +1,125 @@
 # Cratebug Active Tasks
 
-**Phase:** 2 - Read-only library UI
-**Status:** Ready for review
+**Phase:** 3 - Safe enable and disable
+**Status:** Not started
 
-This file contains only the active phase. Replace it when Phase 2 is complete.
+This file contains only the active phase. Replace it when Phase 3 is complete.
 
 ## Phase objective
 
-Build a usable read-only interface for browsing the catalog produced by the
-Phase 1 scanner.
+Add the first safe filesystem mutation to Cratebug: enabling and disabling discovered mods.
 
-The UI must remain independent of filesystem mutations and preserve the
-scanner's read-only behavior.
+Cratebug must write its native `.pak_crateoff` disabled format while remaining compatible with legacy `.bak_bento` and `.pak_disabled` files.
 
-Use the existing BentoMod populated library screen as the primary structural reference where applicable, while refactoring rather than blindly copying its component structure.
+All mutation policy and filesystem operations belong in Go. React only requests an operation and displays its result.
 
 ## Exit criteria
 
-* Synthetic and real read-only libraries render correctly.
-* Search and folder selection work without unnecessary rescans.
-* Scanning does not freeze the interface.
-* Migrated components are understandable and refactored.
+* Enabled mods can be disabled safely using `.pak_crateoff`.
+* Cratebug-disabled and supported legacy-disabled mods can be enabled.
+* `.utoc` and `.ucas` sidecars remain unchanged.
+* Destination collisions and invalid states fail without modifying files.
+* Game-running safety is enforced by the backend.
+* Mutation behavior is covered by disposable filesystem tests.
+* The UI reflects successful and failed operations correctly.
 * Running-app screenshots receive review approval.
 
 ## Out of scope
 
-Phase 2 does not include:
+Phase 3 does not include:
 
-* File mutations
-* Enable or disable operations
-* Rename, move, priority changes, or deletion
+* Priority changes
+* General rename or move operations
+* Folder mutations
+* Deletion
 * Tags or metadata persistence
 * Archive installation
 * Asset conflict inspection
-* Large visual redesigns
+* Batch enable or disable
+* Permanent migration of legacy disabled filenames
 
-## 2.1 Define the UI boundary
+## 3.1 Define the mutation boundary
 
-* Expose the Phase 1 library result through a narrow typed application binding.
-* Keep scanning and filesystem operations in Go.
-* Keep React components focused on rendering and user interaction.
-* Represent loading, populated, empty, and error states explicitly.
-* Do not introduce mutation controls or future-phase models.
+* Add a narrow Go operation for enabling or disabling a discovered mod.
+* Identify mods using scanner-produced data rather than arbitrary frontend paths.
+* Validate the requested transition against the current filesystem state.
+* Keep filesystem mutation details out of Wails bindings and React components.
+* Return specific, actionable errors for rejected operations.
 
-**Verify:** The binding exposes only the read-only data and operations needed by
-the initial library view.
+**Verify:** The application layer exposes only the enable/disable operation needed by the UI and does not expose arbitrary rename functionality.
 
-## 2.2 Migrate the initial library structure
+## 3.2 Implement safe disable behavior
 
-* Selectively migrate the useful BentoMod information architecture.
-* Add a header and library navigation structure.
-* Add search and physical folder navigation.
-* Add a mod list or grid showing name, enabled state, priority, and bundle type.
-* Preserve nested folder information from discovery results.
-* Refactor migrated components into understandable boundaries.
-* Use the existing BentoMod populated library screen as the primary structural reference where applicable, while refactoring rather than blindly copying its component structure.
+* Disable an enabled `.pak` by renaming only the primary file to `.pak_crateoff`.
+* Leave `.utoc` and `.ucas` sidecars unchanged.
+* Refuse the operation if the expected source is missing or the destination already exists.
+* Do not overwrite or remove existing files.
+* Preserve the original filename apart from the disabled suffix.
 
-**Verify:** The UI renders a synthetic discovered library with nested folders,
-disabled entries, incomplete bundles, and orphan diagnostics visible.
+Example:
 
-## 2.3 Implement read-only interaction states
+`Example_9999999_P.pak` -> `Example_9999999_P.pak_crateoff`
 
-* Add an explicit refresh action.
-* Keep search and folder selection local to the displayed catalog.
-* Avoid rescanning for filtering or navigation changes.
-* Report scan errors without hiding the rest of the application shell.
-* Ensure long-running scans do not freeze the interface.
+**Verify:** Disposable fixtures prove successful disable behavior, unchanged sidecars, collision handling, and no unintended filesystem changes.
 
-**Verify:** Search, folder selection, refresh, loading, empty, populated, and
-error states behave correctly with disposable fixtures.
+## 3.3 Implement safe enable behavior
 
-## 2.4 Add appearance and accessibility foundations
+* Enable `.pak_crateoff` by restoring the primary `.pak` filename.
+* Support enabling legacy `.bak_bento` and `.pak_disabled` files.
+* Legacy formats are read-compatible only; future disables use `.pak_crateoff`.
+* Refuse ambiguous or colliding destinations rather than choosing or overwriting automatically.
+* Leave `.utoc` and `.ucas` sidecars unchanged.
 
-* Support light, dark, and system appearance modes.
-* Preserve the playful identity without reducing readability or usability.
-* Support keyboard navigation for the initial library controls.
-* Check common Windows scaling and viewport sizes.
-* Keep typography, spacing, contrast, and overflow understandable at the
-  standard review viewport.
+**Verify:** Tests cover all supported disabled formats, destination collisions, missing files, and unchanged sidecars.
 
-**Verify:** Appearance modes and keyboard navigation work in the running
-application without clipping or inaccessible controls.
+## 3.4 Enforce game-running safety
 
-## 2.5 Validate and complete the review
+* Detect whether Marvel Rivals is running using the established executable identity.
+* Enforce the restriction in Go before performing a mutation.
+* Do not rely on disabled UI controls as the safety boundary.
+* Return a clear error when an operation is blocked because the game is running.
+
+**Verify:** Backend tests prove the mutation is rejected before filesystem changes occur when game-running protection is active.
+
+## 3.5 Add the UI interaction
+
+* Add enable/disable controls to the existing library UI.
+* Keep the control state consistent with the discovered mod state.
+* Show operation progress without freezing the interface.
+* Prevent accidental duplicate requests while an operation is in progress.
+* Surface failures without discarding the current library view.
+* Refresh or update the catalog after a successful mutation so the displayed state matches disk.
+
+**Verify:** Enabled, Cratebug-disabled, and legacy-disabled entries transition correctly in the running application, and failures remain understandable.
+
+## 3.6 Validate mutation safety and complete the review
 
 * Run the canonical repository validation command.
-* Launch the application and navigate through the affected states.
-* Capture application-window screenshots for the initial library states.
-* Compare screenshots with the available reference direction.
-* Fix visible layout, clipping, spacing, typography, color, and state issues.
-* Create `docs/reviews/phase-2-review.md` with validation results, screenshot
-  paths, limitations, and deferred findings.
-* Use the existing BentoMod populated library screen as the primary structural reference where applicable, while refactoring rather than blindly copying its component structure.
+* Run focused filesystem mutation tests against disposable fixtures.
+* Verify before-and-after filesystem state for successful and rejected operations.
+* Launch the application and exercise enable/disable behavior using disposable test data.
+* Capture screenshots of the relevant enabled, disabled, busy, and error states.
+* Confirm no real Marvel Rivals mod files were modified during automated testing.
+* Create `docs/reviews/phase-3-review.md` with validation results, screenshot paths, limitations, and deferred findings.
 
 The review should record:
 
-* UI states and fixture coverage
-* Binding and scanning behavior
-* Search and folder-navigation behavior
-* Appearance and accessibility checks
+* Supported state transitions
+* Legacy disabled-format behavior
+* Collision and invalid-state behavior
+* Sidecar preservation
+* Game-running protection
 * Commands and tests run
-* Screenshot paths
+* Manual checks and screenshot paths
 * Known limitations
-* Deferred questions
+* Deferred findings
 * Review approval
 
-**Verify:** Review approval grants permission to begin Phase 3.
+**Verify:** Review approval grants permission to begin Phase 4.
 
-## Phase 2 completion report
+## Phase 3 completion report
 
-For each task, report:
+Report:
 
 * What changed
 * Files changed
@@ -119,4 +129,4 @@ For each task, report:
 * Deferred findings
 * Suggested commit message
 
-Proceed through Phase 2 as one bounded implementation pass unless a material design decision or explicit review gate is encountered. Stop before Phase 3.
+Proceed through Phase 3 as one bounded implementation pass unless a material design decision or explicit review gate is encountered. Stop before Phase 4.
