@@ -10,11 +10,14 @@ import (
 )
 
 const (
-	groupKeySeparator          = "\x00"
-	prioritySuffix             = "_P"
-	prioritySeparator          = "_"
-	minimumTrailingNines       = 7
-	trailingNinePriorityOffset = minimumTrailingNines - 1
+	groupKeySeparator            = "\x00"
+	entryIDSeparator             = ":"
+	entryIDModPrefix             = "mod"
+	entryIDOrphanedSidecarPrefix = "orphaned-sidecar"
+	prioritySuffix               = "_P"
+	prioritySeparator            = "_"
+	minimumTrailingNines         = 7
+	trailingNinePriorityOffset   = minimumTrailingNines - 1
 )
 
 // Describes whether a primary file is enabled or disabled.
@@ -94,6 +97,7 @@ type Issue struct {
 
 // Describes one primary file or one orphaned sidecar group.
 type Entry struct {
+	ID             string         `json:"id"`
 	PrimaryPath    string         `json:"primaryPath,omitempty"`
 	RelativeFolder string         `json:"relativeFolder"`
 	DisplayName    string         `json:"displayName"`
@@ -288,6 +292,7 @@ func primaryEntry(primary fileRecord, sidecars Sidecars, ambiguous bool) Entry {
 	}
 
 	return Entry{
+		ID:             modEntryID(folder, primary.stem, primary.kind, ambiguous),
 		PrimaryPath:    primary.path,
 		RelativeFolder: folder,
 		DisplayName:    cleanDisplayName(primary.stem),
@@ -306,6 +311,7 @@ func orphanEntry(stem, path string, sidecars Sidecars) Entry {
 	folder := relativeFolder(path)
 
 	return Entry{
+		ID:             orphanedSidecarEntryID(folder, stem),
 		RelativeFolder: folder,
 		DisplayName:    cleanDisplayName(stem),
 		Kind:           EntryOrphanedSidecar,
@@ -314,6 +320,22 @@ func orphanEntry(stem, path string, sidecars Sidecars) Entry {
 		Priority:       parsePriority(stem),
 		Issues:         []Issue{{Code: IssueOrphanedSidecar, Message: "Sidecar has no supported primary file"}},
 	}
+}
+
+// Produces a stable identity for an entry while Cratebug changes only its primary suffix.
+func modEntryID(folder, stem string, kind extension, ambiguous bool) string {
+	id := entryIDModPrefix + entryIDSeparator + strings.ToLower(folder) + entryIDSeparator + strings.ToLower(stem)
+	if ambiguous {
+		// Ambiguous primaries cannot be mutated, so their current suffix disambiguates read-only entries.
+		return id + entryIDSeparator + string(kind)
+	}
+
+	return id
+}
+
+// Produces a stable identity for a sidecar-only entry within a scan result.
+func orphanedSidecarEntryID(folder, stem string) string {
+	return entryIDOrphanedSidecarPrefix + entryIDSeparator + strings.ToLower(folder) + entryIDSeparator + strings.ToLower(stem)
 }
 
 // Removes filename-only priority conventions for presentation.

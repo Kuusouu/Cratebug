@@ -31,8 +31,8 @@ func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
 }
 
 // Changes one current scanner entry to the requested enabled state.
-// The primary path is a scanner-relative identifier, never an arbitrary filesystem path.
-func (a *App) SetModEnabled(modRoot, primaryPath string, enabled bool) (mutation.Result, error) {
-	operation := mutation.NewSetEnabledOperation(modRoot, primaryPath, enabled)
+// The entry ID is scanner-issued, never an arbitrary filesystem path.
+func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Result, error) {
+	operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
 	return a.mutationExecutor.Execute(operation)
 }

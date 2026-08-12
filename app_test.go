@@ -41,9 +41,13 @@ func TestSetModEnabledBlocksRunningGame(t *testing.T) {
 	}
 
 	app := newApp(staticGameRunningChecker{gameRunning: true})
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Act
-	_, err := app.SetModEnabled(root, "Example_9999999_P.pak", false)
+	_, err = app.SetModEnabled(root, library.Entries[0].ID, false)
 
 	// Assert
 	if !errors.Is(err, mutation.ErrGameRunning) {
@@ -95,9 +99,13 @@ func TestSetModEnabled(t *testing.T) {
 	}
 
 	app := newApp(staticGameRunningChecker{})
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Act
-	result, err := app.SetModEnabled(root, "Example_9999999_P.bak_bento", true)
+	result, err := app.SetModEnabled(root, library.Entries[0].ID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
