@@ -34,9 +34,9 @@ type Executor struct {
 
 // Changes one current scanner entry to the requested enabled state.
 type SetEnabledOperation struct {
-	modRoot     string
-	primaryPath string
-	enabled     bool
+	modRoot string
+	entryID string
+	enabled bool
 }
 
 // Creates a mutation executor with the supplied game-running detector.
@@ -45,8 +45,8 @@ func NewExecutor(gameRunningChecker GameRunningChecker) Executor {
 }
 
 // Creates the narrow operation exposed by the Phase 3 application boundary.
-func NewSetEnabledOperation(modRoot, primaryPath string, enabled bool) SetEnabledOperation {
-	return SetEnabledOperation{modRoot: modRoot, primaryPath: primaryPath, enabled: enabled}
+func NewSetEnabledOperation(modRoot, entryID string, enabled bool) SetEnabledOperation {
+	return SetEnabledOperation{modRoot: modRoot, entryID: entryID, enabled: enabled}
 }
 
 // Applies the operation only after its game-running restriction has been enforced.
@@ -82,5 +82,5 @@ func (operation SetEnabledOperation) GameRunningRequirement() GameRunningRequire
 
 // Performs the existing primary-only transition after the executor has authorized it.
 func (operation SetEnabledOperation) Execute() (Result, error) {
-	return setEnabled(operation.modRoot, operation.primaryPath, operation.enabled)
+	return setEnabled(operation.modRoot, operation.entryID, operation.enabled)
 }

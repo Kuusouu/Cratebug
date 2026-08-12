@@ -7,7 +7,7 @@ type ModCatalogProps = {
 	state: LibraryState;
 	scanError: string;
 	hasLibrary: boolean;
-	mutatingPrimaryPath: string | null;
+	mutatingEntryIDs: ReadonlySet<string>;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	viewMode: ViewMode;
 };
@@ -20,7 +20,7 @@ type CatalogMessage = {
 
 type ModCardProps = {
 	entry: discovery.Entry;
-	mutatingPrimaryPath: ModCatalogProps["mutatingPrimaryPath"];
+	isMutating: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	viewMode: ModCatalogProps["viewMode"];
 };
@@ -32,9 +32,9 @@ function stateLabel(entry: discovery.Entry): string {
 	return entry.state === "disabled" ? "Disabled" : "Enabled";
 }
 
-// Produces a stable key when orphaned entries lack a primary path.
+// Uses the scanner-issued identity so a primary suffix transition does not remount the card.
 function entryKey(entry: discovery.Entry): string {
-	return entry.primaryPath ?? entry.sidecars.ucas ?? entry.sidecars.utoc ?? entry.relativeFolder;
+	return entry.id;
 }
 
 // Centralizes catalog states so they cannot diverge visually.
@@ -83,7 +83,7 @@ export function ModCatalog({
 	state,
 	scanError,
 	hasLibrary,
-	mutatingPrimaryPath,
+	mutatingEntryIDs,
 	onSetEnabled,
 	viewMode,
 }: ModCatalogProps) {
@@ -107,7 +107,7 @@ export function ModCatalog({
 				<ModCard
 					entry={entry}
 					key={entryKey(entry)}
-					mutatingPrimaryPath={mutatingPrimaryPath}
+					isMutating={mutatingEntryIDs.has(entry.id)}
 					onSetEnabled={onSetEnabled}
 					viewMode={viewMode}
 				/>
@@ -117,15 +117,9 @@ export function ModCatalog({
 }
 
 // Avoids work for retained entries during local navigation changes.
-const ModCard = memo(function ModCard({
-	entry,
-	mutatingPrimaryPath,
-	onSetEnabled,
-	viewMode,
-}: ModCardProps) {
+const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMode }: ModCardProps) {
 	const canChangeState = entry.kind === "mod" && entry.primaryPath !== undefined;
 	const enabled = entry.state === "enabled";
-	const isMutating = entry.primaryPath === mutatingPrimaryPath;
 	const actionLabel = enabled ? "Disable" : "Enable";
 	const facts = (
 		<div className="mod-facts">
@@ -150,7 +144,7 @@ const ModCard = memo(function ModCard({
 			type="button"
 			aria-busy={isMutating}
 			className="mod-action"
-			disabled={mutatingPrimaryPath !== null}
+			disabled={isMutating}
 			onClick={() => onSetEnabled(entry)}
 		>
 			{isMutating ? (enabled ? "Disabling..." : "Enabling...") : actionLabel}

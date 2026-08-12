@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import { Grid2X2, List, PanelsTopLeft } from "lucide-react";
 import { ScanLibrary, SetModEnabled } from "../../wailsjs/go/main/App";
 import { discovery } from "../../wailsjs/go/models";
@@ -90,11 +90,13 @@ export function LibraryScreen() {
 	const [libraryState, setLibraryState] = useState<LibraryState>("initial");
 	const [scanError, setScanError] = useState("");
 	const [mutationError, setMutationError] = useState("");
-	const [mutatingPrimaryPath, setMutatingPrimaryPath] = useState<string | null>(null);
+	const [mutatingEntryIDs, setMutatingEntryIDs] = useState<ReadonlySet<string>>(new Set());
 	const [search, setSearch] = useState("");
 	const [selectedFolder, setSelectedFolder] = useState("all");
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
+	const mutatingEntryIDsRef = useRef(new Set<string>());
+	const libraryRoot = library?.root;
 
 	const libraryIndex = useMemo(() => indexLibrary(library?.entries ?? []), [library]);
 
@@ -127,24 +129,22 @@ export function LibraryScreen() {
 
 	const setModEnabled = useCallback(
 		async (entry: discovery.Entry) => {
-			if (!library) return;
+			if (!libraryRoot) return;
 
-			if (!entry.primaryPath) return;
-
-			if (mutatingPrimaryPath) return;
+			if (!entry.primaryPath || mutatingEntryIDsRef.current.has(entry.id)) return;
 
 			const enabled = entry.state !== "enabled";
 			setMutationError("");
-			setMutatingPrimaryPath(entry.primaryPath);
+			mutatingEntryIDsRef.current.add(entry.id);
+			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 
 			try {
-				const result = await SetModEnabled(library.root, entry.primaryPath, enabled);
+				const result = await SetModEnabled(libraryRoot, entry.id, enabled);
 				setLibrary((currentLibrary) => {
 					if (!currentLibrary) return currentLibrary;
 
 					const entries = currentLibrary.entries.map((currentEntry) => {
-						if (currentEntry.primaryPath !== result.previousPrimaryPath)
-							return currentEntry;
+						if (currentEntry.id !== result.id) return currentEntry;
 
 						return new discovery.Entry({
 							...currentEntry,
@@ -158,10 +158,11 @@ export function LibraryScreen() {
 			} catch (error) {
 				setMutationError(errorMessage(error));
 			} finally {
-				setMutatingPrimaryPath(null);
+				mutatingEntryIDsRef.current.delete(entry.id);
+				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 			}
 		},
-		[library, mutatingPrimaryPath],
+		[libraryRoot],
 	);
 
 	// Replaces the catalog only after a scan finishes successfully.
@@ -231,10 +232,7 @@ export function LibraryScreen() {
 						placeholder="Paste the Marvel Rivals mod folder path"
 						autoComplete="off"
 					/>
-					<button
-						type="submit"
-						disabled={libraryState === "loading" || mutatingPrimaryPath !== null}
-					>
+					<button type="submit" disabled={libraryState === "loading"}>
 						{libraryState === "loading" ? "Scanning..." : "Scan library"}
 					</button>
 				</form>
@@ -243,7 +241,7 @@ export function LibraryScreen() {
 						type="button"
 						className="quiet-button"
 						onClick={() => scan()}
-						disabled={libraryState === "loading" || mutatingPrimaryPath !== null}
+						disabled={libraryState === "loading"}
 					>
 						Refresh
 					</button>
@@ -254,7 +252,7 @@ export function LibraryScreen() {
 				<p className="visually-hidden" role="status">
 					{statusMessage}
 				</p>
-				{mutatingPrimaryPath && (
+				{mutatingEntryIDs.size > 0 && (
 					<p className="visually-hidden" role="status">
 						Updating mod state.
 					</p>
@@ -310,7 +308,7 @@ export function LibraryScreen() {
 						state={libraryState}
 						scanError={scanError}
 						hasLibrary={library !== null}
-						mutatingPrimaryPath={mutatingPrimaryPath}
+						mutatingEntryIDs={mutatingEntryIDs}
 						onSetEnabled={setModEnabled}
 						viewMode={viewMode}
 					/>
