@@ -44,3 +44,20 @@ func TestScanLibrary(t *testing.T) {
 		t.Errorf("State = %q, want %q", entry.State, discovery.StateEnabled)
 	}
 }
+
+func TestSetModEnabled(t *testing.T) {
+	root := t.TempDir()
+	primaryPath := filepath.Join(root, "Example_9999999_P.bak_bento")
+	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	app := NewApp()
+	result, err := app.SetModEnabled(root, "Example_9999999_P.bak_bento", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PrimaryPath != "Example_9999999_P.pak" || result.State != discovery.StateEnabled {
+		t.Errorf("result = %#v, want enabled Example_9999999_P.pak", result)
+	}
+}
