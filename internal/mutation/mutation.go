@@ -16,6 +16,7 @@ const crateoffSuffix = ".pak_crateoff"
 // Reports the reconciled primary path and state after a successful mutation.
 // Paths are relative to the mod root so callers never need filesystem paths from Go.
 type Result struct {
+	ID                  string          `json:"id"`
 	PreviousPrimaryPath string          `json:"previousPrimaryPath"`
 	PrimaryPath         string          `json:"primaryPath"`
 	State               discovery.State `json:"state"`
@@ -31,20 +32,20 @@ type plan struct {
 
 // Changes one scanner-discovered primary between enabled and disabled.
 // It only renames the primary file; IoStore sidecars deliberately retain their names.
-func setEnabled(modRoot, primaryPath string, enabled bool) (Result, error) {
+func setEnabled(modRoot, entryID string, enabled bool) (Result, error) {
 	// Rescan so a stale frontend entry cannot select an arbitrary filesystem path.
 	library, err := discovery.Scan(modRoot)
 	if err != nil {
 		return Result{}, fmt.Errorf("scan mod library before mutation: %w", err)
 	}
 
-	entry, err := findEntry(library.Entries, primaryPath)
+	entry, err := findEntry(library.Entries, entryID)
 	if err != nil {
 		return Result{}, err
 	}
 
 	if enabled == (entry.State == discovery.StateEnabled) {
-		return Result{}, fmt.Errorf("mod %q is already %s", primaryPath, entry.State)
+		return Result{}, fmt.Errorf("mod %q is already %s", entry.PrimaryPath, entry.State)
 	}
 
 	// Planning performs every rejection-prone check before changing the primary.
@@ -58,20 +59,21 @@ func setEnabled(modRoot, primaryPath string, enabled bool) (Result, error) {
 	}
 
 	return Result{
+		ID:                  entry.ID,
 		PreviousPrimaryPath: entry.PrimaryPath,
 		PrimaryPath:         plan.destinationRelative,
 		State:               plan.resultState,
 	}, nil
 }
 
-// Finds an entry by the scanner-relative primary path returned to the frontend.
-func findEntry(entries []discovery.Entry, primaryPath string) (discovery.Entry, error) {
+// Finds an entry by the scanner-issued identity returned to the frontend.
+func findEntry(entries []discovery.Entry, entryID string) (discovery.Entry, error) {
 	for _, entry := range entries {
-		if entry.PrimaryPath == primaryPath {
+		if entry.ID == entryID {
 			return entry, nil
 		}
 	}
-	return discovery.Entry{}, fmt.Errorf("mod is not present in the current scan: %q", primaryPath)
+	return discovery.Entry{}, fmt.Errorf("mod is not present in the current scan: %q", entryID)
 }
 
 // Builds every filesystem path before mutation so rejected operations do not alter files.

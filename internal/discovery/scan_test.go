@@ -263,6 +263,62 @@ func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
 	}
 }
 
+// Keeps a mod identity stable when Cratebug changes only its supported primary suffix.
+func TestScanKeepsModIDAcrossPrimaryStateTransitions(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	enabledPath := filepath.Join(root, "Example_9999999_P.pak")
+	disabledPath := filepath.Join(root, "Example_9999999_P.pak_crateoff")
+	if err := os.WriteFile(enabledPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	first, err := Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(enabledPath, disabledPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	second, err := Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if len(first.Entries) != 1 || len(second.Entries) != 1 {
+		t.Fatalf("entry counts = %d and %d, want one entry in both scans", len(first.Entries), len(second.Entries))
+	}
+	if first.Entries[0].ID != second.Entries[0].ID {
+		t.Errorf("ID changed from %q to %q after a state transition", first.Entries[0].ID, second.Entries[0].ID)
+	}
+}
+
+// Gives every entry a unique scanner-issued identity, including ambiguous read-only entries.
+func TestScanAssignsUniqueEntryIDs(t *testing.T) {
+	// Arrange
+	root := copyFixtureLibrary(t)
+
+	// Act
+	library, err := Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	ids := make(map[string]struct{}, len(library.Entries))
+	for _, entry := range library.Entries {
+		if entry.ID == "" {
+			t.Fatal("scanner returned an empty entry ID")
+		}
+		if _, exists := ids[entry.ID]; exists {
+			t.Fatalf("scanner returned duplicate entry ID %q", entry.ID)
+		}
+		ids[entry.ID] = struct{}{}
+	}
+}
+
 // Checks that filesystem enumeration cannot affect output order.
 func TestScanOrderingIsDeterministic(t *testing.T) {
 	// Arrange

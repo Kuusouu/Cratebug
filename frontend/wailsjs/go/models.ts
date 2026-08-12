@@ -47,6 +47,7 @@ export namespace discovery {
 	    }
 	}
 	export class Entry {
+	    id: string;
 	    primaryPath?: string;
 	    relativeFolder: string;
 	    displayName: string;
@@ -64,6 +65,7 @@ export namespace discovery {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	        this.primaryPath = source["primaryPath"];
 	        this.relativeFolder = source["relativeFolder"];
 	        this.displayName = source["displayName"];
@@ -132,15 +134,20 @@ export namespace discovery {
 }
 
 export namespace mutation {
+	
 	export class Result {
+	    id: string;
 	    previousPrimaryPath: string;
 	    primaryPath: string;
 	    state: string;
+	
 	    static createFrom(source: any = {}) {
 	        return new Result(source);
 	    }
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	        this.previousPrimaryPath = source["previousPrimaryPath"];
 	        this.primaryPath = source["primaryPath"];
 	        this.state = source["state"];
@@ -148,3 +155,4 @@ export namespace mutation {
 	}
 
 }
+

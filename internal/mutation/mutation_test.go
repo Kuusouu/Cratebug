@@ -52,9 +52,10 @@ func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 			writeFile(t, filepath.Join(root, sidecarFolder, "Example_9999999_P.utoc"), "utoc")
 			writeFile(t, filepath.Join(root, sidecarFolder, "Example_9999999_P.ucas"), "ucas")
 			beforeSidecars := snapshotFiles(t, root, ".utoc", ".ucas")
+			entryID := scannedEntryID(t, root, test.source)
 
 			// Act
-			result, err := setEnabled(root, test.source, test.enabled)
+			result, err := setEnabled(root, entryID, test.enabled)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,9 +94,13 @@ func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T)
 				writeFile(t, filepath.Join(root, file), file)
 			}
 			before := snapshotFiles(t, root, "")
+			entryID := test.primary
+			if test.name != "missing scanner entry" && test.name != "path traversal" {
+				entryID = scannedEntryID(t, root, test.primary)
+			}
 
 			// Act
-			if _, err := setEnabled(root, test.primary, test.enabled); err == nil {
+			if _, err := setEnabled(root, entryID, test.enabled); err == nil {
 				t.Fatal("setEnabled succeeded, want error")
 			}
 
@@ -116,9 +121,10 @@ func TestSetEnabledRejectsDestinationCollisionWithoutChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := snapshotFiles(t, root, "")
+	entryID := scannedEntryID(t, root, "Example.pak")
 
 	// Act
-	if _, err := setEnabled(root, "Example.pak", false); err == nil {
+	if _, err := setEnabled(root, entryID, false); err == nil {
 		t.Fatal("setEnabled succeeded, want destination collision error")
 	}
 
@@ -159,15 +165,16 @@ func TestSetEnabledUsesCurrentScannerState(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
+	entryID := scannedEntryID(t, root, "Example.pak")
 
 	// Act
-	if _, err := setEnabled(root, "Example.pak", false); err != nil {
+	if _, err := setEnabled(root, entryID, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := setEnabled(root, "Example.pak", false); err == nil {
-		t.Fatal("stale primary path succeeded, want error")
+	if _, err := setEnabled(root, entryID, false); err == nil {
+		t.Fatal("repeated state transition succeeded, want error")
 	}
-	if _, err := setEnabled(root, "Example.pak_crateoff", true); err != nil {
+	if _, err := setEnabled(root, entryID, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -183,7 +190,8 @@ func TestExecutorBlocksSetEnabledWhenGameIsRunning(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
 	executor := NewExecutor(staticGameRunningChecker{gameRunning: true})
-	operation := NewSetEnabledOperation(root, "Example.pak", false)
+	entryID := scannedEntryID(t, root, "Example.pak")
+	operation := NewSetEnabledOperation(root, entryID, false)
 
 	// Act
 	_, err := executor.Execute(operation)
@@ -204,7 +212,8 @@ func TestExecutorBlocksSetEnabledWhenGameCheckFails(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
 	executor := NewExecutor(staticGameRunningChecker{err: errors.New("process snapshot failed")})
-	operation := NewSetEnabledOperation(root, "Example.pak", false)
+	entryID := scannedEntryID(t, root, "Example.pak")
+	operation := NewSetEnabledOperation(root, entryID, false)
 
 	// Act
 	_, err := executor.Execute(operation)
@@ -244,6 +253,24 @@ func writeFile(t *testing.T, path, contents string) {
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Finds the current scanner-issued identity for a fixture primary.
+func scannedEntryID(t *testing.T, root, primaryPath string) string {
+	t.Helper()
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, entry := range library.Entries {
+		if entry.PrimaryPath == primaryPath {
+			return entry.ID
+		}
+	}
+
+	t.Fatalf("scanner did not return primary %q", primaryPath)
+	return ""
 }
 
 func snapshotFiles(t *testing.T, root string, suffixes ...string) map[string]string {
