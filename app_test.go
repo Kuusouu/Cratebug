@@ -1,16 +1,26 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/mutation"
 )
+
+type staticGameRunningChecker struct {
+	gameRunning bool
+}
+
+func (checker staticGameRunningChecker) IsGameRunning() (bool, error) {
+	return checker.gameRunning, nil
+}
 
 func TestRuntimeStatus(t *testing.T) {
 	// Arrange
-	app := NewApp()
+	app := newApp(staticGameRunningChecker{})
 
 	// Act
 	got := app.RuntimeStatus()
@@ -22,6 +32,28 @@ func TestRuntimeStatus(t *testing.T) {
 	}
 }
 
+func TestSetModEnabledBlocksRunningGame(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	primaryPath := filepath.Join(root, "Example_9999999_P.pak")
+	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	app := newApp(staticGameRunningChecker{gameRunning: true})
+
+	// Act
+	_, err := app.SetModEnabled(root, "Example_9999999_P.pak", false)
+
+	// Assert
+	if !errors.Is(err, mutation.ErrGameRunning) {
+		t.Fatalf("SetModEnabled() error = %v, want ErrGameRunning", err)
+	}
+	if _, err := os.Lstat(primaryPath); err != nil {
+		t.Errorf("enabled primary is missing: %v", err)
+	}
+}
+
 func TestScanLibrary(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
@@ -30,7 +62,7 @@ func TestScanLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := NewApp()
+	app := newApp(staticGameRunningChecker{})
 
 	// Act
 	library, err := app.ScanLibrary(root)
@@ -62,7 +94,7 @@ func TestSetModEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := NewApp()
+	app := newApp(staticGameRunningChecker{})
 
 	// Act
 	result, err := app.SetModEnabled(root, "Example_9999999_P.bak_bento", true)

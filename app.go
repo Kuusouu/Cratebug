@@ -5,12 +5,19 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/mutation"
 )
 
-// App exposes the small backend surface used by the frontend.
-type App struct{}
+// Exposes the small backend surface used by the frontend.
+type App struct {
+	mutationExecutor mutation.Executor
+}
 
 // Creates the application binding.
 func NewApp() *App {
-	return &App{}
+	return newApp(mutation.WindowsGameRunningChecker{})
+}
+
+// Lets tests inject a deterministic game-running detector without exposing it to Wails.
+func newApp(gameRunningChecker mutation.GameRunningChecker) *App {
+	return &App{mutationExecutor: mutation.NewExecutor(gameRunningChecker)}
 }
 
 // Confirms that the frontend can reach the Go application.
@@ -23,8 +30,9 @@ func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
 	return discovery.Scan(modRoot)
 }
 
-// SetModEnabled changes one current scanner entry to the requested enabled state.
+// Changes one current scanner entry to the requested enabled state.
 // The primary path is a scanner-relative identifier, never an arbitrary filesystem path.
 func (a *App) SetModEnabled(modRoot, primaryPath string, enabled bool) (mutation.Result, error) {
-	return mutation.SetEnabled(modRoot, primaryPath, enabled)
+	operation := mutation.NewSetEnabledOperation(modRoot, primaryPath, enabled)
+	return a.mutationExecutor.Execute(operation)
 }
