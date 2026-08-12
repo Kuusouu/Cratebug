@@ -17,7 +17,7 @@ const (
 	trailingNinePriorityOffset = minimumTrailingNines - 1
 )
 
-// State describes whether a primary file is enabled or disabled.
+// Describes whether a primary file is enabled or disabled.
 type State string
 
 const (
@@ -25,7 +25,7 @@ const (
 	StateDisabled State = "disabled"
 )
 
-// DisabledFormat identifies the disabled filename convention, when present.
+// Identifies the disabled filename convention, when present.
 type DisabledFormat string
 
 const (
@@ -35,7 +35,7 @@ const (
 	DisabledFormatLegacy   DisabledFormat = ".pak_disabled"
 )
 
-// EntryKind describes whether an entry has a primary file or only sidecars.
+// Describes whether an entry has a primary file or only sidecars.
 type EntryKind string
 
 const (
@@ -43,7 +43,7 @@ const (
 	EntryOrphanedSidecar EntryKind = "orphaned_sidecar"
 )
 
-// BundleFormat describes the recognized bundle format for a primary-backed entry.
+// Describes the recognized bundle format for a primary-backed entry.
 type BundleFormat string
 
 const (
@@ -52,7 +52,7 @@ const (
 	BundleFormatIoStore BundleFormat = "iostore"
 )
 
-// PriorityKind records how a filename's priority was interpreted.
+// Records how a filename's priority was interpreted.
 type PriorityKind string
 
 const (
@@ -62,7 +62,7 @@ const (
 	PriorityUnrecognized PriorityKind = "unrecognized"
 )
 
-// Priority contains the parsed priority and the evidence used to derive it.
+// Contains the parsed priority and the evidence used to derive it.
 type Priority struct {
 	Value         int          `json:"value"`
 	Kind          PriorityKind `json:"kind"`
@@ -70,13 +70,13 @@ type Priority struct {
 	TrailingNines int          `json:"trailingNines"`
 }
 
-// Sidecars records recognized same-stem sidecar paths, relative to the root.
+// Records recognized same-stem sidecar paths, relative to the root.
 type Sidecars struct {
 	UTOC string `json:"utoc,omitempty"`
 	UCAS string `json:"ucas,omitempty"`
 }
 
-// IssueCode identifies an unusual or incomplete discovered condition.
+// Identifies an unusual or incomplete discovered condition.
 type IssueCode string
 
 const (
@@ -86,13 +86,13 @@ const (
 	IssueOrphanedSidecar  IssueCode = "orphaned-sidecar"
 )
 
-// Issue is a read-only explanation attached to a discovered entry.
+// Provides a read-only explanation attached to a discovered entry.
 type Issue struct {
 	Code    IssueCode `json:"code"`
 	Message string    `json:"message"`
 }
 
-// Entry describes one primary file or one orphaned sidecar group.
+// Describes one primary file or one orphaned sidecar group.
 type Entry struct {
 	PrimaryPath    string         `json:"primaryPath,omitempty"`
 	RelativeFolder string         `json:"relativeFolder"`
@@ -106,7 +106,7 @@ type Entry struct {
 	Issues         []Issue        `json:"issues,omitempty"`
 }
 
-// Library is the deterministic result of scanning one mod root.
+// Provides the deterministic result of scanning one mod root.
 type Library struct {
 	Root    string  `json:"root"`
 	Entries []Entry `json:"entries"`
@@ -129,7 +129,7 @@ const (
 	extensionUCAS       extension = ".ucas"
 )
 
-// Scan recursively discovers supported primaries and sidecars under root.
+// Recursively discovers supported primaries and sidecars under root.
 // It never writes to the filesystem.
 func Scan(root string) (Library, error) {
 	info, err := os.Stat(root)
