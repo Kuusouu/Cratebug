@@ -83,7 +83,7 @@ function libraryStatusMessage(
 	}
 }
 
-// LibraryScreen owns local browsing state; scanning remains behind the Go binding.
+// Owns local browsing state while scanning remains behind the Go binding.
 export function LibraryScreen() {
 	const [modRoot, setModRoot] = useState("");
 	const [library, setLibrary] = useState<discovery.Library | null>(null);

@@ -13,7 +13,7 @@ import (
 
 const crateoffSuffix = ".pak_crateoff"
 
-// Result reports the reconciled primary path and state after a successful mutation.
+// Reports the reconciled primary path and state after a successful mutation.
 // Paths are relative to the mod root so callers never need filesystem paths from Go.
 type Result struct {
 	PreviousPrimaryPath string          `json:"previousPrimaryPath"`
@@ -21,7 +21,7 @@ type Result struct {
 	State               discovery.State `json:"state"`
 }
 
-// plan contains the exact one-file rename validated before it is applied.
+// Contains the exact one-file rename validated before it is applied.
 type plan struct {
 	source              string
 	destination         string
@@ -29,9 +29,9 @@ type plan struct {
 	resultState         discovery.State
 }
 
-// SetEnabled changes one scanner-discovered primary between enabled and disabled.
+// Changes one scanner-discovered primary between enabled and disabled.
 // It only renames the primary file; IoStore sidecars deliberately retain their names.
-func SetEnabled(modRoot, primaryPath string, enabled bool) (Result, error) {
+func setEnabled(modRoot, primaryPath string, enabled bool) (Result, error) {
 	// Rescan so a stale frontend entry cannot select an arbitrary filesystem path.
 	library, err := discovery.Scan(modRoot)
 	if err != nil {

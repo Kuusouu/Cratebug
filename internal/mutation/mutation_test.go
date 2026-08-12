@@ -1,6 +1,7 @@
 package mutation
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -25,6 +26,15 @@ type rejectedTransitionTest struct {
 	enabled bool
 }
 
+type staticGameRunningChecker struct {
+	gameRunning bool
+	err         error
+}
+
+func (checker staticGameRunningChecker) IsGameRunning() (bool, error) {
+	return checker.gameRunning, checker.err
+}
+
 // Covers all supported filename transitions with isolated filesystem fixtures.
 func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 	for _, test := range []transitionTest{
@@ -44,7 +54,7 @@ func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 			beforeSidecars := snapshotFiles(t, root, ".utoc", ".ucas")
 
 			// Act
-			result, err := SetEnabled(root, test.source, test.enabled)
+			result, err := setEnabled(root, test.source, test.enabled)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -85,8 +95,8 @@ func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T)
 			before := snapshotFiles(t, root, "")
 
 			// Act
-			if _, err := SetEnabled(root, test.primary, test.enabled); err == nil {
-				t.Fatal("SetEnabled succeeded, want error")
+			if _, err := setEnabled(root, test.primary, test.enabled); err == nil {
+				t.Fatal("setEnabled succeeded, want error")
 			}
 
 			// Assert
@@ -108,8 +118,8 @@ func TestSetEnabledRejectsDestinationCollisionWithoutChanges(t *testing.T) {
 	before := snapshotFiles(t, root, "")
 
 	// Act
-	if _, err := SetEnabled(root, "Example.pak", false); err == nil {
-		t.Fatal("SetEnabled succeeded, want destination collision error")
+	if _, err := setEnabled(root, "Example.pak", false); err == nil {
+		t.Fatal("setEnabled succeeded, want destination collision error")
 	}
 
 	// Assert
@@ -151,19 +161,78 @@ func TestSetEnabledUsesCurrentScannerState(t *testing.T) {
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
 
 	// Act
-	if _, err := SetEnabled(root, "Example.pak", false); err != nil {
+	if _, err := setEnabled(root, "Example.pak", false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SetEnabled(root, "Example.pak", false); err == nil {
+	if _, err := setEnabled(root, "Example.pak", false); err == nil {
 		t.Fatal("stale primary path succeeded, want error")
 	}
-	if _, err := SetEnabled(root, "Example.pak_crateoff", true); err != nil {
+	if _, err := setEnabled(root, "Example.pak_crateoff", true); err != nil {
 		t.Fatal(err)
 	}
 
 	// Assert
 	if _, err := os.Lstat(filepath.Join(root, "Example.pak")); err != nil {
 		t.Errorf("enabled primary is missing: %v", err)
+	}
+}
+
+// Verifies blocked operations never reach their filesystem mutation while the game is running.
+func TestExecutorBlocksSetEnabledWhenGameIsRunning(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
+	executor := NewExecutor(staticGameRunningChecker{gameRunning: true})
+	operation := NewSetEnabledOperation(root, "Example.pak", false)
+
+	// Act
+	_, err := executor.Execute(operation)
+
+	// Assert
+	if !errors.Is(err, ErrGameRunning) {
+		t.Fatalf("Execute() error = %v, want ErrGameRunning", err)
+	}
+	assertFileContents(t, filepath.Join(root, "Example.pak"), "primary")
+	if _, err := os.Lstat(filepath.Join(root, "Example.pak_crateoff")); !os.IsNotExist(err) {
+		t.Errorf("disabled primary exists or could not be checked: %v", err)
+	}
+}
+
+// Verifies detector failures also prevent mutations instead of allowing a potentially unsafe operation.
+func TestExecutorBlocksSetEnabledWhenGameCheckFails(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
+	executor := NewExecutor(staticGameRunningChecker{err: errors.New("process snapshot failed")})
+	operation := NewSetEnabledOperation(root, "Example.pak", false)
+
+	// Act
+	_, err := executor.Execute(operation)
+
+	// Assert
+	if err == nil {
+		t.Fatal("Execute() succeeded, want game-running detector error")
+	}
+	assertFileContents(t, filepath.Join(root, "Example.pak"), "primary")
+	if _, err := os.Lstat(filepath.Join(root, "Example.pak_crateoff")); !os.IsNotExist(err) {
+		t.Errorf("disabled primary exists or could not be checked: %v", err)
+	}
+}
+
+// Verifies the established executable identity is case-insensitive like BentoMod's process check.
+func TestIsMarvelRivalsProcess(t *testing.T) {
+	// Arrange
+	processNames := map[string]bool{
+		"Marvel-Win64-Shipping.exe": true,
+		"MARVEL-WIN64-SHIPPING.EXE": true,
+		"MarvelRivals.exe":          false,
+	}
+
+	// Act and assert
+	for processName, want := range processNames {
+		if got := isMarvelRivalsProcess(processName); got != want {
+			t.Errorf("isMarvelRivalsProcess(%q) = %t, want %t", processName, got, want)
+		}
 	}
 }
 

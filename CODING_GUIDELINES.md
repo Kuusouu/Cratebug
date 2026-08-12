@@ -9,6 +9,7 @@ These guidelines define the shared readability and maintainability standards for
 - Group file-level types, interfaces, constants, and configuration before functions.
 - Use blank lines to separate distinct validation and control-flow decisions when that makes the code easier to scan.
 - Comment why a decision, constraint, or workaround exists. Do not narrate the next line of code.
+- Write documentation comments as a natural description of behavior or purpose; do not repeat the identifier they document.
 - Keep public APIs narrow. Do not export helpers or types unless another package or module needs them.
 - Tests use explicit `Arrange`, `Act`, and `Assert` markers. Combine stages only when an operation must be checked immediately.
 
