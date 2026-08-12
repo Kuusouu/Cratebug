@@ -77,6 +77,7 @@ If visual verification cannot be performed, say so clearly.
 
 - Capture the application window, not the full desktop.
 - Wait for a nonzero `MainWindowHandle`, then use Win32 `PrintWindow` through PowerShell/.NET. Avoid `CopyFromScreen`, which can clip windows under display scaling.
+- Before reading the window rectangle, make the PowerShell capture process DPI-aware with `SetProcessDPIAware()`. Wails/WebView windows can render at a higher per-monitor DPI than a non-DPI-aware process reports; without this step, `PrintWindow` output is cropped to virtualized bounds.
 - Save screenshots as `docs/screenshots/<phase>/task-<number>-<state>.png`.
 - Inspect the saved PNG and close only the process launched for verification.
 
