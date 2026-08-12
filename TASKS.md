@@ -1,123 +1,158 @@
 # Cratebug Active Tasks
 
-**Phase:** 3 - Safe enable and disable
+**Phase:** 4 - Organization and recoverable deletion
 **Status:** Not started
 
-This file contains only the active phase. Replace it when Phase 3 is complete.
+This file contains only the active phase. Replace it when Phase 4 is complete.
 
 ## Phase objective
 
-Add the first safe filesystem mutation to Cratebug: enabling and disabling discovered mods.
+Let users organize a discovered mod library safely: rename and reprioritize
+bundles, move them between physical folders, manage nested folders, and delete
+mods through the Windows Recycle Bin.
 
-Cratebug must write its native `.pak_crateoff` disabled format while remaining compatible with legacy `.bak_bento` and `.pak_disabled` files.
+All mutation policy and filesystem operations belong in Go. React requests an
+operation, displays its progress and result, and reconciles the affected catalog
+state.
 
-All mutation policy and filesystem operations belong in Go. React only requests an operation and displays its result.
+Every controlled operation must plan against the complete recognized bundle,
+remain inside the selected mod root, and report its final filesystem state.
 
 ## Exit criteria
 
-* Enabled mods can be disabled safely using `.pak_crateoff`.
-* Cratebug-disabled and supported legacy-disabled mods can be enabled.
-* `.utoc` and `.ucas` sidecars remain unchanged.
-* Destination collisions and invalid states fail without modifying files.
-* Game-running safety is enforced by the backend.
-* Mutation behavior is covered by disposable filesystem tests.
-* The UI reflects successful and failed operations correctly.
+* Rename, priority, move, and deletion operations keep primaries and recognized
+  sidecars synchronized.
+* Priority behavior matches compatibility fixtures, including leading `!` and
+  trailing runs of nines.
+* Folder operations remain inside the selected mod root; the root cannot be
+  renamed or deleted.
+* Normal deletion uses the Recycle Bin and never silently becomes permanent.
+* Destination collisions, invalid paths, and partial failures are reconciled
+  and reported accurately.
+* Controlled rename and move preserve the metadata identity mechanism selected
+  for this phase.
+* The UI reflects successful, rejected, busy, and recoverably deleted states.
 * Running-app screenshots receive review approval.
 
 ## Out of scope
 
-Phase 3 does not include:
+Phase 4 does not include:
 
-* Priority changes
-* General rename or move operations
-* Folder mutations
-* Deletion
-* Tags or metadata persistence
+* Batch operations
+* Permanent deletion
 * Archive installation
 * Asset conflict inspection
-* Batch enable or disable
-* Permanent migration of legacy disabled filenames
+* BentoMod import
+* Tags, tag management, and general metadata persistence beyond preserving
+  controlled-operation identity
 
-## 3.1 Define the mutation boundary
+## 4.1 Define bundle-aware organization operations
 
-* Add a narrow Go operation for enabling or disabling a discovered mod.
-* Identify mods using scanner-produced data rather than arbitrary frontend paths.
-* Validate the requested transition against the current filesystem state.
-* Keep filesystem mutation details out of Wails bindings and React components.
-* Return specific, actionable errors for rejected operations.
+* Extend the Go-owned mutation boundary with narrow operations for mod rename,
+  priority change, move, folder management, and recoverable deletion.
+* Identify mods and folders from scanner-produced data rather than arbitrary
+  frontend paths.
+* Plan every mutation against the primary and all recognized sidecars before
+  modifying the filesystem.
+* Preserve or introduce only the minimum internal identity needed for controlled
+  rename and move; defer general persistence and tags to Phase 5.
+* Apply the existing game-running safety restriction to every unsafe mutation.
+* Return specific, actionable errors and final reconciled state.
 
-**Verify:** The application layer exposes only the enable/disable operation needed by the UI and does not expose arbitrary rename functionality.
+**Verify:** The application layer exposes only the required organization
+operations and does not expose arbitrary filesystem access.
 
-## 3.2 Implement safe disable behavior
+## 4.2 Implement bundle-aware rename and priority
 
-* Disable an enabled `.pak` by renaming only the primary file to `.pak_crateoff`.
-* Leave `.utoc` and `.ucas` sidecars unchanged.
-* Refuse the operation if the expected source is missing or the destination already exists.
-* Do not overwrite or remove existing files.
-* Preserve the original filename apart from the disabled suffix.
+* Rename a mod by applying the planned filename transformation to its primary
+  and recognized sidecars as one logical bundle.
+* Implement filename-based priority changes compatible with established
+  BentoMod patterns, including a leading `!` and trailing runs of nines.
+* Reject empty, invalid, ambiguous, colliding, or unsafe destinations before
+  mutation. Never overwrite an existing file.
+* Attempt rollback when a multi-file operation partially fails, then reconcile
+  and report the actual state.
+* Preserve disabled-format suffixes while changing the underlying mod name or
+  priority.
 
-Example:
+**Verify:** Disposable fixtures cover classic and IoStore bundles, supported
+priority forms, collision rejection, failure injection, rollback attempts,
+unchanged unrelated files, and preserved controlled-operation identity.
 
-`Example_9999999_P.pak` -> `Example_9999999_P.pak_crateoff`
+## 4.3 Implement safe moves and nested folder management
 
-**Verify:** Disposable fixtures prove successful disable behavior, unchanged sidecars, collision handling, and no unintended filesystem changes.
+* Move complete bundles between existing physical folders below the selected mod
+  root.
+* Create and rename nested folders, and move folders only when the planned
+  source and destination remain inside the mod root.
+* Reject root rename or deletion, traversal, absolute paths, collisions, moves
+  into a descendant, and operations involving missing or invalid entries.
+* Preserve bundle relationships and controlled-operation identity through moves.
+* Reconcile after successful and partially failed operations.
 
-## 3.3 Implement safe enable behavior
+**Verify:** Disposable fixtures cover nested folders, bundle moves, folder
+rename and create behavior, unsafe path rejection, root protection, collision
+handling, and recovery from injected failures.
 
-* Enable `.pak_crateoff` by restoring the primary `.pak` filename.
-* Support enabling legacy `.bak_bento` and `.pak_disabled` files.
-* Legacy formats are read-compatible only; future disables use `.pak_crateoff`.
-* Refuse ambiguous or colliding destinations rather than choosing or overwriting automatically.
-* Leave `.utoc` and `.ucas` sidecars unchanged.
+## 4.4 Implement recoverable deletion
 
-**Verify:** Tests cover all supported disabled formats, destination collisions, missing files, and unchanged sidecars.
+* Delete a complete mod bundle through the Windows Recycle Bin using a reviewed
+  platform boundary; do not implement a permanent-delete fallback.
+* Require a clear confirmation with a short destructive-action delay before
+  accepting deletion.
+* Refuse deletion when the bundle is invalid, ambiguous, outside the mod root,
+  or the game-running safety check blocks it.
+* Reconcile the catalog after success or failure and accurately report any
+  remaining files.
 
-## 3.4 Enforce game-running safety
+**Verify:** Disposable tests prove that destructive operations never call a
+permanent deletion path, rejected operations leave fixtures unchanged, and
+partial or platform failures report the final state.
 
-* Detect whether Marvel Rivals is running using the established executable identity.
-* Enforce the restriction in Go before performing a mutation.
-* Do not rely on disabled UI controls as the safety boundary.
-* Return a clear error when an operation is blocked because the game is running.
+## 4.5 Add organization UI interactions
 
-**Verify:** Backend tests prove the mutation is rejected before filesystem changes occur when game-running protection is active.
+* Add focused controls and dialogs for rename, priority, move, folder
+management, and deletion to the existing library UI.
+* Keep controls and confirmations consistent with discovered state, including
+folder hierarchy and bundle type.
+* Prevent duplicate and conflicting requests while a mutation is in progress.
+* Show progress and actionable failures without freezing or discarding the
+current library view.
+* Reconcile only affected entries when possible; rescan when a folder-level
+operation requires it.
 
-## 3.5 Add the UI interaction
+**Verify:** The running application demonstrates successful, rejected, busy,
+and confirmation states using a user-designated disposable library.
 
-* Add enable/disable controls to the existing library UI.
-* Keep the control state consistent with the discovered mod state.
-* Show operation progress without freezing the interface.
-* Prevent accidental duplicate requests while an operation is in progress.
-* Surface failures without discarding the current library view.
-* Refresh or update the catalog after a successful mutation so the displayed state matches disk.
+## 4.6 Validate organization safety and complete the review
 
-**Verify:** Enabled, Cratebug-disabled, and legacy-disabled entries transition correctly in the running application, and failures remain understandable.
+* Run the canonical repository validation command and focused disposable
+filesystem tests.
+* Verify before-and-after filesystem state for successful, rejected, and
+partially failed operations.
+* Launch the application and exercise every operation against a
+user-designated disposable library.
+* Capture screenshots of rename, priority, move, folder, deletion confirmation,
+  busy, and error states.
+* Confirm no real Marvel Rivals mod files were modified during automated
+  testing.
+* Create `docs/reviews/phase-4-review.md` with validation results, screenshot
+  paths, limitations, deferred findings, and review approval.
 
-## 3.6 Validate mutation safety and complete the review
+The review must record:
 
-* Run the canonical repository validation command.
-* Run focused filesystem mutation tests against disposable fixtures.
-* Verify before-and-after filesystem state for successful and rejected operations.
-* Launch the application and exercise enable/disable behavior using disposable test data.
-* Capture screenshots of the relevant enabled, disabled, busy, and error states.
-* Confirm no real Marvel Rivals mod files were modified during automated testing.
-* Create `docs/reviews/phase-3-review.md` with validation results, screenshot paths, limitations, and deferred findings.
-
-The review should record:
-
-* Supported state transitions
-* Legacy disabled-format behavior
-* Collision and invalid-state behavior
-* Sidecar preservation
-* Game-running protection
+* Supported bundle, priority, and folder transitions
+* Metadata-identity preservation behavior
+* Recycle Bin implementation and confirmation behavior
+* Collision, path-safety, game-running, rollback, and reconciliation behavior
 * Commands and tests run
 * Manual checks and screenshot paths
-* Known limitations
-* Deferred findings
+* Known limitations and deferred findings
 * Review approval
 
-**Verify:** Review approval grants permission to begin Phase 4.
+**Verify:** Review approval grants permission to begin Phase 5.
 
-## Phase 3 completion report
+## Phase 4 completion report
 
 Report:
 
@@ -129,4 +164,5 @@ Report:
 * Deferred findings
 * Suggested commit message
 
-Proceed through Phase 3 as one bounded implementation pass unless a material design decision or explicit review gate is encountered. Stop before Phase 4.
+Proceed through Phase 4 as one bounded implementation pass unless a material
+design decision or explicit review gate is encountered. Stop before Phase 5.
