@@ -131,3 +131,20 @@ export namespace discovery {
 
 }
 
+export namespace mutation {
+	export class Result {
+	    previousPrimaryPath: string;
+	    primaryPath: string;
+	    state: string;
+	    static createFrom(source: any = {}) {
+	        return new Result(source);
+	    }
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.previousPrimaryPath = source["previousPrimaryPath"];
+	        this.primaryPath = source["primaryPath"];
+	        this.state = source["state"];
+	    }
+	}
+
+}
