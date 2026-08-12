@@ -1,7 +1,7 @@
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useMemo, useState } from "react";
 import { Grid2X2, List, PanelsTopLeft } from "lucide-react";
-import { ScanLibrary } from "../../wailsjs/go/main/App";
-import type { discovery } from "../../wailsjs/go/models";
+import { ScanLibrary, SetModEnabled } from "../../wailsjs/go/main/App";
+import { discovery } from "../../wailsjs/go/models";
 import { FolderNavigation } from "./FolderNavigation";
 import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
@@ -89,6 +89,8 @@ export function LibraryScreen() {
 	const [library, setLibrary] = useState<discovery.Library | null>(null);
 	const [libraryState, setLibraryState] = useState<LibraryState>("initial");
 	const [scanError, setScanError] = useState("");
+	const [mutationError, setMutationError] = useState("");
+	const [mutatingPrimaryPath, setMutatingPrimaryPath] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
 	const [selectedFolder, setSelectedFolder] = useState("all");
 	const [theme, setTheme] = useState<Theme>("system");
@@ -123,13 +125,53 @@ export function LibraryScreen() {
 		viewMode,
 	);
 
-	// scan replaces the current read-only library only after the Wails binding resolves.
+	const setModEnabled = useCallback(
+		async (entry: discovery.Entry) => {
+			if (!library) return;
+
+			if (!entry.primaryPath) return;
+
+			if (mutatingPrimaryPath) return;
+
+			const enabled = entry.state !== "enabled";
+			setMutationError("");
+			setMutatingPrimaryPath(entry.primaryPath);
+
+			try {
+				const result = await SetModEnabled(library.root, entry.primaryPath, enabled);
+				setLibrary((currentLibrary) => {
+					if (!currentLibrary) return currentLibrary;
+
+					const entries = currentLibrary.entries.map((currentEntry) => {
+						if (currentEntry.primaryPath !== result.previousPrimaryPath)
+							return currentEntry;
+
+						return new discovery.Entry({
+							...currentEntry,
+							primaryPath: result.primaryPath,
+							state: result.state,
+						});
+					});
+
+					return new discovery.Library({ ...currentLibrary, entries });
+				});
+			} catch (error) {
+				setMutationError(errorMessage(error));
+			} finally {
+				setMutatingPrimaryPath(null);
+			}
+		},
+		[library, mutatingPrimaryPath],
+	);
+
+	// Replaces the catalog only after a scan finishes successfully.
 	async function scan(event?: FormEvent) {
 		event?.preventDefault();
 		const root = modRoot.trim();
 		if (!root) {
 			setLibrary(null);
 			setScanError("");
+			setMutationError("");
 			setSearch("");
 			setSelectedFolder("all");
 			setLibraryState("initial");
@@ -138,6 +180,7 @@ export function LibraryScreen() {
 
 		setLibraryState("loading");
 		setScanError("");
+		setMutationError("");
 		try {
 			const result = await ScanLibrary(root);
 			setLibrary(result);
@@ -188,7 +231,10 @@ export function LibraryScreen() {
 						placeholder="Paste the Marvel Rivals mod folder path"
 						autoComplete="off"
 					/>
-					<button type="submit" disabled={libraryState === "loading"}>
+					<button
+						type="submit"
+						disabled={libraryState === "loading" || mutatingPrimaryPath !== null}
+					>
 						{libraryState === "loading" ? "Scanning..." : "Scan library"}
 					</button>
 				</form>
@@ -197,7 +243,7 @@ export function LibraryScreen() {
 						type="button"
 						className="quiet-button"
 						onClick={() => scan()}
-						disabled={libraryState === "loading"}
+						disabled={libraryState === "loading" || mutatingPrimaryPath !== null}
 					>
 						Refresh
 					</button>
@@ -208,6 +254,11 @@ export function LibraryScreen() {
 				<p className="visually-hidden" role="status">
 					{statusMessage}
 				</p>
+				{mutatingPrimaryPath && (
+					<p className="visually-hidden" role="status">
+						Updating mod state.
+					</p>
+				)}
 				<aside className="library-sidebar" aria-label="Library folders">
 					<div className="sidebar-heading">
 						<span>Folders</span>
@@ -225,7 +276,7 @@ export function LibraryScreen() {
 				<section className="catalog-panel" aria-label="Discovered mods">
 					<div className="catalog-header">
 						<div>
-							<p className="eyebrow">Read-only library</p>
+							<p className="eyebrow">Mod library</p>
 							<h2>{selectedFolder === "all" ? "All mods" : selectedFolder}</h2>
 						</div>
 						<label className="search-control">
@@ -249,11 +300,18 @@ export function LibraryScreen() {
 							))}
 						</fieldset>
 					</div>
+					{mutationError && (
+						<p className="catalog-operation-error" role="alert">
+							{mutationError}
+						</p>
+					)}
 					<ModCatalog
 						entries={displayedEntries}
 						state={libraryState}
 						scanError={scanError}
 						hasLibrary={library !== null}
+						mutatingPrimaryPath={mutatingPrimaryPath}
+						onSetEnabled={setModEnabled}
 						viewMode={viewMode}
 					/>
 				</section>
