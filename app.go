@@ -72,3 +72,9 @@ func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Re
 	operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
 	return a.mutationExecutor.Execute(operation)
 }
+
+// Deletes one current scanner entry through the Windows Recycle Bin.
+func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Result, error) {
+	operation := mutation.NewDeleteModOperation(modRoot, entryID, confirmed)
+	return a.mutationExecutor.Execute(operation)
+}
