@@ -7,6 +7,8 @@ type ModCatalogProps = {
 	state: LibraryState;
 	scanError: string;
 	hasLibrary: boolean;
+	mutatingPrimaryPath: string | null;
+	onSetEnabled: (entry: discovery.Entry) => void;
 	viewMode: ViewMode;
 };
 
@@ -18,6 +20,8 @@ type CatalogMessage = {
 
 type ModCardProps = {
 	entry: discovery.Entry;
+	mutatingPrimaryPath: ModCatalogProps["mutatingPrimaryPath"];
+	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	viewMode: ModCatalogProps["viewMode"];
 };
 
@@ -74,7 +78,15 @@ function CatalogState({ heading, message, isError = false }: CatalogMessage) {
 }
 
 // Renders already-scanned, locally-filtered entries without filesystem access.
-export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: ModCatalogProps) {
+export function ModCatalog({
+	entries,
+	state,
+	scanError,
+	hasLibrary,
+	mutatingPrimaryPath,
+	onSetEnabled,
+	viewMode,
+}: ModCatalogProps) {
 	const stateMessage = scanStateMessage(state, scanError);
 	if (stateMessage) {
 		return <CatalogState {...stateMessage} />;
@@ -92,14 +104,29 @@ export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: 
 	return (
 		<div className={`mod-grid view-${viewMode}`}>
 			{entries.map((entry) => (
-				<ModCard entry={entry} key={entryKey(entry)} viewMode={viewMode} />
+				<ModCard
+					entry={entry}
+					key={entryKey(entry)}
+					mutatingPrimaryPath={mutatingPrimaryPath}
+					onSetEnabled={onSetEnabled}
+					viewMode={viewMode}
+				/>
 			))}
 		</div>
 	);
 }
 
 // Avoids work for retained entries during local navigation changes.
-const ModCard = memo(function ModCard({ entry, viewMode }: ModCardProps) {
+const ModCard = memo(function ModCard({
+	entry,
+	mutatingPrimaryPath,
+	onSetEnabled,
+	viewMode,
+}: ModCardProps) {
+	const canChangeState = entry.kind === "mod" && entry.primaryPath !== undefined;
+	const enabled = entry.state === "enabled";
+	const isMutating = entry.primaryPath === mutatingPrimaryPath;
+	const actionLabel = enabled ? "Disable" : "Enable";
 	const facts = (
 		<div className="mod-facts">
 			<span>{stateLabel(entry)}</span>
@@ -118,6 +145,17 @@ const ModCard = memo(function ModCard({ entry, viewMode }: ModCardProps) {
 			</div>
 		</div>
 	);
+	const action = canChangeState ? (
+		<button
+			type="button"
+			aria-busy={isMutating}
+			className="mod-action"
+			disabled={mutatingPrimaryPath !== null}
+			onClick={() => onSetEnabled(entry)}
+		>
+			{isMutating ? (enabled ? "Disabling..." : "Enabling...") : actionLabel}
+		</button>
+	) : null;
 	const issues = entry.issues?.length ? (
 		<ul className="issues">
 			{entry.issues.map((issue) => (
@@ -128,20 +166,24 @@ const ModCard = memo(function ModCard({ entry, viewMode }: ModCardProps) {
 
 	if (viewMode === "list")
 		return (
-			<article className="list-mod-row">
+			<article aria-busy={isMutating} className="list-mod-row">
 				<div className="list-mod-summary">
 					{heading}
-					{facts}
+					<div className="list-mod-controls">
+						{facts}
+						{action}
+					</div>
 				</div>
 				{issues}
 			</article>
 		);
 	return (
-		<article className="mod-card">
+		<article aria-busy={isMutating} className="mod-card">
 			<div className="mod-card-summary">
 				{heading}
 				{facts}
 			</div>
+			{action}
 			{issues}
 		</article>
 	);
