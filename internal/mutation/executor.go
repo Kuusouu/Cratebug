@@ -39,6 +39,20 @@ type SetEnabledOperation struct {
 	enabled bool
 }
 
+// Renames one scanner-discovered mod while keeping its recognized bundle synchronized.
+type RenameModOperation struct {
+	modRoot string
+	entryID string
+	name    string
+}
+
+// Changes one scanner-discovered mod's filename-based priority.
+type SetPriorityOperation struct {
+	modRoot  string
+	entryID  string
+	priority int
+}
+
 // Creates a mutation executor with the supplied game-running detector.
 func NewExecutor(gameRunningChecker GameRunningChecker) Executor {
 	return Executor{gameRunningChecker: gameRunningChecker}
@@ -47,6 +61,16 @@ func NewExecutor(gameRunningChecker GameRunningChecker) Executor {
 // Creates the narrow operation exposed by the Phase 3 application boundary.
 func NewSetEnabledOperation(modRoot, entryID string, enabled bool) SetEnabledOperation {
 	return SetEnabledOperation{modRoot: modRoot, entryID: entryID, enabled: enabled}
+}
+
+// Creates the narrow rename operation exposed by the Phase 4 application boundary.
+func NewRenameModOperation(modRoot, entryID, name string) RenameModOperation {
+	return RenameModOperation{modRoot: modRoot, entryID: entryID, name: name}
+}
+
+// Creates the narrow priority operation exposed by the Phase 4 application boundary.
+func NewSetPriorityOperation(modRoot, entryID string, priority int) SetPriorityOperation {
+	return SetPriorityOperation{modRoot: modRoot, entryID: entryID, priority: priority}
 }
 
 // Applies the operation only after its game-running restriction has been enforced.
@@ -83,4 +107,24 @@ func (operation SetEnabledOperation) GameRunningRequirement() GameRunningRequire
 // Performs the existing primary-only transition after the executor has authorized it.
 func (operation SetEnabledOperation) Execute() (Result, error) {
 	return setEnabled(operation.modRoot, operation.entryID, operation.enabled)
+}
+
+// Blocks bundle filename changes while the game may have their archives open.
+func (operation RenameModOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Performs the planned bundle rename after the executor has authorized it.
+func (operation RenameModOperation) Execute() (Result, error) {
+	return renameMod(operation.modRoot, operation.entryID, operation.name)
+}
+
+// Blocks priority filename changes while the game may have their archives open.
+func (operation SetPriorityOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Performs the planned priority change after the executor has authorized it.
+func (operation SetPriorityOperation) Execute() (Result, error) {
+	return setPriority(operation.modRoot, operation.entryID, operation.priority)
 }
