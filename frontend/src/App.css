@@ -521,9 +521,9 @@ button:disabled {
 }
 
 .mod-card-summary {
-	/* Compact cards need a fixed content flow so their action cannot overlap metadata. */
 	display: flex;
 	min-height: 0;
+	flex: 1;
 	flex-direction: column;
 	gap: 0.85rem;
 }
@@ -579,6 +579,7 @@ button:disabled {
 
 .mod-facts {
 	display: flex;
+	margin-top: auto;
 	flex-wrap: wrap;
 	gap: 0.35rem;
 }
@@ -599,7 +600,7 @@ button:disabled {
 }
 
 .mod-grid.view-compact .mod-action {
-	margin-top: 5.6rem;
+	margin-top: 0.25rem;
 }
 
 .issues {
@@ -617,14 +618,6 @@ button:disabled {
 .mod-grid.view-large .mod-card {
 	min-height: 13.5rem;
 	padding: 1.25rem;
-}
-
-.mod-grid.view-large .mod-card-summary {
-	flex: 1;
-}
-
-.mod-grid.view-large .mod-facts {
-	margin-top: auto;
 }
 
 .mod-grid.view-list {

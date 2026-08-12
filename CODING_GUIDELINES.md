@@ -6,7 +6,8 @@ These guidelines define the shared readability and maintainability standards for
 
 - Keep changes small, direct, and easy to review.
 - Prefer clear names and straightforward control flow over clever abstractions.
-- Group file-level types, interfaces, constants, and configuration before functions.
+- When a file-level declaration is justified, group types, interfaces, constants, and configuration before functions.
+- Avoid file-level globals. Keep single-use values local, and introduce a narrowly scoped shared definition only when multiple consumers need it.
 - Use blank lines to separate distinct validation and control-flow decisions when that makes the code easier to scan.
 - Comment why a decision, constraint, or workaround exists. Do not narrate the next line of code.
 - Write documentation comments as a natural description of behavior or purpose; do not repeat the identifier they document.
@@ -30,7 +31,7 @@ These guidelines define the shared readability and maintainability standards for
 - Use `const` by default. Use `let` only when reassignment is necessary. Never use `var`.
 - Prefer `async` and `await` to promise chains.
 - Use optional chaining and nullish coalescing when they express the intended nullability behavior.
-- Use `camelCase` for variables, functions, and filenames; `PascalCase` for React components and types; and `UPPER_SNAKE_CASE` for global constants, environment variables, and regular-expression patterns.
+- Use `camelCase` for variables, functions, and non-component filenames. Use `PascalCase` for React components, their filenames, and types. Use `UPPER_SNAKE_CASE` for environment variables and regular-expression patterns.
 - Keep React components focused on rendering and interaction. Filesystem policy and mutations belong in Go.
 - Use Biome for formatting and linting; do not manually fight its output.
 
