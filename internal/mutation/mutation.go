@@ -20,6 +20,8 @@ type Result struct {
 	PreviousID          string          `json:"previousID,omitempty"`
 	PreviousPrimaryPath string          `json:"previousPrimaryPath"`
 	PrimaryPath         string          `json:"primaryPath"`
+	PreviousFolderPath  string          `json:"previousFolderPath,omitempty"`
+	FolderPath          string          `json:"folderPath,omitempty"`
 	State               discovery.State `json:"state"`
 }
 

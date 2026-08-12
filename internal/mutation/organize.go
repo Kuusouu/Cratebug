@@ -376,7 +376,7 @@ func renamedStem(entry discovery.Entry, name string) (string, error) {
 	return filepath.ToSlash(filepath.Join(entry.RelativeFolder, name)), nil
 }
 
-// Produces a compatibility priority filename. Priority zero uses BentoMod's
+// Produces a Marvel Rivals priority filename. Priority zero uses the
 // leading-bang form; positive values use seven or more trailing nines.
 func priorityStem(entry discovery.Entry, priority int) (string, error) {
 	if priority < 0 {

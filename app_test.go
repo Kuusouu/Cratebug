@@ -135,12 +135,46 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name: "mod move",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.MoveMod(root, entryID, "destination")
+				return err
+			},
+		},
+		{
+			name: "folder create",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.CreateFolder(root, "", "created")
+				return err
+			},
+		},
+		{
+			name: "folder rename",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.RenameFolder(root, "source", "renamed")
+				return err
+			},
+		},
+		{
+			name: "folder move",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.MoveFolder(root, "source", "destination")
+				return err
+			},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
 			root := t.TempDir()
 			primaryPath := filepath.Join(root, "Example_9999999_P.pak")
 			if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(filepath.Join(root, "source"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(filepath.Join(root, "destination"), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			app := newApp(staticGameRunningChecker{gameRunning: true})
