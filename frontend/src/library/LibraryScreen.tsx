@@ -95,6 +95,7 @@ export function LibraryScreen() {
 	const [selectedFolder, setSelectedFolder] = useState("all");
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
+	const activeLibraryRootRef = useRef<string | null>(null);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const libraryRoot = library?.root;
 
@@ -133,15 +134,20 @@ export function LibraryScreen() {
 
 			if (!entry.primaryPath || mutatingEntryIDsRef.current.has(entry.id)) return;
 
+			const requestRoot = libraryRoot;
 			const enabled = entry.state !== "enabled";
 			setMutationError("");
 			mutatingEntryIDsRef.current.add(entry.id);
 			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 
 			try {
-				const result = await SetModEnabled(libraryRoot, entry.id, enabled);
+				const result = await SetModEnabled(requestRoot, entry.id, enabled);
+				if (activeLibraryRootRef.current !== requestRoot) return;
+
 				setLibrary((currentLibrary) => {
-					if (!currentLibrary) return currentLibrary;
+					if (!currentLibrary || currentLibrary.root !== requestRoot) {
+						return currentLibrary;
+					}
 
 					const entries = currentLibrary.entries.map((currentEntry) => {
 						if (currentEntry.id !== result.id) return currentEntry;
@@ -156,6 +162,8 @@ export function LibraryScreen() {
 					return new discovery.Library({ ...currentLibrary, entries });
 				});
 			} catch (error) {
+				if (activeLibraryRootRef.current !== requestRoot) return;
+
 				setMutationError(errorMessage(error));
 			} finally {
 				mutatingEntryIDsRef.current.delete(entry.id);
@@ -170,6 +178,7 @@ export function LibraryScreen() {
 		event?.preventDefault();
 		const root = modRoot.trim();
 		if (!root) {
+			activeLibraryRootRef.current = null;
 			setLibrary(null);
 			setScanError("");
 			setMutationError("");
@@ -179,16 +188,21 @@ export function LibraryScreen() {
 			return;
 		}
 
+		activeLibraryRootRef.current = root;
 		setLibraryState("loading");
 		setScanError("");
 		setMutationError("");
 		try {
 			const result = await ScanLibrary(root);
+			if (activeLibraryRootRef.current !== root) return;
+
 			setLibrary(result);
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
 		} catch (error) {
+			if (activeLibraryRootRef.current !== root) return;
+
 			setScanError(errorMessage(error));
 			setLibraryState("error");
 		}
