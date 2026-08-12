@@ -53,6 +53,34 @@ type SetPriorityOperation struct {
 	priority int
 }
 
+// Moves one scanner-discovered mod to a scanner-known physical folder.
+type MoveModOperation struct {
+	modRoot           string
+	entryID           string
+	destinationFolder string
+}
+
+// Creates one physical folder beneath a scanner-known parent folder.
+type CreateFolderOperation struct {
+	modRoot      string
+	parentFolder string
+	name         string
+}
+
+// Renames one scanner-known physical folder.
+type RenameFolderOperation struct {
+	modRoot string
+	folder  string
+	name    string
+}
+
+// Moves one scanner-known physical folder beneath a scanner-known parent.
+type MoveFolderOperation struct {
+	modRoot           string
+	folder            string
+	destinationParent string
+}
+
 // Creates a mutation executor with the supplied game-running detector.
 func NewExecutor(gameRunningChecker GameRunningChecker) Executor {
 	return Executor{gameRunningChecker: gameRunningChecker}
@@ -71,6 +99,26 @@ func NewRenameModOperation(modRoot, entryID, name string) RenameModOperation {
 // Creates the narrow priority operation exposed by the Phase 4 application boundary.
 func NewSetPriorityOperation(modRoot, entryID string, priority int) SetPriorityOperation {
 	return SetPriorityOperation{modRoot: modRoot, entryID: entryID, priority: priority}
+}
+
+// Creates the narrow mod-move operation exposed by the Phase 4 application boundary.
+func NewMoveModOperation(modRoot, entryID, destinationFolder string) MoveModOperation {
+	return MoveModOperation{modRoot: modRoot, entryID: entryID, destinationFolder: destinationFolder}
+}
+
+// Creates the narrow folder-creation operation exposed by the Phase 4 application boundary.
+func NewCreateFolderOperation(modRoot, parentFolder, name string) CreateFolderOperation {
+	return CreateFolderOperation{modRoot: modRoot, parentFolder: parentFolder, name: name}
+}
+
+// Creates the narrow folder-rename operation exposed by the Phase 4 application boundary.
+func NewRenameFolderOperation(modRoot, folder, name string) RenameFolderOperation {
+	return RenameFolderOperation{modRoot: modRoot, folder: folder, name: name}
+}
+
+// Creates the narrow folder-move operation exposed by the Phase 4 application boundary.
+func NewMoveFolderOperation(modRoot, folder, destinationParent string) MoveFolderOperation {
+	return MoveFolderOperation{modRoot: modRoot, folder: folder, destinationParent: destinationParent}
 }
 
 // Applies the operation only after its game-running restriction has been enforced.
@@ -127,4 +175,44 @@ func (operation SetPriorityOperation) GameRunningRequirement() GameRunningRequir
 // Performs the planned priority change after the executor has authorized it.
 func (operation SetPriorityOperation) Execute() (Result, error) {
 	return setPriority(operation.modRoot, operation.entryID, operation.priority)
+}
+
+// Blocks a bundle move while the game may have its archive files open.
+func (operation MoveModOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Moves the scanner-selected bundle after game-running protection succeeds.
+func (operation MoveModOperation) Execute() (Result, error) {
+	return moveMod(operation.modRoot, operation.entryID, operation.destinationFolder)
+}
+
+// Blocks folder creation while the game may be using the mod directory.
+func (operation CreateFolderOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Creates the requested child folder after game-running protection succeeds.
+func (operation CreateFolderOperation) Execute() (Result, error) {
+	return createFolder(operation.modRoot, operation.parentFolder, operation.name)
+}
+
+// Blocks folder renames while the game may be using the mod directory.
+func (operation RenameFolderOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Renames the scanner-selected folder after game-running protection succeeds.
+func (operation RenameFolderOperation) Execute() (Result, error) {
+	return renameFolder(operation.modRoot, operation.folder, operation.name)
+}
+
+// Blocks folder moves while the game may be using the mod directory.
+func (operation MoveFolderOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Moves the scanner-selected folder after game-running protection succeeds.
+func (operation MoveFolderOperation) Execute() (Result, error) {
+	return moveFolderToParent(operation.modRoot, operation.folder, operation.destinationParent)
 }
