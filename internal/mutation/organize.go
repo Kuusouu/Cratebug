@@ -133,14 +133,8 @@ func setPriorityWithMove(modRoot, entryID string, priority int, move func(string
 // Builds a complete, no-replace rename plan for the scanner-recognized bundle.
 // Planning validates every source and destination before any file is moved.
 func buildBundlePlan(modRoot string, entry discovery.Entry, destinationStem string) (bundlePlan, error) {
-	if entry.Kind != discovery.EntryMod || entry.PrimaryPath == "" {
-		return bundlePlan{}, fmt.Errorf("mod does not have a mutable primary file")
-	}
-	if hasIssue(entry.Issues, discovery.IssueAmbiguousPrimary) {
-		return bundlePlan{}, fmt.Errorf("mod %q has multiple supported primaries and cannot be changed safely", entry.PrimaryPath)
-	}
-	if hasIssue(entry.Issues, discovery.IssueMissingUTOC) || hasIssue(entry.Issues, discovery.IssueMissingUCAS) {
-		return bundlePlan{}, fmt.Errorf("mod %q is an incomplete IoStore bundle and cannot be changed safely", entry.PrimaryPath)
+	if err := validateMutableBundleEntry(entry); err != nil {
+		return bundlePlan{}, err
 	}
 
 	root, err := filepath.Abs(modRoot)
@@ -189,6 +183,31 @@ func buildBundlePlan(modRoot string, entry discovery.Entry, destinationStem stri
 		plan.moves = append(plan.moves, move)
 	}
 	return plan, nil
+}
+
+// Applies the checks for operations that require a complete bundle to move safely.
+func validateMutableBundleEntry(entry discovery.Entry) error {
+	if err := validateDeletableBundleEntry(entry); err != nil {
+		return err
+	}
+
+	if hasIssue(entry.Issues, discovery.IssueMissingUTOC) || hasIssue(entry.Issues, discovery.IssueMissingUCAS) {
+		return fmt.Errorf("mod %q is an incomplete IoStore bundle and cannot be changed safely", entry.PrimaryPath)
+	}
+	return nil
+}
+
+// Applies the checks required before a scanner-recognized bundle can be deleted.
+// Deletion intentionally permits incomplete IoStore bundles because it only sends
+// the primary and sidecars that are present to the Recycle Bin.
+func validateDeletableBundleEntry(entry discovery.Entry) error {
+	if entry.Kind != discovery.EntryMod || entry.PrimaryPath == "" {
+		return fmt.Errorf("mod does not have a deletable primary file")
+	}
+	if hasIssue(entry.Issues, discovery.IssueAmbiguousPrimary) {
+		return fmt.Errorf("mod %q has multiple supported primaries and cannot be deleted safely", entry.PrimaryPath)
+	}
+	return nil
 }
 
 // Validates one bundle member before it becomes part of a multi-file rename.

@@ -96,12 +96,12 @@ handling, and recovery from injected failures.
 
 ## 4.4 Implement recoverable deletion
 
-* Delete a complete mod bundle through the Windows Recycle Bin using a reviewed
-  platform boundary; do not implement a permanent-delete fallback.
-* Require a clear confirmation with a short destructive-action delay before
-  accepting deletion.
-* Refuse deletion when the bundle is invalid, ambiguous, outside the mod root,
-  or the game-running safety check blocks it.
+* Delete a scanner-recognized mod bundle through the Windows Recycle Bin using
+  a reviewed platform boundary; do not implement a permanent-delete fallback.
+* Require an explicit confirmation request; the destructive-action delay is a
+  Task 4.5 UI safeguard, not backend timing policy.
+* Permit incomplete IoStore bundles to delete their present recognized members;
+  refuse ambiguous, missing-primary, outside-root, or game-running requests.
 * Reconcile the catalog after success or failure and accurately report any
   remaining files.
 
@@ -113,6 +113,8 @@ partial or platform failures report the final state.
 
 * Add focused controls and dialogs for rename, priority, move, folder
 management, and deletion to the existing library UI.
+* Require a clear destructive-deletion confirmation with a short delay before
+  sending the backend request.
 * Keep controls and confirmations consistent with discovered state, including
 folder hierarchy and bundle type.
 * Prevent duplicate and conflicting requests while a mutation is in progress.

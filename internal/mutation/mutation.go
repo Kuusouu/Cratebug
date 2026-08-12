@@ -22,6 +22,7 @@ type Result struct {
 	PrimaryPath         string          `json:"primaryPath"`
 	PreviousFolderPath  string          `json:"previousFolderPath,omitempty"`
 	FolderPath          string          `json:"folderPath,omitempty"`
+	Deleted             bool            `json:"deleted,omitempty"`
 	State               discovery.State `json:"state"`
 }
 
