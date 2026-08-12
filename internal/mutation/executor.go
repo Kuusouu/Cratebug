@@ -14,7 +14,7 @@ const (
 )
 
 // Returned before a blocked operation changes the filesystem.
-var ErrGameRunning = errors.New("Marvel Rivals is running; close it before changing mods")
+var ErrGameRunning = errors.New("Marvel Rivals is running. Close it before changing mods.")
 
 // Reports whether the established Marvel Rivals executable is running.
 type GameRunningChecker interface {
