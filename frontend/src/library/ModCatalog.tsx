@@ -118,7 +118,9 @@ export function ModCatalog({
 
 // Avoids work for retained entries during local navigation changes.
 const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMode }: ModCardProps) {
-	const canChangeState = entry.kind === "mod" && entry.primaryPath !== undefined;
+	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
+	const canChangeState =
+		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
 	const enabled = entry.state === "enabled";
 	const actionLabel = enabled ? "Disable" : "Enable";
 	const facts = (

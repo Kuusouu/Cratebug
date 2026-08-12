@@ -20,10 +20,11 @@ type transitionTest struct {
 }
 
 type rejectedTransitionTest struct {
-	name    string
-	files   []string
-	primary string
-	enabled bool
+	name               string
+	files              []string
+	primary            string
+	lookupScannerEntry bool
+	enabled            bool
 }
 
 type staticGameRunningChecker struct {
@@ -82,10 +83,10 @@ func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 // Ensures every rejected plan leaves the complete fixture unchanged.
 func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T) {
 	for _, test := range []rejectedTransitionTest{
-		{name: "ambiguous primary", files: []string{"Example.pak", "Example.pak_crateoff"}, primary: "Example.pak_crateoff", enabled: true},
+		{name: "ambiguous primary", files: []string{"Example.pak", "Example.pak_crateoff"}, primary: "Example.pak_crateoff", lookupScannerEntry: true, enabled: true},
 		{name: "missing scanner entry", files: []string{"Example.pak"}, primary: "missing.pak"},
-		{name: "already enabled", files: []string{"Example.pak"}, primary: "Example.pak", enabled: true},
-		{name: "path traversal", files: []string{"Example.pak"}, primary: "../Example.pak"},
+		{name: "already enabled", files: []string{"Example.pak"}, primary: "Example.pak", lookupScannerEntry: true, enabled: true},
+		{name: "forged entry ID", files: []string{"Example.pak"}, primary: "forged-entry-id"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
@@ -95,7 +96,7 @@ func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T)
 			}
 			before := snapshotFiles(t, root, "")
 			entryID := test.primary
-			if test.name != "missing scanner entry" && test.name != "path traversal" {
+			if test.lookupScannerEntry {
 				entryID = scannedEntryID(t, root, test.primary)
 			}
 
@@ -109,6 +110,29 @@ func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T)
 				t.Errorf("rejected operation changed files\nbefore: %#v\nafter: %#v", before, after)
 			}
 		})
+	}
+}
+
+// Confirms planning rejects a future unsafe primary path without reaching the filesystem.
+func TestBuildPlanRejectsTraversalPrimaryPathWithoutChanges(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
+	before := snapshotFiles(t, root, "")
+	entry := discovery.Entry{
+		Kind:        discovery.EntryMod,
+		PrimaryPath: "../Example.pak",
+		State:       discovery.StateEnabled,
+	}
+
+	// Act
+	if _, err := buildPlan(root, entry, false); err == nil {
+		t.Fatal("buildPlan succeeded, want traversal error")
+	}
+
+	// Assert
+	if after := snapshotFiles(t, root, ""); !reflect.DeepEqual(before, after) {
+		t.Errorf("rejected plan changed files\nbefore: %#v\nafter: %#v", before, after)
 	}
 }
 
