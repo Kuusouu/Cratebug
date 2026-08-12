@@ -173,6 +173,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Worker distributed as a versioned release artifact from the maintained UAssetToolRivals fork; normal Cratebug development and builds do not require the .NET toolchain unless the worker is explicitly rebuilt from source
 - FFI comparison only when a concrete performance, packaging, or operational reason exists
 - Crash, packaging, performance, and complexity validation for the selected boundary
+- Evaluate bounded parallel archive inspection and archive-tool actions using representative mod libraries; adopt concurrency only when measurements show it improves responsiveness without weakening cancellation, progress reporting, deterministic results, or filesystem safety
 - Version checks, structured errors, logging, and test doubles
 - Representative read-only archive operations from the Cratebug subset
 
@@ -183,6 +184,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - A written decision selects a supervised helper process by default, or documents the concrete reason to pursue FFI instead.
 - Worker release version, source revision, and checksum are pinned and documented.
 - Representative failures do not corrupt or crash Cratebug unexpectedly.
+- The review records the parallelism evaluation, benchmark evidence, selected concurrency policy, and any decision to defer concurrency.
 - Production packaging works.
 - Licensing and notices are documented.
 - Review approves the boundary before archive mutation begins.
