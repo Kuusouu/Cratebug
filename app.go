@@ -36,3 +36,15 @@ func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Res
 	operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
 	return a.mutationExecutor.Execute(operation)
 }
+
+// Renames one current scanner entry without exposing arbitrary filesystem paths.
+func (a *App) RenameMod(modRoot, entryID, name string) (mutation.Result, error) {
+	operation := mutation.NewRenameModOperation(modRoot, entryID, name)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Changes one current scanner entry's filename-based priority.
+func (a *App) SetModPriority(modRoot, entryID string, priority int) (mutation.Result, error) {
+	operation := mutation.NewSetPriorityOperation(modRoot, entryID, priority)
+	return a.mutationExecutor.Execute(operation)
+}

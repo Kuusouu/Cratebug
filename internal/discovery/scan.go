@@ -16,8 +16,10 @@ const (
 	entryIDOrphanedSidecarPrefix = "orphaned-sidecar"
 	prioritySuffix               = "_P"
 	prioritySeparator            = "_"
-	minimumTrailingNines         = 7
-	trailingNinePriorityOffset   = minimumTrailingNines - 1
+	// MinimumTrailingNines is the shortest trailing-nine priority form used by
+	// Marvel Rivals mod filenames.
+	MinimumTrailingNines       = 7
+	trailingNinePriorityOffset = MinimumTrailingNines - 1
 )
 
 // Describes whether a primary file is enabled or disabled.
@@ -375,7 +377,7 @@ func trailingNinesSuffixStart(stem string) int {
 		return -1
 	}
 	digits := stem[separator+1 : len(stem)-len(prioritySuffix)]
-	if len(digits) < minimumTrailingNines {
+	if len(digits) < MinimumTrailingNines {
 		return -1
 	}
 	for _, digit := range digits {

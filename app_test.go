@@ -115,3 +115,50 @@ func TestSetModEnabled(t *testing.T) {
 		t.Errorf("result = %#v, want enabled Example_9999999_P.pak", result)
 	}
 }
+
+func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		run  func(app *App, root, entryID string) error
+	}{
+		{
+			name: "rename",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.RenameMod(root, entryID, "Renamed")
+				return err
+			},
+		},
+		{
+			name: "priority",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.SetModPriority(root, entryID, 2)
+				return err
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			root := t.TempDir()
+			primaryPath := filepath.Join(root, "Example_9999999_P.pak")
+			if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			app := newApp(staticGameRunningChecker{gameRunning: true})
+			library, err := app.ScanLibrary(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Act
+			err = test.run(app, root, library.Entries[0].ID)
+
+			// Assert
+			if !errors.Is(err, mutation.ErrGameRunning) {
+				t.Fatalf("organization operation error = %v, want ErrGameRunning", err)
+			}
+			if _, err := os.Lstat(primaryPath); err != nil {
+				t.Errorf("blocked operation changed primary: %v", err)
+			}
+		})
+	}
+}
