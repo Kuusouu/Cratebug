@@ -112,6 +112,23 @@ type Library struct {
 	Entries []Entry `json:"entries"`
 }
 
+type extension string
+
+type fileRecord struct {
+	path string
+	stem string
+	kind extension
+}
+
+const (
+	extensionPrimaryPak extension = ".pak"
+	extensionCrateoff   extension = ".pak_crateoff"
+	extensionBento      extension = ".bak_bento"
+	extensionLegacy     extension = ".pak_disabled"
+	extensionUTOC       extension = ".utoc"
+	extensionUCAS       extension = ".ucas"
+)
+
 // Scan recursively discovers supported primaries and sidecars under root.
 // It never writes to the filesystem.
 func Scan(root string) (Library, error) {
@@ -188,23 +205,6 @@ func Scan(root string) (Library, error) {
 		return entrySortKey(result.Entries[i]) < entrySortKey(result.Entries[j])
 	})
 	return result, nil
-}
-
-type extension string
-
-const (
-	extensionPrimaryPak extension = ".pak"
-	extensionCrateoff   extension = ".pak_crateoff"
-	extensionBento      extension = ".bak_bento"
-	extensionLegacy     extension = ".pak_disabled"
-	extensionUTOC       extension = ".utoc"
-	extensionUCAS       extension = ".ucas"
-)
-
-type fileRecord struct {
-	path string
-	stem string
-	kind extension
 }
 
 // Groups case-insensitively while retaining original path casing for display.

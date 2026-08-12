@@ -47,9 +47,11 @@ var expectedFixturePaths = []string{
 func TestFixtureLibraryIntegrity(t *testing.T) {
 	t.Parallel()
 
+	// Arrange
 	root := filepath.Join("testdata", "library")
 	var actualPaths []string
 
+	// Act
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -89,6 +91,7 @@ func TestFixtureLibraryIntegrity(t *testing.T) {
 		t.Fatalf("walk fixture library: %v", err)
 	}
 
+	// Assert
 	sort.Strings(actualPaths)
 	if !reflect.DeepEqual(actualPaths, expectedFixturePaths) {
 		t.Errorf("fixture inventory mismatch\nwant: %v\ngot:  %v", expectedFixturePaths, actualPaths)
