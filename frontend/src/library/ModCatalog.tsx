@@ -174,11 +174,9 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 			</article>
 		);
 	return (
-		<article aria-busy={isMutating} className="mod-card">
-			<div className="mod-card-summary">
-				{heading}
-				{facts}
-			</div>
+		<article aria-busy={isMutating} className={`mod-card${action ? " has-action" : ""}`}>
+			{heading}
+			{facts}
 			{action}
 			{issues}
 		</article>
