@@ -16,6 +16,11 @@ type CatalogMessage = {
 	isError?: boolean;
 };
 
+type ModCardProps = {
+	entry: discovery.Entry;
+	viewMode: ModCatalogProps["viewMode"];
+};
+
 // Presents orphaned sidecars differently from primary-backed entries.
 function stateLabel(entry: discovery.Entry): string {
 	if (entry.kind === "orphaned_sidecar") return "Orphaned sidecar";
@@ -71,15 +76,18 @@ function CatalogState({ heading, message, isError = false }: CatalogMessage) {
 // Renders already-scanned, locally-filtered entries without filesystem access.
 export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: ModCatalogProps) {
 	const stateMessage = scanStateMessage(state, scanError);
-	if (stateMessage) return <CatalogState {...stateMessage} />;
+	if (stateMessage) {
+		return <CatalogState {...stateMessage} />;
+	}
 
-	if (hasLibrary && entries.length === 0)
+	if (hasLibrary && entries.length === 0) {
 		return (
 			<CatalogState
 				heading="No matching mods"
 				message="Try another folder or adjust the search query."
 			/>
 		);
+	}
 
 	return (
 		<div className={`mod-grid view-${viewMode}`}>
@@ -91,13 +99,7 @@ export function ModCatalog({ entries, state, scanError, hasLibrary, viewMode }: 
 }
 
 // Avoids work for retained entries during local navigation changes.
-const ModCard = memo(function ModCard({
-	entry,
-	viewMode,
-}: {
-	entry: discovery.Entry;
-	viewMode: ModCatalogProps["viewMode"];
-}) {
+const ModCard = memo(function ModCard({ entry, viewMode }: ModCardProps) {
 	const facts = (
 		<div className="mod-facts">
 			<span>{stateLabel(entry)}</span>

@@ -23,6 +23,17 @@ type TooltipState = {
 	y: number;
 };
 
+type FolderTreeItemProps = {
+	node: FolderNode;
+	selectedFolder: string;
+	expandedFolders: ReadonlySet<string>;
+	entryCounts: ReadonlyMap<string, number>;
+	onSelect: (folder: string) => void;
+	onHideTooltip: () => void;
+	onShowTooltip: (content: string, target: HTMLElement) => void;
+	onToggle: (folder: string) => void;
+};
+
 // Turns flat relative paths into the expandable sidebar hierarchy.
 function buildFolderTree(folders: string[]): FolderNode[] {
 	const nodes = new Map<string, FolderNode>();
@@ -35,7 +46,9 @@ function buildFolderTree(folders: string[]): FolderNode[] {
 
 	for (const path of folders) {
 		const node = nodes.get(path);
-		if (!node) continue;
+		if (!node) {
+			continue;
+		}
 
 		const parentPath = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
 		const parent = nodes.get(parentPath);
@@ -75,7 +88,9 @@ export const FolderNavigation = memo(function FolderNavigation({
 
 	const showTooltip = useCallback((content: string, target: HTMLElement) => {
 		const container = target.closest<HTMLElement>(".app-shell");
-		if (!container) return;
+		if (!container) {
+			return;
+		}
 
 		const { right, top, height } = target.getBoundingClientRect();
 		setTooltip({ content, container, x: right, y: top + height / 2 });
@@ -85,7 +100,9 @@ export const FolderNavigation = memo(function FolderNavigation({
 
 	// Fixed-position tooltips must disappear when their source row moves.
 	useEffect(() => {
-		if (!tooltip) return;
+		if (!tooltip) {
+			return;
+		}
 
 		window.addEventListener("scroll", hideTooltip, true);
 		window.addEventListener("resize", hideTooltip);
@@ -133,18 +150,6 @@ export const FolderNavigation = memo(function FolderNavigation({
 		</nav>
 	);
 });
-
-type FolderTreeItemProps = {
-	node: FolderNode;
-	selectedFolder: string;
-	expandedFolders: ReadonlySet<string>;
-	entryCounts: ReadonlyMap<string, number>;
-	onSelect: (folder: string) => void;
-	onHideTooltip: () => void;
-	onShowTooltip: (content: string, target: HTMLElement) => void;
-	onToggle: (folder: string) => void;
-};
-
 // Identifies the small part of the tree that must update on selection.
 function selectionTouchesBranch(selectedFolder: string, folderPath: string): boolean {
 	return selectedFolder === folderPath || selectedFolder.startsWith(`${folderPath}/`);
@@ -166,7 +171,9 @@ function sameFolderTreeItemProps(
 	)
 		return false;
 
-	if (previous.selectedFolder === next.selectedFolder) return true;
+	if (previous.selectedFolder === next.selectedFolder) {
+		return true;
+	}
 
 	return (
 		!selectionTouchesBranch(previous.selectedFolder, previous.node.path) &&
