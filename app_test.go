@@ -163,6 +163,13 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name: "deletion",
+			run: func(app *App, root, entryID string) error {
+				_, err := app.DeleteMod(root, entryID, true)
+				return err
+			},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Arrange
