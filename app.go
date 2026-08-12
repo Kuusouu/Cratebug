@@ -48,3 +48,27 @@ func (a *App) SetModPriority(modRoot, entryID string, priority int) (mutation.Re
 	operation := mutation.NewSetPriorityOperation(modRoot, entryID, priority)
 	return a.mutationExecutor.Execute(operation)
 }
+
+// Moves one current scanner entry to an existing scanner-known folder.
+func (a *App) MoveMod(modRoot, entryID, destinationFolder string) (mutation.Result, error) {
+	operation := mutation.NewMoveModOperation(modRoot, entryID, destinationFolder)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Creates one folder beneath the root or an existing scanner-known folder.
+func (a *App) CreateFolder(modRoot, parentFolder, name string) (mutation.Result, error) {
+	operation := mutation.NewCreateFolderOperation(modRoot, parentFolder, name)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Renames one scanner-known physical folder.
+func (a *App) RenameFolder(modRoot, folder, name string) (mutation.Result, error) {
+	operation := mutation.NewRenameFolderOperation(modRoot, folder, name)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Moves one scanner-known physical folder beneath the root or another scanner-known folder.
+func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Result, error) {
+	operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
+	return a.mutationExecutor.Execute(operation)
+}
