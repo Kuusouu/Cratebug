@@ -24,6 +24,7 @@ Read only what the task requires:
 - `TASKS.md` for the active numbered task and required validation.
 - `docs/decisions/` for accepted technical decisions.
 - `README.md` for canonical development commands.
+- `CODING_GUIDELINES.md` for language, test, frontend, and CSS conventions.
 
 Before editing, identify the active task and confirm that the work belongs in the current roadmap phase. Do not implement later-phase work without approval.
 
@@ -38,6 +39,7 @@ Before editing, identify the active task and confirm that the work belongs in th
 
 - Use the minimum change that completely solves the task.
 - Match established project structure, naming, and style.
+- Follow `CODING_GUIDELINES.md` for code, test, frontend, and CSS conventions.
 - Keep Go domain and filesystem behavior independent of Wails and React.
 - Keep filesystem operations out of React components.
 - Do not add dependencies unless the active task requires them.

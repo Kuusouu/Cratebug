@@ -10,15 +10,24 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 )
 
+type transitionTest struct {
+	name        string
+	source      string
+	enabled     bool
+	destination string
+	state       discovery.State
+}
+
+type rejectedTransitionTest struct {
+	name    string
+	files   []string
+	primary string
+	enabled bool
+}
+
 // Covers all supported filename transitions with isolated filesystem fixtures.
 func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
-	for _, test := range []struct {
-		name        string
-		source      string
-		enabled     bool
-		destination string
-		state       discovery.State
-	}{
+	for _, test := range []transitionTest{
 		{name: "disable", source: "Example_9999999_P.pak", destination: "Example_9999999_P.pak_crateoff", state: discovery.StateDisabled},
 		{name: "disable nested", source: "nested/Example_9999999_P.pak", destination: "nested/Example_9999999_P.pak_crateoff", state: discovery.StateDisabled},
 		{name: "enable cratebug", source: "Example_9999999_P.pak_crateoff", enabled: true, destination: "Example_9999999_P.pak", state: discovery.StateEnabled},
@@ -26,6 +35,7 @@ func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 		{name: "enable legacy", source: "Example_9999999_P.pak_disabled", enabled: true, destination: "Example_9999999_P.pak", state: discovery.StateEnabled},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			// Arrange
 			root := t.TempDir()
 			writeFile(t, filepath.Join(root, test.source), "primary")
 			sidecarFolder := filepath.Dir(test.source)
@@ -33,10 +43,12 @@ func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 			writeFile(t, filepath.Join(root, sidecarFolder, "Example_9999999_P.ucas"), "ucas")
 			beforeSidecars := snapshotFiles(t, root, ".utoc", ".ucas")
 
+			// Act
 			result, err := SetEnabled(root, test.source, test.enabled)
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Assert
 			if result.PrimaryPath != test.destination {
 				t.Errorf("PrimaryPath = %q, want %q", result.PrimaryPath, test.destination)
 			}
@@ -58,26 +70,26 @@ func TestSetEnabledTransitionsPrimaryWithoutChangingSidecars(t *testing.T) {
 
 // Ensures every rejected plan leaves the complete fixture unchanged.
 func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T) {
-	for _, test := range []struct {
-		name    string
-		files   []string
-		primary string
-		enabled bool
-	}{
+	for _, test := range []rejectedTransitionTest{
 		{name: "ambiguous primary", files: []string{"Example.pak", "Example.pak_crateoff"}, primary: "Example.pak_crateoff", enabled: true},
 		{name: "missing scanner entry", files: []string{"Example.pak"}, primary: "missing.pak"},
 		{name: "already enabled", files: []string{"Example.pak"}, primary: "Example.pak", enabled: true},
 		{name: "path traversal", files: []string{"Example.pak"}, primary: "../Example.pak"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			// Arrange
 			root := t.TempDir()
 			for _, file := range test.files {
 				writeFile(t, filepath.Join(root, file), file)
 			}
 			before := snapshotFiles(t, root, "")
+
+			// Act
 			if _, err := SetEnabled(root, test.primary, test.enabled); err == nil {
 				t.Fatal("SetEnabled succeeded, want error")
 			}
+
+			// Assert
 			if after := snapshotFiles(t, root, ""); !reflect.DeepEqual(before, after) {
 				t.Errorf("rejected operation changed files\nbefore: %#v\nafter: %#v", before, after)
 			}
@@ -87,6 +99,7 @@ func TestSetEnabledRejectsUnsafeOrInvalidTransitionsWithoutChanges(t *testing.T)
 
 // Exercises collision handling without a second primary, which the scanner rejects as ambiguous first.
 func TestSetEnabledRejectsDestinationCollisionWithoutChanges(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
 	if err := os.Mkdir(filepath.Join(root, "Example.pak_crateoff"), 0o700); err != nil {
@@ -94,9 +107,12 @@ func TestSetEnabledRejectsDestinationCollisionWithoutChanges(t *testing.T) {
 	}
 	before := snapshotFiles(t, root, "")
 
+	// Act
 	if _, err := SetEnabled(root, "Example.pak", false); err == nil {
 		t.Fatal("SetEnabled succeeded, want destination collision error")
 	}
+
+	// Assert
 	if after := snapshotFiles(t, root, ""); !reflect.DeepEqual(before, after) {
 		t.Errorf("collision changed files\nbefore: %#v\nafter: %#v", before, after)
 	}
@@ -104,6 +120,7 @@ func TestSetEnabledRejectsDestinationCollisionWithoutChanges(t *testing.T) {
 
 // Confirms a destination created after planning is never overwritten by the native rename.
 func TestPlanApplyRejectsDestinationCreatedAfterPlanning(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "Example.pak"), "source")
 	library, err := discovery.Scan(root)
@@ -117,17 +134,23 @@ func TestPlanApplyRejectsDestinationCreatedAfterPlanning(t *testing.T) {
 	}
 	writeFile(t, filepath.Join(root, "Example.pak_crateoff"), "destination")
 
+	// Act
 	if err := plan.apply(); err == nil {
 		t.Fatal("plan.apply succeeded, want destination collision error")
 	}
+
+	// Assert
 	assertFileContents(t, filepath.Join(root, "Example.pak"), "source")
 	assertFileContents(t, filepath.Join(root, "Example.pak_crateoff"), "destination")
 }
 
 // Verifies the operation only accepts entries that the current scanner produced.
 func TestSetEnabledUsesCurrentScannerState(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
+
+	// Act
 	if _, err := SetEnabled(root, "Example.pak", false); err != nil {
 		t.Fatal(err)
 	}
@@ -136,6 +159,11 @@ func TestSetEnabledUsesCurrentScannerState(t *testing.T) {
 	}
 	if _, err := SetEnabled(root, "Example.pak_crateoff", true); err != nil {
 		t.Fatal(err)
+	}
+
+	// Assert
+	if _, err := os.Lstat(filepath.Join(root, "Example.pak")); err != nil {
+		t.Errorf("enabled primary is missing: %v", err)
 	}
 }
 

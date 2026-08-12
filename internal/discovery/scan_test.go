@@ -8,13 +8,39 @@ import (
 	"testing"
 )
 
+type entryExpectation struct {
+	path           string
+	kind           EntryKind
+	format         BundleFormat
+	state          State
+	disabledFormat DisabledFormat
+	sidecars       Sidecars
+	issues         []IssueCode
+}
+
+type fileSnapshot struct {
+	contents string
+	mode     fs.FileMode
+	modTime  int64
+}
+
+type priorityExpectation struct {
+	kind  PriorityKind
+	value int
+}
+
 // Verifies supported formats and fixture-specific diagnostics.
 func TestScanFixtureLibrary(t *testing.T) {
+	// Arrange
 	root := copyFixtureLibrary(t)
+
+	// Act
 	library, err := Scan(root)
 	if err != nil {
 		t.Fatalf("scan fixtures: %v", err)
 	}
+
+	// Assert
 	if len(library.Entries) != 22 {
 		t.Fatalf("entry count = %d, want 22", len(library.Entries))
 	}
@@ -44,10 +70,7 @@ func TestScanFixtureLibrary(t *testing.T) {
 	assertOrphan(t, library.Entries, Sidecars{UTOC: "orphan/OrphanUtoc.utoc"})
 	assertOrphan(t, library.Entries, Sidecars{UCAS: "orphan/OrphanUcas.ucas"})
 
-	priorityCases := map[string]struct {
-		kind  PriorityKind
-		value int
-	}{
+	priorityCases := map[string]priorityExpectation{
 		"priority/!Example_9999999_P.pak":      {kind: PriorityLeadingBang, value: 0},
 		"priority/Example_9999999_P.pak":       {kind: PriorityTrailingNine, value: 1},
 		"priority/Example_99999999_P.pak":      {kind: PriorityTrailingNine, value: 2},
@@ -70,11 +93,14 @@ func TestScanFixtureLibrary(t *testing.T) {
 
 // Rejects missing paths and files passed as scan roots.
 func TestScanRejectsInvalidRoots(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	file := filepath.Join(root, "file")
 	if err := os.WriteFile(file, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+
+	// Act and assert
 	for _, path := range []string{filepath.Join(root, "missing"), file} {
 		if _, err := Scan(path); err == nil {
 			t.Errorf("Scan(%q) succeeded, want error", path)
@@ -84,11 +110,16 @@ func TestScanRejectsInvalidRoots(t *testing.T) {
 
 // Returns an empty, non-nil catalog for an empty directory.
 func TestScanEmptyRoot(t *testing.T) {
-	library, err := Scan(t.TempDir())
+	// Arrange
+	root := t.TempDir()
+
+	// Act
+	library, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// Assert
 	if library.Entries == nil {
 		t.Fatal("entries = nil, want an empty slice")
 	}
@@ -100,6 +131,7 @@ func TestScanEmptyRoot(t *testing.T) {
 
 // Keeps relevant relative paths intact while ignoring unrelated files.
 func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "A", "B"), 0o700); err != nil {
 		t.Fatal(err)
@@ -111,10 +143,14 @@ func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+
+	// Act
 	library, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Assert
 	if len(library.Entries) != 1 || library.Entries[0].RelativeFolder != "A/B" {
 		t.Fatalf("entries = %#v, want one entry in A/B", library.Entries)
 	}
@@ -122,16 +158,21 @@ func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
 
 // Associates case-insensitive sidecars without changing display casing.
 func TestScanGroupsMixedCaseNames(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	for _, name := range []string{"Example.pak", "example.utoc"} {
 		if err := os.WriteFile(filepath.Join(root, name), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
+
+	// Act
 	library, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Assert
 	if len(library.Entries) != 1 {
 		t.Fatalf("entry count = %d, want 1", len(library.Entries))
 	}
@@ -143,16 +184,21 @@ func TestScanGroupsMixedCaseNames(t *testing.T) {
 
 // Reports incomplete and ambiguous conditions together.
 func TestScanPreservesSimultaneousIssues(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	for _, name := range []string{"Example.pak", "Example.pak_crateoff", "Example.utoc"} {
 		if err := os.WriteFile(filepath.Join(root, name), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
+
+	// Act
 	library, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Assert
 	if len(library.Entries) != 2 {
 		t.Fatalf("entry count = %d, want 2", len(library.Entries))
 	}
@@ -165,11 +211,16 @@ func TestScanPreservesSimultaneousIssues(t *testing.T) {
 
 // Proves the read-only scanner leaves fixtures unchanged.
 func TestScanDoesNotModifyFiles(t *testing.T) {
+	// Arrange
 	root := copyFixtureLibrary(t)
 	before := snapshotFiles(t, root)
+
+	// Act
 	if _, err := Scan(root); err != nil {
 		t.Fatal(err)
 	}
+
+	// Assert
 	after := snapshotFiles(t, root)
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("Scan changed fixture files")
@@ -178,7 +229,10 @@ func TestScanDoesNotModifyFiles(t *testing.T) {
 
 // Verifies deterministic fresh snapshots after filesystem changes.
 func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
+	// Arrange
 	root := copyFixtureLibrary(t)
+
+	// Act
 	first, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
@@ -187,9 +241,11 @@ func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Assert
 	if !reflect.DeepEqual(first, second) {
 		t.Fatal("repeated scans of unchanged files differ")
 	}
+	// Arrange changed fixture state
 	newPath := filepath.Join(root, "new", "Added_9999999_P.pak")
 	if err := os.MkdirAll(filepath.Dir(newPath), 0o700); err != nil {
 		t.Fatal(err)
@@ -197,6 +253,7 @@ func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
 	if err := os.WriteFile(newPath, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// Act
 	third, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
@@ -208,16 +265,19 @@ func TestScanIsRepeatableAndReflectsFilesystemChanges(t *testing.T) {
 
 // Checks that filesystem enumeration cannot affect output order.
 func TestScanOrderingIsDeterministic(t *testing.T) {
+	// Arrange
 	root := t.TempDir()
 	for _, name := range []string{"Z_9999999_P.pak", "A_9999999_P.pak", "M_9999999_P.pak"} {
 		if err := os.WriteFile(filepath.Join(root, name), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
+	// Act
 	library, err := Scan(root)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Assert
 	paths := make([]string, 0, len(library.Entries))
 	for _, entry := range library.Entries {
 		paths = append(paths, entry.PrimaryPath)
@@ -226,16 +286,6 @@ func TestScanOrderingIsDeterministic(t *testing.T) {
 	if !reflect.DeepEqual(paths, want) {
 		t.Fatalf("paths = %v, want %v", paths, want)
 	}
-}
-
-type entryExpectation struct {
-	path           string
-	kind           EntryKind
-	format         BundleFormat
-	state          State
-	disabledFormat DisabledFormat
-	sidecars       Sidecars
-	issues         []IssueCode
 }
 
 // Compares every scanner field covered by a fixture expectation.
@@ -311,12 +361,6 @@ func copyFixtureLibrary(t *testing.T) string {
 		t.Fatalf("copy fixtures: %v", err)
 	}
 	return destination
-}
-
-type fileSnapshot struct {
-	contents string
-	mode     fs.FileMode
-	modTime  int64
 }
 
 // Captures file contents and metadata for the scanner's read-only assertion.

@@ -14,6 +14,12 @@ type LibraryIndex = {
 	folderEntryCounts: ReadonlyMap<string, number>;
 };
 
+type ViewModeButtonProps = {
+	active: boolean;
+	mode: ViewMode;
+	onSelect: (mode: ViewMode) => void;
+};
+
 const viewModeIcons = {
 	compact: Grid2X2,
 	large: PanelsTopLeft,
@@ -96,7 +102,9 @@ export function LibraryScreen() {
 			selectedFolder === "all"
 				? (library?.entries ?? [])
 				: (libraryIndex.folderEntries.get(selectedFolder) ?? []);
-		if (normalizedSearch === "") return scopedEntries;
+		if (normalizedSearch === "") {
+			return scopedEntries;
+		}
 
 		return scopedEntries.filter((entry) => {
 			const matchesSearch =
@@ -255,15 +263,7 @@ export function LibraryScreen() {
 }
 
 // Keeps the accessible name alongside an icon-only control.
-function ViewModeButton({
-	active,
-	mode,
-	onSelect,
-}: {
-	active: boolean;
-	mode: ViewMode;
-	onSelect: (mode: ViewMode) => void;
-}) {
+function ViewModeButton({ active, mode, onSelect }: ViewModeButtonProps) {
 	const Icon = viewModeIcons[mode];
 	const label = viewModeLabels[mode];
 
