@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { discovery } from "../../wailsjs/go/models";
+import { entryStateLabel } from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
 type ModCatalogProps = {
@@ -9,6 +10,8 @@ type ModCatalogProps = {
 	hasLibrary: boolean;
 	mutatingEntryIDs: ReadonlySet<string>;
 	onSetEnabled: (entry: discovery.Entry) => void;
+	onSelect: (entry: discovery.Entry) => void;
+	selectedEntryID: string | null;
 	viewMode: ViewMode;
 };
 
@@ -21,16 +24,12 @@ type CatalogMessage = {
 type ModCardProps = {
 	entry: discovery.Entry;
 	isMutating: boolean;
+	isMutationLocked: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
+	onSelect: ModCatalogProps["onSelect"];
+	selected: boolean;
 	viewMode: ModCatalogProps["viewMode"];
 };
-
-// Presents orphaned sidecars differently from primary-backed entries.
-function stateLabel(entry: discovery.Entry): string {
-	if (entry.kind === "orphaned_sidecar") return "Orphaned sidecar";
-
-	return entry.state === "disabled" ? "Disabled" : "Enabled";
-}
 
 // Uses the scanner-issued identity so a primary suffix transition does not remount the card.
 function entryKey(entry: discovery.Entry): string {
@@ -85,6 +84,8 @@ export function ModCatalog({
 	hasLibrary,
 	mutatingEntryIDs,
 	onSetEnabled,
+	onSelect,
+	selectedEntryID,
 	viewMode,
 }: ModCatalogProps) {
 	const stateMessage = scanStateMessage(state, scanError);
@@ -108,7 +109,10 @@ export function ModCatalog({
 					entry={entry}
 					key={entryKey(entry)}
 					isMutating={mutatingEntryIDs.has(entry.id)}
+					isMutationLocked={mutatingEntryIDs.size > 0}
 					onSetEnabled={onSetEnabled}
+					onSelect={onSelect}
+					selected={selectedEntryID === entry.id}
 					viewMode={viewMode}
 				/>
 			))}
@@ -117,7 +121,15 @@ export function ModCatalog({
 }
 
 // Avoids work for retained entries during local navigation changes.
-const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMode }: ModCardProps) {
+const ModCard = memo(function ModCard({
+	entry,
+	isMutating,
+	isMutationLocked,
+	onSetEnabled,
+	onSelect,
+	selected,
+	viewMode,
+}: ModCardProps) {
 	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
 	const canChangeState =
 		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
@@ -126,7 +138,7 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 	const actionLabel = enabled ? "Disable" : "Enable";
 	const facts = (
 		<div className="mod-facts">
-			{!disabled && <span>{stateLabel(entry)}</span>}
+			{!disabled && <span>{entryStateLabel(entry)}</span>}
 			{entry.bundleFormat && (
 				<span>{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}</span>
 			)}
@@ -145,13 +157,32 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 			</div>
 		</div>
 	);
+	function selection(includeFacts: boolean) {
+		return (
+			<button
+				type="button"
+				aria-pressed={selected}
+				className="mod-card-select"
+				onClick={(event) => {
+					event.stopPropagation();
+					onSelect(entry);
+				}}
+			>
+				{heading}
+				{includeFacts && facts}
+			</button>
+		);
+	}
 	const action = canChangeState ? (
 		<button
 			type="button"
 			aria-busy={isMutating}
 			className="mod-action"
-			disabled={isMutating}
-			onClick={() => onSetEnabled(entry)}
+			disabled={isMutationLocked}
+			onClick={(event) => {
+				event.stopPropagation();
+				onSetEnabled(entry);
+			}}
 		>
 			{isMutating ? (enabled ? "Disabling..." : "Enabling...") : actionLabel}
 		</button>
@@ -166,12 +197,14 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 
 	if (viewMode === "list")
 		return (
+			// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the row click only extends selection to its empty pointer area.
 			<article
 				aria-busy={isMutating}
-				className={`list-mod-row${disabled ? " is-disabled" : ""}`}
+				className={`list-mod-row${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
+				onClick={() => onSelect(entry)}
 			>
 				<div className="list-mod-summary">
-					{heading}
+					{selection(false)}
 					<div className="list-mod-controls">
 						{facts}
 						{action}
@@ -181,12 +214,13 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 			</article>
 		);
 	return (
+		// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
 		<article
 			aria-busy={isMutating}
-			className={`mod-card${action ? " has-action" : ""}${disabled ? " is-disabled" : ""}`}
+			className={`mod-card${action ? " has-action" : ""}${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
+			onClick={() => onSelect(entry)}
 		>
-			{heading}
-			{facts}
+			{selection(true)}
 			{action}
 			{issues}
 		</article>
