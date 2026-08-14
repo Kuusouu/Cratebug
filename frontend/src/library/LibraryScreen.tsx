@@ -1,7 +1,8 @@
-import { type FormEvent, useCallback, useMemo, useRef, useState } from "react";
-import { Grid2X2, List, PanelsTopLeft } from "lucide-react";
+import { CircleAlert, CircleCheckBig, Grid2X2, List, PanelsTopLeft, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScanLibrary, SetModEnabled } from "../../wailsjs/go/main/App";
 import { discovery } from "../../wailsjs/go/models";
+import { entryStateLabel } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
 import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
@@ -20,11 +21,34 @@ type ViewModeButtonProps = {
 	onSelect: (mode: ViewMode) => void;
 };
 
+type SelectedModPanelProps = {
+	entry: discovery.Entry | null;
+	isMutating: boolean;
+	isMutationLocked: boolean;
+	onClear: () => void;
+	onSetEnabled: (entry: discovery.Entry) => void;
+};
+
+type MutationFeedback = {
+	id: number;
+	kind: "error" | "success";
+	message: string;
+};
+
+type MutationToastProps = {
+	feedback: MutationFeedback;
+	onDismiss: () => void;
+};
+
 const viewModeIcons = {
 	compact: Grid2X2,
 	large: PanelsTopLeft,
 	list: List,
 } satisfies Record<ViewMode, typeof Grid2X2>;
+
+const successToastDurationMilliseconds = 5000;
+// Errors stay visible longer so people can read and dismiss actionable recovery guidance.
+const errorToastDurationMilliseconds = 8000;
 
 // Converts unknown Wails failures into displayable scan errors.
 function errorMessage(error: unknown): string {
@@ -89,14 +113,16 @@ export function LibraryScreen() {
 	const [library, setLibrary] = useState<discovery.Library | null>(null);
 	const [libraryState, setLibraryState] = useState<LibraryState>("initial");
 	const [scanError, setScanError] = useState("");
-	const [mutationError, setMutationError] = useState("");
+	const [mutationFeedback, setMutationFeedback] = useState<MutationFeedback | null>(null);
 	const [mutatingEntryIDs, setMutatingEntryIDs] = useState<ReadonlySet<string>>(new Set());
 	const [search, setSearch] = useState("");
 	const [selectedFolder, setSelectedFolder] = useState("all");
+	const [selectedEntryID, setSelectedEntryID] = useState<string | null>(null);
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
+	const nextMutationFeedbackIDRef = useRef(0);
 	const libraryRoot = library?.root;
 
 	const libraryIndex = useMemo(() => indexLibrary(library?.entries ?? []), [library]);
@@ -127,16 +153,22 @@ export function LibraryScreen() {
 		search,
 		viewMode,
 	);
+	const selectedEntry = library?.entries.find((entry) => entry.id === selectedEntryID) ?? null;
+	const isMutationLocked = mutatingEntryIDs.size > 0;
+	const dismissMutationFeedback = useCallback(() => setMutationFeedback(null), []);
+	const showMutationFeedback = useCallback((kind: MutationFeedback["kind"], message: string) => {
+		nextMutationFeedbackIDRef.current += 1;
+		setMutationFeedback({ id: nextMutationFeedbackIDRef.current, kind, message });
+	}, []);
 
 	const setModEnabled = useCallback(
 		async (entry: discovery.Entry) => {
 			if (!libraryRoot) return;
 
-			if (!entry.primaryPath || mutatingEntryIDsRef.current.has(entry.id)) return;
+			if (!entry.primaryPath || mutatingEntryIDsRef.current.size > 0) return;
 
 			const requestRoot = libraryRoot;
 			const enabled = entry.state !== "enabled";
-			setMutationError("");
 			mutatingEntryIDsRef.current.add(entry.id);
 			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 
@@ -161,29 +193,38 @@ export function LibraryScreen() {
 
 					return new discovery.Library({ ...currentLibrary, entries });
 				});
+				showMutationFeedback(
+					"success",
+					`${enabled ? "Enabled" : "Disabled"} ${entry.displayName}.`,
+				);
 			} catch (error) {
 				if (activeLibraryRootRef.current !== requestRoot) return;
 
-				setMutationError(errorMessage(error));
+				showMutationFeedback(
+					"error",
+					`Could not ${enabled ? "enable" : "disable"} ${entry.displayName}: ${errorMessage(error)}`,
+				);
 			} finally {
 				mutatingEntryIDsRef.current.delete(entry.id);
 				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 			}
 		},
-		[libraryRoot],
+		[libraryRoot, showMutationFeedback],
 	);
 
 	// Replaces the catalog only after a scan finishes successfully.
-	async function scan(event?: FormEvent) {
-		event?.preventDefault();
+	async function scan() {
+		if (isMutationLocked) return;
+
 		const root = modRoot.trim();
 		if (!root) {
 			activeLibraryRootRef.current = null;
 			setLibrary(null);
 			setScanError("");
-			setMutationError("");
+			setMutationFeedback(null);
 			setSearch("");
 			setSelectedFolder("all");
+			setSelectedEntryID(null);
 			setLibraryState("initial");
 			return;
 		}
@@ -191,7 +232,7 @@ export function LibraryScreen() {
 		activeLibraryRootRef.current = root;
 		setLibraryState("loading");
 		setScanError("");
-		setMutationError("");
+		setMutationFeedback(null);
 		try {
 			const result = await ScanLibrary(root);
 			if (activeLibraryRootRef.current !== root) return;
@@ -199,6 +240,7 @@ export function LibraryScreen() {
 			setLibrary(result);
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
+			setSelectedEntryID(null);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
 		} catch (error) {
 			if (activeLibraryRootRef.current !== root) return;
@@ -236,7 +278,13 @@ export function LibraryScreen() {
 			</header>
 
 			<section className="library-toolbar" aria-label="Library scan controls">
-				<form className="root-form" onSubmit={scan}>
+				<form
+					className="root-form"
+					onSubmit={(event) => {
+						event.preventDefault();
+						void scan();
+					}}
+				>
 					<label htmlFor="mod-root">Mod library folder</label>
 					<input
 						id="mod-root"
@@ -246,7 +294,7 @@ export function LibraryScreen() {
 						placeholder="Paste the Marvel Rivals mod folder path"
 						autoComplete="off"
 					/>
-					<button type="submit" disabled={libraryState === "loading"}>
+					<button type="submit" disabled={libraryState === "loading" || isMutationLocked}>
 						{libraryState === "loading" ? "Scanning..." : "Scan library"}
 					</button>
 				</form>
@@ -255,7 +303,7 @@ export function LibraryScreen() {
 						type="button"
 						className="quiet-button"
 						onClick={() => scan()}
-						disabled={libraryState === "loading"}
+						disabled={libraryState === "loading" || isMutationLocked}
 					>
 						Refresh
 					</button>
@@ -312,11 +360,13 @@ export function LibraryScreen() {
 							))}
 						</fieldset>
 					</div>
-					{mutationError && (
-						<p className="catalog-operation-error" role="alert">
-							{mutationError}
-						</p>
-					)}
+					<SelectedModPanel
+						entry={selectedEntry}
+						isMutating={selectedEntry ? mutatingEntryIDs.has(selectedEntry.id) : false}
+						isMutationLocked={isMutationLocked}
+						onClear={() => setSelectedEntryID(null)}
+						onSetEnabled={setModEnabled}
+					/>
 					<ModCatalog
 						entries={displayedEntries}
 						state={libraryState}
@@ -324,11 +374,126 @@ export function LibraryScreen() {
 						hasLibrary={library !== null}
 						mutatingEntryIDs={mutatingEntryIDs}
 						onSetEnabled={setModEnabled}
+						onSelect={(entry) =>
+							setSelectedEntryID((currentEntryID) =>
+								currentEntryID === entry.id ? null : entry.id,
+							)
+						}
+						selectedEntryID={selectedEntryID}
 						viewMode={viewMode}
 					/>
 				</section>
 			</section>
+			{mutationFeedback && (
+				<MutationToast
+					feedback={mutationFeedback}
+					key={mutationFeedback.id}
+					onDismiss={dismissMutationFeedback}
+				/>
+			)}
 		</main>
+	);
+}
+
+// Keeps mutation feedback out of the catalog layout while still allowing it to be dismissed.
+function MutationToast({ feedback, onDismiss }: MutationToastProps) {
+	const duration =
+		feedback.kind === "success"
+			? successToastDurationMilliseconds
+			: errorToastDurationMilliseconds;
+	const Icon = feedback.kind === "success" ? CircleCheckBig : CircleAlert;
+
+	useEffect(() => {
+		const timeout = window.setTimeout(onDismiss, duration);
+		return () => window.clearTimeout(timeout);
+	}, [duration, onDismiss]);
+
+	return (
+		<div
+			className={`mutation-toast ${feedback.kind}`}
+			role={feedback.kind === "error" ? "alert" : "status"}
+		>
+			<Icon aria-hidden="true" />
+			<p>{feedback.message}</p>
+			<button
+				type="button"
+				className="mutation-toast-close"
+				onClick={onDismiss}
+				aria-label="Dismiss"
+			>
+				<X aria-hidden="true" />
+			</button>
+		</div>
+	);
+}
+
+// Keeps the current selection and its available actions in one stable location.
+function SelectedModPanel({
+	entry,
+	isMutating,
+	isMutationLocked,
+	onClear,
+	onSetEnabled,
+}: SelectedModPanelProps) {
+	if (!entry) {
+		return (
+			<section className="selected-mod-panel empty" aria-label="Mod actions">
+				<div>
+					<p className="eyebrow">Mod actions</p>
+					<p>Select a mod to organize it.</p>
+				</div>
+				<p className="selected-mod-hint">
+					Rename, priority, move, and deletion controls arrive next.
+				</p>
+			</section>
+		);
+	}
+
+	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
+	const canChangeState =
+		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
+	const enabled = entry.state === "enabled";
+	const stateLabel = entryStateLabel(entry);
+
+	return (
+		<section className="selected-mod-panel" aria-label="Selected mod actions">
+			<div className="selected-mod-details">
+				<p className="eyebrow">Selected mod</p>
+				<h3>{entry.displayName}</h3>
+				<p>
+					{entry.relativeFolder || "Library root"} · {stateLabel} · Priority{" "}
+					{entry.priority.value}
+				</p>
+			</div>
+			<div className="selected-mod-actions">
+				{canChangeState && (
+					<button
+						type="button"
+						className="mod-action"
+						disabled={isMutationLocked}
+						onClick={() => onSetEnabled(entry)}
+					>
+						{isMutating
+							? enabled
+								? "Disabling..."
+								: "Enabling..."
+							: isMutationLocked
+								? "Working..."
+								: enabled
+									? "Disable"
+									: "Enable"}
+					</button>
+				)}
+				<button
+					type="button"
+					className="quiet-button"
+					disabled={isMutationLocked}
+					onClick={onClear}
+				>
+					Clear selection
+				</button>
+			</div>
+		</section>
 	);
 }
 

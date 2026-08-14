@@ -1,6 +1,6 @@
+import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 
 type FolderNode = {
 	path: string;
