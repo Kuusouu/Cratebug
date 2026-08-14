@@ -111,6 +111,43 @@ partial or platform failures report the final state.
 
 ## 4.5 Add organization UI interactions
 
+### 4.5.1 Clarify disabled mods
+
+* Give intentionally disabled mods a clearly muted, non-error card treatment
+  across every catalog view, with a visible Disabled badge and distinct state
+  indicator.
+
+### 4.5.2 Build mutation interaction foundations
+
+* Add selected-mod state, a consistent action area, busy/request locking, and
+  actionable mutation feedback without discarding the current library view.
+* Visually verify selection, loading, duplicate-request prevention, and error
+  states before adding individual mutation dialogs.
+
+### 4.5.3 Add rename and priority controls
+
+* Add focused rename and priority dialogs wired to the existing backend.
+* Visually verify successful updates, invalid names, priority bounds, and busy
+  states against a user-designated disposable library.
+
+### 4.5.4 Add folder and move controls
+
+* Add create, rename, and move-folder controls alongside mod move controls.
+* Visually verify nested folders, collisions, and mod moves between folders
+  against a user-designated disposable library.
+
+### 4.5.5 Add recoverable deletion controls
+
+* Add a destructive confirmation dialog with a short UI delay before sending a
+  deletion request to the backend.
+* Visually verify complete and incomplete bundle deletion against a
+  user-designated disposable library.
+
+### 4.5.6 Polish organization interaction resilience
+
+* Verify empty, error, busy, and narrow-layout states; prevent conflicting
+  actions and capture final interaction screenshots.
+
 * Add focused controls and dialogs for rename, priority, move, folder
 management, and deletion to the existing library UI.
 * Require a clear destructive-deletion confirmation with a short delay before

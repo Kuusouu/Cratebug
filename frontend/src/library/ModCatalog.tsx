@@ -122,10 +122,11 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 	const canChangeState =
 		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
 	const enabled = entry.state === "enabled";
+	const disabled = entry.state === "disabled";
 	const actionLabel = enabled ? "Disable" : "Enable";
 	const facts = (
 		<div className="mod-facts">
-			<span>{stateLabel(entry)}</span>
+			{!disabled && <span>{stateLabel(entry)}</span>}
 			{entry.bundleFormat && (
 				<span>{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}</span>
 			)}
@@ -136,7 +137,10 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 		<div className="mod-card-heading">
 			<span className={`status-dot ${entry.state ?? "unknown"}`} aria-hidden="true" />
 			<div>
-				<h3>{entry.displayName}</h3>
+				<div className="mod-title-row">
+					<h3>{entry.displayName}</h3>
+					{disabled && <span className="disabled-badge">Disabled</span>}
+				</div>
 				<p>{entry.relativeFolder || "Library root"}</p>
 			</div>
 		</div>
@@ -162,7 +166,10 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 
 	if (viewMode === "list")
 		return (
-			<article aria-busy={isMutating} className="list-mod-row">
+			<article
+				aria-busy={isMutating}
+				className={`list-mod-row${disabled ? " is-disabled" : ""}`}
+			>
 				<div className="list-mod-summary">
 					{heading}
 					<div className="list-mod-controls">
@@ -174,7 +181,10 @@ const ModCard = memo(function ModCard({ entry, isMutating, onSetEnabled, viewMod
 			</article>
 		);
 	return (
-		<article aria-busy={isMutating} className={`mod-card${action ? " has-action" : ""}`}>
+		<article
+			aria-busy={isMutating}
+			className={`mod-card${action ? " has-action" : ""}${disabled ? " is-disabled" : ""}`}
+		>
 			{heading}
 			{facts}
 			{action}
