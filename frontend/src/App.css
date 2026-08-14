@@ -520,6 +520,15 @@ button:disabled {
 	background: var(--panel-raised);
 }
 
+.mod-card.is-disabled,
+.list-mod-row.is-disabled {
+	border-color: color-mix(in srgb, var(--muted), transparent 48%);
+	background:
+		linear-gradient(90deg, color-mix(in srgb, var(--muted), transparent 78%), transparent 28%),
+		color-mix(in srgb, var(--panel), var(--muted) 12%);
+	box-shadow: inset 0.25rem 0 color-mix(in srgb, var(--muted), transparent 20%);
+}
+
 .mod-card.has-action {
 	grid-template-rows: auto auto minmax(0, 1fr);
 }
@@ -535,6 +544,13 @@ button:disabled {
 	min-width: 0;
 }
 
+.mod-title-row {
+	display: flex;
+	min-width: 0;
+	align-items: start;
+	gap: 0.45rem;
+}
+
 .mod-card-heading h3 {
 	display: -webkit-box;
 	overflow: hidden;
@@ -543,6 +559,11 @@ button:disabled {
 	overflow-wrap: anywhere;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
+}
+
+.mod-card.is-disabled .mod-card-heading h3,
+.list-mod-row.is-disabled .mod-card-heading h3 {
+	color: color-mix(in srgb, var(--text), var(--muted) 48%);
 }
 
 .mod-card-heading p {
@@ -570,7 +591,22 @@ button:disabled {
 }
 
 .status-dot.disabled {
-	background: var(--bad);
+	border: 1px solid color-mix(in srgb, var(--muted), var(--panel) 40%);
+	background: transparent;
+}
+
+.disabled-badge {
+	flex: 0 0 auto;
+	padding: 0.16rem 0.35rem;
+	border: 1px solid color-mix(in srgb, var(--muted), transparent 28%);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--muted), transparent 84%);
+	color: var(--muted);
+	font-size: 0.62rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	line-height: 1;
+	text-transform: uppercase;
 }
 
 .mod-facts {
@@ -597,6 +633,12 @@ button:disabled {
 .mod-card.has-action .mod-action {
 	align-self: end;
 	justify-self: start;
+}
+
+.mod-card.is-disabled .mod-action,
+.list-mod-row.is-disabled .mod-action {
+	background: var(--accent);
+	color: var(--accent-ink);
 }
 
 .issues {

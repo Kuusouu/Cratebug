@@ -99,6 +99,7 @@ export namespace discovery {
 	
 	export class Library {
 	    root: string;
+	    folders: string[];
 	    entries: Entry[];
 	
 	    static createFrom(source: any = {}) {
@@ -108,6 +109,7 @@ export namespace discovery {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.root = source["root"];
+	        this.folders = source["folders"];
 	        this.entries = this.convertValues(source["entries"], Entry);
 	    }
 	
@@ -137,8 +139,12 @@ export namespace mutation {
 	
 	export class Result {
 	    id: string;
+	    previousID?: string;
 	    previousPrimaryPath: string;
 	    primaryPath: string;
+	    previousFolderPath?: string;
+	    folderPath?: string;
+	    deleted?: boolean;
 	    state: string;
 	
 	    static createFrom(source: any = {}) {
@@ -148,8 +154,12 @@ export namespace mutation {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.previousID = source["previousID"];
 	        this.previousPrimaryPath = source["previousPrimaryPath"];
 	        this.primaryPath = source["primaryPath"];
+	        this.previousFolderPath = source["previousFolderPath"];
+	        this.folderPath = source["folderPath"];
+	        this.deleted = source["deleted"];
 	        this.state = source["state"];
 	    }
 	}
