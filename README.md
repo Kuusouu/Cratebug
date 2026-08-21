@@ -22,6 +22,7 @@ See:
 - [Active tasks](TASKS.md)
 - [Contributor and agent guidance](AGENTS.md)
 - [Toolchain baseline](docs/decisions/0001-toolchain-baseline.md)
+- [Organize action pattern](docs/decisions/0002-organize-action-pattern.md)
 
 ## Prerequisites
 

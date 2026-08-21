@@ -1,7 +1,17 @@
 import { CircleAlert, CircleCheckBig, Grid2X2, List, PanelsTopLeft, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RenameMod, ScanLibrary, SetModEnabled, SetModPriority } from "../../wailsjs/go/main/App";
+import { useCallback, useEffect, useMemo, type MouseEvent, useRef, useState } from "react";
+import {
+	CreateFolder,
+	MoveFolder,
+	MoveMod,
+	RenameFolder,
+	RenameMod,
+	ScanLibrary,
+	SetModEnabled,
+	SetModPriority,
+} from "../../wailsjs/go/main/App";
 import { discovery, type mutation } from "../../wailsjs/go/models";
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import { entryStateLabel } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
 import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
@@ -26,19 +36,33 @@ type SelectedModPanelProps = {
 	isMutating: boolean;
 	isMutationLocked: boolean;
 	onClear: () => void;
-	onOpenDialog: (dialog: MutationDialog) => void;
 	onSetEnabled: (entry: discovery.Entry) => void;
 };
 
-type MutationDialog = "priority" | "rename";
+type MutationDialog = "priority" | "rename" | "move";
 
 type ModMutationDialogProps = {
 	entry: discovery.Entry;
+	folders: string[];
 	isMutating: boolean;
 	mode: MutationDialog;
 	onClose: () => void;
+	onMove: (entry: discovery.Entry, destinationFolder: string) => Promise<boolean>;
 	onRename: (entry: discovery.Entry, name: string) => Promise<boolean>;
 	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
+};
+
+type FolderDialogMode = "create" | "rename" | "move";
+
+type FolderMutationDialogProps = {
+	folders: string[];
+	isMutating: boolean;
+	mode: FolderDialogMode;
+	targetFolder: string;
+	onClose: () => void;
+	onCreate: (parentFolder: string, name: string) => Promise<boolean>;
+	onMove: (folder: string, destinationParent: string) => Promise<boolean>;
+	onRename: (folder: string, name: string) => Promise<boolean>;
 };
 
 type MutationFeedback = {
@@ -70,13 +94,17 @@ function errorMessage(error: unknown): string {
 }
 
 // Build subtree lookups once per scan so folder navigation does not repeatedly scan the library.
-function indexLibrary(entries: discovery.Entry[]): LibraryIndex {
+// Starts from the scanner's complete folder list, not just folders containing mods, so an empty
+// folder created through Cratebug still appears and stays selectable.
+function indexLibrary(library: discovery.Library | null): LibraryIndex {
 	const folderEntries = new Map<string, discovery.Entry[]>();
+	const folders = new Set<string>(library?.folders ?? []);
 
-	for (const entry of entries) {
+	for (const entry of library?.entries ?? []) {
 		const segments = entry.relativeFolder.split("/").filter(Boolean);
 		for (let index = 1; index <= segments.length; index += 1) {
 			const folder = segments.slice(0, index).join("/");
+			folders.add(folder);
 			const entriesInFolder = folderEntries.get(folder);
 			if (entriesInFolder) {
 				entriesInFolder.push(entry);
@@ -87,12 +115,44 @@ function indexLibrary(entries: discovery.Entry[]): LibraryIndex {
 	}
 
 	return {
-		folders: [...folderEntries.keys()].sort((left, right) => left.localeCompare(right)),
+		folders: [...folders].sort((left, right) => left.localeCompare(right)),
 		folderEntries,
 		folderEntryCounts: new Map(
 			[...folderEntries].map(([folder, entriesInFolder]) => [folder, entriesInFolder.length]),
 		),
 	};
+}
+
+// Keeps a folder selection pointed at the correct subtree after a rename or move.
+function remapFolderSelection(
+	selectedFolder: string,
+	oldFolder: string,
+	newFolder: string,
+): string {
+	if (selectedFolder === oldFolder) return newFolder;
+	if (selectedFolder.startsWith(`${oldFolder}/`)) {
+		return newFolder + selectedFolder.slice(oldFolder.length);
+	}
+	return selectedFolder;
+}
+
+function folderParent(folder: string): string {
+	const separatorIndex = folder.lastIndexOf("/");
+	return separatorIndex === -1 ? "" : folder.slice(0, separatorIndex);
+}
+
+// Rename, priority, and move all require the same complete, unambiguous bundle.
+function canOrganizeMod(entry: discovery.Entry): boolean {
+	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
+	const hasMissingSidecar = entry.issues?.some(
+		(issue) => issue.code === "missing-utoc" || issue.code === "missing-ucas",
+	);
+	return (
+		entry.kind === "mod" &&
+		entry.primaryPath !== undefined &&
+		!hasAmbiguousPrimary &&
+		!hasMissingSidecar
+	);
 }
 
 // Keeps live announcements concise when the catalog changes.
@@ -133,14 +193,19 @@ export function LibraryScreen() {
 	const [selectedFolder, setSelectedFolder] = useState("all");
 	const [selectedEntryID, setSelectedEntryID] = useState<string | null>(null);
 	const [activeDialog, setActiveDialog] = useState<MutationDialog | null>(null);
+	const [activeFolderDialog, setActiveFolderDialog] = useState<FolderDialogMode | null>(null);
+	const [folderDialogTarget, setFolderDialogTarget] = useState("");
+	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+	const [isFolderMutating, setIsFolderMutating] = useState(false);
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
+	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
 	const libraryRoot = library?.root;
 
-	const libraryIndex = useMemo(() => indexLibrary(library?.entries ?? []), [library]);
+	const libraryIndex = useMemo(() => indexLibrary(library), [library]);
 
 	const displayedEntries = useMemo(() => {
 		const normalizedSearch = search.trim().toLocaleLowerCase();
@@ -169,7 +234,7 @@ export function LibraryScreen() {
 		viewMode,
 	);
 	const selectedEntry = library?.entries.find((entry) => entry.id === selectedEntryID) ?? null;
-	const isMutationLocked = mutatingEntryIDs.size > 0;
+	const isMutationLocked = mutatingEntryIDs.size > 0 || isFolderMutating;
 	const dismissMutationFeedback = useCallback(() => setMutationFeedback(null), []);
 	const showMutationFeedback = useCallback((kind: MutationFeedback["kind"], message: string) => {
 		nextMutationFeedbackIDRef.current += 1;
@@ -201,6 +266,30 @@ export function LibraryScreen() {
 		},
 		[],
 	);
+
+	// Refreshes the catalog after a folder-level or cross-folder mutation without
+	// resetting search, folder selection, or view mode the way a user-initiated scan does.
+	const reloadLibrary = useCallback(async (): Promise<discovery.Library | null> => {
+		if (!libraryRoot) return null;
+
+		const requestRoot = libraryRoot;
+		try {
+			const result = await ScanLibrary(requestRoot);
+			if (activeLibraryRootRef.current !== requestRoot) return null;
+
+			setLibrary(result);
+			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+			return result;
+		} catch (error) {
+			if (activeLibraryRootRef.current === requestRoot) {
+				showMutationFeedback(
+					"error",
+					`Could not refresh the library: ${errorMessage(error)}`,
+				);
+			}
+			return null;
+		}
+	}, [libraryRoot, showMutationFeedback]);
 
 	const setModEnabled = useCallback(
 		async (entry: discovery.Entry) => {
@@ -318,6 +407,215 @@ export function LibraryScreen() {
 		[libraryRoot, showMutationFeedback, updateMutatedEntry],
 	);
 
+	// A folder move changes the destination's scanner identity for every entry it
+	// carries, not just the one primary being moved, so this reconciles by rescanning
+	// rather than patching the single entry the way rename and priority do.
+	const moveModToFolder = useCallback(
+		async (entry: discovery.Entry, destinationFolder: string): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
+
+			mutatingEntryIDsRef.current.add(entry.id);
+			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+
+			try {
+				const result = await MoveMod(libraryRoot, entry.id, destinationFolder);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				setSelectedEntryID(result.id);
+				showMutationFeedback(
+					"success",
+					`Moved ${entry.displayName} to ${destinationFolder || "Library root"}.`,
+				);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback(
+						"error",
+						`Could not move ${entry.displayName}: ${errorMessage(error)}`,
+					);
+				}
+				return false;
+			} finally {
+				mutatingEntryIDsRef.current.delete(entry.id);
+				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+			}
+		},
+		[libraryRoot, reloadLibrary, showMutationFeedback],
+	);
+
+	const createFolder = useCallback(
+		async (parentFolder: string, name: string): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
+
+			isFolderMutatingRef.current = true;
+			setIsFolderMutating(true);
+			try {
+				const result = await CreateFolder(libraryRoot, parentFolder, name);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				setSelectedFolder(result.folderPath ?? "all");
+				showMutationFeedback("success", `Created folder ${result.folderPath}.`);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback(
+						"error",
+						`Could not create folder: ${errorMessage(error)}`,
+					);
+				}
+				return false;
+			} finally {
+				isFolderMutatingRef.current = false;
+				setIsFolderMutating(false);
+			}
+		},
+		[libraryRoot, reloadLibrary, showMutationFeedback],
+	);
+
+	// Folder renames and moves change the scanner identity of every mod they carry,
+	// so the previous selection is cleared rather than remapped to a stale entry ID.
+	const renameFolder = useCallback(
+		async (folder: string, name: string): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
+
+			isFolderMutatingRef.current = true;
+			setIsFolderMutating(true);
+			try {
+				const result = await RenameFolder(libraryRoot, folder, name);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				const destination = result.folderPath ?? folder;
+				setSelectedFolder((current) => remapFolderSelection(current, folder, destination));
+				setSelectedEntryID(null);
+				setActiveDialog(null);
+				showMutationFeedback("success", `Renamed folder to ${destination}.`);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback(
+						"error",
+						`Could not rename folder: ${errorMessage(error)}`,
+					);
+				}
+				return false;
+			} finally {
+				isFolderMutatingRef.current = false;
+				setIsFolderMutating(false);
+			}
+		},
+		[libraryRoot, reloadLibrary, showMutationFeedback],
+	);
+
+	const moveFolder = useCallback(
+		async (folder: string, destinationParent: string): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
+
+			isFolderMutatingRef.current = true;
+			setIsFolderMutating(true);
+			try {
+				const result = await MoveFolder(libraryRoot, folder, destinationParent);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				const destination = result.folderPath ?? folder;
+				setSelectedFolder((current) => remapFolderSelection(current, folder, destination));
+				setSelectedEntryID(null);
+				setActiveDialog(null);
+				showMutationFeedback("success", `Moved folder to ${destination}.`);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback("error", `Could not move folder: ${errorMessage(error)}`);
+				}
+				return false;
+			} finally {
+				isFolderMutatingRef.current = false;
+				setIsFolderMutating(false);
+			}
+		},
+		[libraryRoot, reloadLibrary, showMutationFeedback],
+	);
+
+	// Lets a folder's actions reach it without first navigating into it.
+	const openFolderContextMenu = useCallback((folder: string, event: MouseEvent) => {
+		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
+		if (!container) return;
+
+		const isRoot = folder === "";
+		const items: ContextMenuItem[] = [
+			{
+				label: "New folder",
+				onSelect: () => {
+					setFolderDialogTarget(folder);
+					setActiveFolderDialog("create");
+				},
+			},
+		];
+
+		if (!isRoot) {
+			items.push(
+				{
+					label: "Rename folder",
+					onSelect: () => {
+						setFolderDialogTarget(folder);
+						setActiveFolderDialog("rename");
+					},
+				},
+				{
+					label: "Move to...",
+					onSelect: () => {
+						setFolderDialogTarget(folder);
+						setActiveFolderDialog("move");
+					},
+				},
+			);
+		}
+
+		setContextMenu({
+			x: event.clientX,
+			y: event.clientY,
+			container,
+			title: isRoot ? "Library root" : folder,
+			items,
+		});
+	}, []);
+
+	// Selects the mod under the pointer so its actions and the panel agree on the target.
+	const openModContextMenu = useCallback((entry: discovery.Entry, event: MouseEvent) => {
+		if (!canOrganizeMod(entry)) return;
+
+		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
+		if (!container) return;
+
+		setSelectedEntryID(entry.id);
+		setContextMenu({
+			x: event.clientX,
+			y: event.clientY,
+			container,
+			title: entry.displayName,
+			items: [
+				{ label: "Rename", onSelect: () => setActiveDialog("rename") },
+				{ label: "Priority", onSelect: () => setActiveDialog("priority") },
+				{ label: "Move to...", onSelect: () => setActiveDialog("move") },
+			],
+		});
+	}, []);
+
 	// Replaces the catalog only after a scan finishes successfully.
 	async function scan() {
 		if (isMutationLocked) return;
@@ -332,6 +630,8 @@ export function LibraryScreen() {
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
 			setActiveDialog(null);
+			setActiveFolderDialog(null);
+			setContextMenu(null);
 			setLibraryState("initial");
 			return;
 		}
@@ -349,6 +649,8 @@ export function LibraryScreen() {
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
 			setActiveDialog(null);
+			setActiveFolderDialog(null);
+			setContextMenu(null);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
 		} catch (error) {
 			if (activeLibraryRootRef.current !== root) return;
@@ -430,12 +732,30 @@ export function LibraryScreen() {
 				<aside className="library-sidebar" aria-label="Library folders">
 					<div className="sidebar-heading">
 						<span>Folders</span>
-						{library && <span>{library.entries?.length ?? 0}</span>}
+						{library && (
+							<div className="sidebar-heading-actions">
+								<span>{library.entries?.length ?? 0}</span>
+								<button
+									type="button"
+									className="quiet-button sidebar-heading-action"
+									disabled={isMutationLocked}
+									onClick={() => {
+										setFolderDialogTarget(
+											selectedFolder === "all" ? "" : selectedFolder,
+										);
+										setActiveFolderDialog("create");
+									}}
+								>
+									New folder
+								</button>
+							</div>
+						)}
 					</div>
 					<FolderNavigation
 						folders={libraryIndex.folders}
 						selectedFolder={selectedFolder}
 						onSelect={setSelectedFolder}
+						onContextMenu={openFolderContextMenu}
 						entryCount={library?.entries?.length ?? 0}
 						folderEntryCounts={libraryIndex.folderEntryCounts}
 					/>
@@ -476,7 +796,6 @@ export function LibraryScreen() {
 							setSelectedEntryID(null);
 							setActiveDialog(null);
 						}}
-						onOpenDialog={setActiveDialog}
 						onSetEnabled={setModEnabled}
 					/>
 					<ModCatalog
@@ -491,6 +810,7 @@ export function LibraryScreen() {
 								currentEntryID === entry.id ? null : entry.id,
 							)
 						}
+						onContextMenu={openModContextMenu}
 						selectedEntryID={selectedEntryID}
 						viewMode={viewMode}
 					/>
@@ -506,13 +826,31 @@ export function LibraryScreen() {
 			{activeDialog && selectedEntry && (
 				<ModMutationDialog
 					entry={selectedEntry}
+					folders={libraryIndex.folders}
 					isMutating={isMutationLocked}
 					key={`${selectedEntry.id}-${activeDialog}`}
 					mode={activeDialog}
 					onClose={() => setActiveDialog(null)}
+					onMove={moveModToFolder}
 					onRename={renameMod}
 					onSetPriority={setModPriority}
 				/>
+			)}
+			{activeFolderDialog && library && (
+				<FolderMutationDialog
+					folders={libraryIndex.folders}
+					isMutating={isFolderMutating}
+					key={`${folderDialogTarget}-${activeFolderDialog}`}
+					mode={activeFolderDialog}
+					targetFolder={folderDialogTarget}
+					onClose={() => setActiveFolderDialog(null)}
+					onCreate={createFolder}
+					onMove={moveFolder}
+					onRename={renameFolder}
+				/>
+			)}
+			{contextMenu && (
+				<ContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />
 			)}
 		</main>
 	);
@@ -552,22 +890,32 @@ function MutationToast({ feedback, onDismiss }: MutationToastProps) {
 
 function ModMutationDialog({
 	entry,
+	folders,
 	isMutating,
 	mode,
 	onClose,
+	onMove,
 	onRename,
 	onSetPriority,
 }: ModMutationDialogProps) {
 	const inputRef = useRef<HTMLInputElement>(null);
+	const selectRef = useRef<HTMLSelectElement>(null);
 	const [name, setName] = useState(entry.displayName);
 	const [priority, setPriority] = useState(String(entry.priority.value));
+	const [destinationFolder, setDestinationFolder] = useState(entry.relativeFolder);
 	const [validationError, setValidationError] = useState("");
 	const renameMode = mode === "rename";
-	const title = renameMode ? "Rename mod" : "Set priority";
+	const priorityMode = mode === "priority";
+	const moveMode = mode === "move";
+	const title = renameMode ? "Rename mod" : priorityMode ? "Set priority" : "Move mod";
 
 	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
+		if (moveMode) {
+			selectRef.current?.focus();
+		} else {
+			inputRef.current?.focus();
+		}
+	}, [moveMode]);
 
 	async function submit() {
 		if (renameMode) {
@@ -583,6 +931,16 @@ function ModMutationDialog({
 			}
 
 			if (await onRename(entry, name)) onClose();
+			return;
+		}
+
+		if (moveMode) {
+			if (destinationFolder === entry.relativeFolder) {
+				setValidationError("Choose a different folder.");
+				return;
+			}
+
+			if (await onMove(entry, destinationFolder)) onClose();
 			return;
 		}
 
@@ -637,6 +995,26 @@ function ModMutationDialog({
 								}}
 							/>
 						</label>
+					) : moveMode ? (
+						<label className="mutation-dialog-field" htmlFor="move-mod-folder">
+							<span>Destination folder</span>
+							<select
+								id="move-mod-folder"
+								ref={selectRef}
+								value={destinationFolder}
+								onChange={(event) => {
+									setDestinationFolder(event.target.value);
+									setValidationError("");
+								}}
+							>
+								<option value="">Library root</option>
+								{folders.map((folder) => (
+									<option key={folder} value={folder}>
+										{folder}
+									</option>
+								))}
+							</select>
+						</label>
 					) : (
 						<label className="mutation-dialog-field" htmlFor="set-mod-priority">
 							<span>Priority</span>
@@ -670,7 +1048,13 @@ function ModMutationDialog({
 							Cancel
 						</button>
 						<button type="submit" disabled={isMutating}>
-							{isMutating ? "Saving..." : renameMode ? "Rename" : "Set priority"}
+							{isMutating
+								? "Saving..."
+								: renameMode
+									? "Rename"
+									: priorityMode
+										? "Set priority"
+										: "Move"}
 						</button>
 					</div>
 				</form>
@@ -679,12 +1063,169 @@ function ModMutationDialog({
 	);
 }
 
-function renameValidationError(name: string): string | null {
-	if (name.trim() === "") return "Enter a mod name.";
+function FolderMutationDialog({
+	folders,
+	isMutating,
+	mode,
+	targetFolder,
+	onClose,
+	onCreate,
+	onMove,
+	onRename,
+}: FolderMutationDialogProps) {
+	const inputRef = useRef<HTMLInputElement>(null);
+	const selectRef = useRef<HTMLSelectElement>(null);
+	const createMode = mode === "create";
+	const renameMode = mode === "rename";
+	const moveMode = mode === "move";
+	const currentName = targetFolder.split("/").at(-1) ?? targetFolder;
+	const currentParent = folderParent(targetFolder);
+	const [name, setName] = useState(renameMode ? currentName : "");
+	const [destinationParent, setDestinationParent] = useState(currentParent);
+	const [validationError, setValidationError] = useState("");
+	const title = createMode ? "New folder" : renameMode ? "Rename folder" : "Move folder";
+	const subtitle = createMode
+		? targetFolder
+			? `Inside ${targetFolder}`
+			: "Inside the library root"
+		: targetFolder;
+
+	useEffect(() => {
+		if (moveMode) {
+			selectRef.current?.focus();
+		} else {
+			inputRef.current?.focus();
+		}
+	}, [moveMode]);
+
+	// Excludes the folder itself and its descendants: a folder cannot move into itself or a child.
+	const moveDestinations = useMemo(
+		() =>
+			folders.filter(
+				(folder) => folder !== targetFolder && !folder.startsWith(`${targetFolder}/`),
+			),
+		[folders, targetFolder],
+	);
+
+	async function submit() {
+		if (moveMode) {
+			if (destinationParent === currentParent) {
+				setValidationError("Choose a different folder.");
+				return;
+			}
+
+			if (await onMove(targetFolder, destinationParent)) onClose();
+			return;
+		}
+
+		const error = renameValidationError(name, "folder");
+		if (error) {
+			setValidationError(error);
+			return;
+		}
+
+		if (createMode) {
+			if (await onCreate(targetFolder, name)) onClose();
+			return;
+		}
+
+		if (name === currentName) {
+			setValidationError("Enter a different folder name.");
+			return;
+		}
+
+		if (await onRename(targetFolder, name)) onClose();
+	}
+
+	return (
+		<div className="mutation-dialog-backdrop">
+			<section
+				className="mutation-dialog"
+				aria-labelledby="folder-dialog-title"
+				aria-modal="true"
+				role="dialog"
+			>
+				<div>
+					<p className="eyebrow">Folder action</p>
+					<h2 id="folder-dialog-title">{title}</h2>
+					<p className="mutation-dialog-subtitle">{subtitle}</p>
+				</div>
+				<form
+					onSubmit={(event) => {
+						event.preventDefault();
+						void submit();
+					}}
+				>
+					{moveMode ? (
+						<label className="mutation-dialog-field" htmlFor="move-folder-destination">
+							<span>Destination folder</span>
+							<select
+								id="move-folder-destination"
+								ref={selectRef}
+								value={destinationParent}
+								onChange={(event) => {
+									setDestinationParent(event.target.value);
+									setValidationError("");
+								}}
+							>
+								<option value="">Library root</option>
+								{moveDestinations.map((folder) => (
+									<option key={folder} value={folder}>
+										{folder}
+									</option>
+								))}
+							</select>
+						</label>
+					) : (
+						<label className="mutation-dialog-field" htmlFor="folder-name">
+							<span>{createMode ? "Folder name" : "New name"}</span>
+							<input
+								id="folder-name"
+								ref={inputRef}
+								value={name}
+								onChange={(event) => {
+									setName(event.target.value);
+									setValidationError("");
+								}}
+							/>
+						</label>
+					)}
+					{validationError && (
+						<p className="mutation-dialog-error" role="alert">
+							{validationError}
+						</p>
+					)}
+					<div className="mutation-dialog-actions">
+						<button
+							type="button"
+							className="quiet-button"
+							disabled={isMutating}
+							onClick={onClose}
+						>
+							Cancel
+						</button>
+						<button type="submit" disabled={isMutating}>
+							{isMutating
+								? "Saving..."
+								: createMode
+									? "Create"
+									: renameMode
+										? "Rename"
+										: "Move"}
+						</button>
+					</div>
+				</form>
+			</section>
+		</div>
+	);
+}
+
+function renameValidationError(name: string, subject: "mod" | "folder" = "mod"): string | null {
+	if (name.trim() === "") return `Enter a ${subject} name.`;
 	if (name.endsWith(" ") || name.endsWith("."))
-		return "A mod name cannot end with a space or period.";
+		return `A ${subject} name cannot end with a space or period.`;
 	if (hasWindowsReservedCharacter(name))
-		return "A mod name contains a Windows-reserved character.";
+		return `A ${subject} name contains a Windows-reserved character.`;
 
 	return null;
 }
@@ -699,7 +1240,6 @@ function SelectedModPanel({
 	isMutating,
 	isMutationLocked,
 	onClear,
-	onOpenDialog,
 	onSetEnabled,
 }: SelectedModPanelProps) {
 	if (!entry) {
@@ -710,19 +1250,15 @@ function SelectedModPanel({
 					<p>Select a mod to organize it.</p>
 				</div>
 				<p className="selected-mod-hint">
-					Rename and priority actions are available for complete, unambiguous mods.
+					Right-click a mod for rename, priority, and move actions.
 				</p>
 			</section>
 		);
 	}
 
 	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
-	const hasMissingSidecar = entry.issues?.some(
-		(issue) => issue.code === "missing-utoc" || issue.code === "missing-ucas",
-	);
 	const canChangeState =
 		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
-	const canOrganize = canChangeState && !hasMissingSidecar;
 	const enabled = entry.state === "enabled";
 	const stateLabel = entryStateLabel(entry);
 
@@ -737,26 +1273,6 @@ function SelectedModPanel({
 				</p>
 			</div>
 			<div className="selected-mod-actions">
-				{canOrganize && (
-					<>
-						<button
-							type="button"
-							className="quiet-button"
-							disabled={isMutationLocked}
-							onClick={() => onOpenDialog("rename")}
-						>
-							Rename
-						</button>
-						<button
-							type="button"
-							className="quiet-button"
-							disabled={isMutationLocked}
-							onClick={() => onOpenDialog("priority")}
-						>
-							Priority
-						</button>
-					</>
-				)}
 				{canChangeState && (
 					<button
 						type="button"
