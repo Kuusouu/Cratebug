@@ -703,6 +703,77 @@ button:disabled {
 	align-self: auto;
 }
 
+.mutation-dialog-backdrop {
+	display: grid;
+	position: fixed;
+	z-index: 30;
+	inset: 0;
+	place-items: center;
+	padding: 1rem;
+	background: color-mix(in srgb, var(--page), transparent 32%);
+	backdrop-filter: blur(0.35rem);
+	-webkit-backdrop-filter: blur(0.35rem);
+}
+
+.mutation-dialog {
+	width: min(100%, 30rem);
+	padding: 1.25rem;
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 52%);
+	border-radius: 0.85rem;
+	background: color-mix(in srgb, var(--panel-raised), var(--page) 8%);
+	box-shadow: 0 1.25rem 3.5rem rgba(0, 0, 0, 0.34);
+}
+
+.mutation-dialog h2 {
+	margin: 0.3rem 0;
+	font-size: 1.25rem;
+}
+
+.mutation-dialog-subtitle {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.82rem;
+	overflow-wrap: anywhere;
+}
+
+.mutation-dialog form {
+	display: grid;
+	margin-top: 1.25rem;
+	gap: 1rem;
+}
+
+.mutation-dialog-field {
+	display: grid;
+	gap: 0.4rem;
+	color: var(--muted);
+	font-size: 0.78rem;
+	font-weight: 750;
+}
+
+.mutation-dialog-field input {
+	min-width: 0;
+	padding: 0.65rem 0.75rem;
+}
+
+.mutation-dialog-error {
+	margin: 0;
+	color: var(--bad);
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.4;
+}
+
+.mutation-dialog-actions {
+	display: flex;
+	justify-content: end;
+	gap: 0.5rem;
+}
+
+.mutation-dialog-actions button {
+	min-height: 2.7rem;
+	padding: 0.6rem 0.85rem;
+}
+
 .mutation-toast {
 	display: flex;
 	position: fixed;

@@ -37,3 +37,6 @@ coverage.out
 /frontend/node_modules/
 /frontend/dist/
 /frontend/package.json.md5
+
+# Playwright
+.playwright-mcp/
