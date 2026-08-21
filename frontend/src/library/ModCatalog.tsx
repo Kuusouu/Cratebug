@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type MouseEvent } from "react";
 import type { discovery } from "../../wailsjs/go/models";
 import { entryStateLabel } from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
@@ -11,6 +11,7 @@ type ModCatalogProps = {
 	mutatingEntryIDs: ReadonlySet<string>;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
+	onContextMenu: (entry: discovery.Entry, event: MouseEvent) => void;
 	selectedEntryID: string | null;
 	viewMode: ViewMode;
 };
@@ -27,6 +28,7 @@ type ModCardProps = {
 	isMutationLocked: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	onSelect: ModCatalogProps["onSelect"];
+	onContextMenu: ModCatalogProps["onContextMenu"];
 	selected: boolean;
 	viewMode: ModCatalogProps["viewMode"];
 };
@@ -85,6 +87,7 @@ export function ModCatalog({
 	mutatingEntryIDs,
 	onSetEnabled,
 	onSelect,
+	onContextMenu,
 	selectedEntryID,
 	viewMode,
 }: ModCatalogProps) {
@@ -112,6 +115,7 @@ export function ModCatalog({
 					isMutationLocked={mutatingEntryIDs.size > 0}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
+					onContextMenu={onContextMenu}
 					selected={selectedEntryID === entry.id}
 					viewMode={viewMode}
 				/>
@@ -127,6 +131,7 @@ const ModCard = memo(function ModCard({
 	isMutationLocked,
 	onSetEnabled,
 	onSelect,
+	onContextMenu,
 	selected,
 	viewMode,
 }: ModCardProps) {
@@ -167,6 +172,11 @@ const ModCard = memo(function ModCard({
 					event.stopPropagation();
 					onSelect(entry);
 				}}
+				onContextMenu={(event) => {
+					event.preventDefault();
+					event.stopPropagation();
+					onContextMenu(entry, event);
+				}}
 			>
 				{heading}
 				{includeFacts && facts}
@@ -202,6 +212,10 @@ const ModCard = memo(function ModCard({
 				aria-busy={isMutating}
 				className={`list-mod-row${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
 				onClick={() => onSelect(entry)}
+				onContextMenu={(event) => {
+					event.preventDefault();
+					onContextMenu(entry, event);
+				}}
 			>
 				<div className="list-mod-summary">
 					{selection(false)}
@@ -219,6 +233,10 @@ const ModCard = memo(function ModCard({
 			aria-busy={isMutating}
 			className={`mod-card${action ? " has-action" : ""}${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
 			onClick={() => onSelect(entry)}
+			onContextMenu={(event) => {
+				event.preventDefault();
+				onContextMenu(entry, event);
+			}}
 		>
 			{selection(true)}
 			{action}
