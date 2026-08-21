@@ -1,7 +1,8 @@
 # Cratebug Active Tasks
 
 **Phase:** 4 - Organization and recoverable deletion
-**Status:** Not started
+**Status:** Approved (see docs/reviews/phase-4-review.md). Replace this file
+when Phase 5's active task plan is established.
 
 This file contains only the active phase. Replace it when Phase 4 is complete.
 

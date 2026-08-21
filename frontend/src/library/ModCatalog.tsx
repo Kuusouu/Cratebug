@@ -9,6 +9,7 @@ type ModCatalogProps = {
 	scanError: string;
 	hasLibrary: boolean;
 	mutatingEntryIDs: ReadonlySet<string>;
+	isMutationLocked: boolean;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
 	onContextMenu: (entry: discovery.Entry, event: MouseEvent) => void;
@@ -85,6 +86,7 @@ export function ModCatalog({
 	scanError,
 	hasLibrary,
 	mutatingEntryIDs,
+	isMutationLocked,
 	onSetEnabled,
 	onSelect,
 	onContextMenu,
@@ -112,7 +114,7 @@ export function ModCatalog({
 					entry={entry}
 					key={entryKey(entry)}
 					isMutating={mutatingEntryIDs.has(entry.id)}
-					isMutationLocked={mutatingEntryIDs.size > 0}
+					isMutationLocked={isMutationLocked}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
 					onContextMenu={onContextMenu}

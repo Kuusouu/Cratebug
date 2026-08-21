@@ -209,6 +209,12 @@ button:disabled {
 	border: 1px solid var(--line);
 }
 
+.destructive-button {
+	padding: 0.65rem 0.9rem;
+	background: var(--bad);
+	color: var(--page);
+}
+
 .library-layout {
 	display: grid;
 	min-height: 0;
@@ -816,6 +822,21 @@ button:disabled {
 }
 
 .mutation-dialog-error {
+	margin: 0;
+	color: var(--bad);
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.4;
+}
+
+.delete-confirm-summary {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.85rem;
+	line-height: 1.5;
+}
+
+.delete-confirm-warning {
 	margin: 0;
 	color: var(--bad);
 	font-size: 0.8rem;

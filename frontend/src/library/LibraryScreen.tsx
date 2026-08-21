@@ -2,6 +2,7 @@ import { CircleAlert, CircleCheckBig, Grid2X2, List, PanelsTopLeft, X } from "lu
 import { useCallback, useEffect, useMemo, type MouseEvent, useRef, useState } from "react";
 import {
 	CreateFolder,
+	DeleteMod,
 	MoveFolder,
 	MoveMod,
 	RenameFolder,
@@ -39,7 +40,7 @@ type SelectedModPanelProps = {
 	onSetEnabled: (entry: discovery.Entry) => void;
 };
 
-type MutationDialog = "priority" | "rename" | "move";
+type MutationDialog = "priority" | "rename" | "move" | "delete";
 
 type ModMutationDialogProps = {
 	entry: discovery.Entry;
@@ -65,6 +66,13 @@ type FolderMutationDialogProps = {
 	onRename: (folder: string, name: string) => Promise<boolean>;
 };
 
+type DeleteConfirmDialogProps = {
+	entry: discovery.Entry;
+	isMutating: boolean;
+	onClose: () => void;
+	onConfirm: (entry: discovery.Entry) => Promise<boolean>;
+};
+
 type MutationFeedback = {
 	id: number;
 	kind: "error" | "success";
@@ -87,6 +95,8 @@ const successToastDurationMilliseconds = 5000;
 const errorToastDurationMilliseconds = 8000;
 // The backend's compatible filename encoding supports priorities from 0 through 255.
 const maximumModPriority = 255;
+// SPEC.md requires a short deliberate delay before destructive confirmation.
+const deleteConfirmDelaySeconds = 3;
 
 // Converts unknown Wails failures into displayable scan errors.
 function errorMessage(error: unknown): string {
@@ -153,6 +163,13 @@ function canOrganizeMod(entry: discovery.Entry): boolean {
 		!hasAmbiguousPrimary &&
 		!hasMissingSidecar
 	);
+}
+
+// Deletion permits incomplete IoStore bundles, unlike rename, priority, and
+// move, because it only sends whichever recognized members are present.
+function canDeleteMod(entry: discovery.Entry): boolean {
+	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
+	return entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
 }
 
 // Keeps live announcements concise when the catalog changes.
@@ -295,7 +312,12 @@ export function LibraryScreen() {
 		async (entry: discovery.Entry) => {
 			if (!libraryRoot) return;
 
-			if (!entry.primaryPath || mutatingEntryIDsRef.current.size > 0) return;
+			if (
+				!entry.primaryPath ||
+				mutatingEntryIDsRef.current.size > 0 ||
+				isFolderMutatingRef.current
+			)
+				return;
 
 			const requestRoot = libraryRoot;
 			const enabled = entry.state !== "enabled";
@@ -436,6 +458,42 @@ export function LibraryScreen() {
 					showMutationFeedback(
 						"error",
 						`Could not move ${entry.displayName}: ${errorMessage(error)}`,
+					);
+				}
+				return false;
+			} finally {
+				mutatingEntryIDsRef.current.delete(entry.id);
+				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+			}
+		},
+		[libraryRoot, reloadLibrary, showMutationFeedback],
+	);
+
+	// The UI-level confirmation delay lives in DeleteConfirmDialog; the backend
+	// only requires a `confirmed` flag, not its own timing policy.
+	const deleteMod = useCallback(
+		async (entry: discovery.Entry): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
+
+			mutatingEntryIDsRef.current.add(entry.id);
+			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+
+			try {
+				await DeleteMod(libraryRoot, entry.id, true);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				setSelectedEntryID(null);
+				showMutationFeedback("success", `Sent ${entry.displayName} to the Recycle Bin.`);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback(
+						"error",
+						`Could not delete ${entry.displayName}: ${errorMessage(error)}`,
 					);
 				}
 				return false;
@@ -597,10 +655,28 @@ export function LibraryScreen() {
 
 	// Selects the mod under the pointer so its actions and the panel agree on the target.
 	const openModContextMenu = useCallback((entry: discovery.Entry, event: MouseEvent) => {
-		if (!canOrganizeMod(entry)) return;
+		const organizable = canOrganizeMod(entry);
+		const deletable = canDeleteMod(entry);
+		if (!organizable && !deletable) return;
 
 		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
 		if (!container) return;
+
+		const items: ContextMenuItem[] = [];
+		if (organizable) {
+			items.push(
+				{ label: "Rename", onSelect: () => setActiveDialog("rename") },
+				{ label: "Priority", onSelect: () => setActiveDialog("priority") },
+				{ label: "Move to...", onSelect: () => setActiveDialog("move") },
+			);
+		}
+		if (deletable) {
+			items.push({
+				label: "Delete...",
+				onSelect: () => setActiveDialog("delete"),
+				destructive: true,
+			});
+		}
 
 		setSelectedEntryID(entry.id);
 		setContextMenu({
@@ -608,11 +684,7 @@ export function LibraryScreen() {
 			y: event.clientY,
 			container,
 			title: entry.displayName,
-			items: [
-				{ label: "Rename", onSelect: () => setActiveDialog("rename") },
-				{ label: "Priority", onSelect: () => setActiveDialog("priority") },
-				{ label: "Move to...", onSelect: () => setActiveDialog("move") },
-			],
+			items,
 		});
 	}, []);
 
@@ -804,6 +876,7 @@ export function LibraryScreen() {
 						scanError={scanError}
 						hasLibrary={library !== null}
 						mutatingEntryIDs={mutatingEntryIDs}
+						isMutationLocked={isMutationLocked}
 						onSetEnabled={setModEnabled}
 						onSelect={(entry) =>
 							setSelectedEntryID((currentEntryID) =>
@@ -823,7 +896,7 @@ export function LibraryScreen() {
 					onDismiss={dismissMutationFeedback}
 				/>
 			)}
-			{activeDialog && selectedEntry && (
+			{activeDialog && activeDialog !== "delete" && selectedEntry && (
 				<ModMutationDialog
 					entry={selectedEntry}
 					folders={libraryIndex.folders}
@@ -836,10 +909,19 @@ export function LibraryScreen() {
 					onSetPriority={setModPriority}
 				/>
 			)}
+			{activeDialog === "delete" && selectedEntry && (
+				<DeleteConfirmDialog
+					entry={selectedEntry}
+					isMutating={isMutationLocked}
+					key={selectedEntry.id}
+					onClose={() => setActiveDialog(null)}
+					onConfirm={deleteMod}
+				/>
+			)}
 			{activeFolderDialog && library && (
 				<FolderMutationDialog
 					folders={libraryIndex.folders}
-					isMutating={isFolderMutating}
+					isMutating={isMutationLocked}
 					key={`${folderDialogTarget}-${activeFolderDialog}`}
 					mode={activeFolderDialog}
 					targetFolder={folderDialogTarget}
@@ -1215,6 +1297,83 @@ function FolderMutationDialog({
 						</button>
 					</div>
 				</form>
+			</section>
+		</div>
+	);
+}
+
+// Sends a scanner-recognized bundle to the Recycle Bin after a short delay
+// gates the confirm button, matching SPEC.md's UI safeguard requirement.
+// The backend enforces the actual safety checks; this dialog cannot bypass them.
+function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteConfirmDialogProps) {
+	const [secondsRemaining, setSecondsRemaining] = useState(deleteConfirmDelaySeconds);
+	const ready = secondsRemaining <= 0;
+
+	useEffect(() => {
+		if (secondsRemaining <= 0) return;
+		const timeout = window.setTimeout(
+			() => setSecondsRemaining((current) => current - 1),
+			1000,
+		);
+		return () => window.clearTimeout(timeout);
+	}, [secondsRemaining]);
+
+	const hasMissingSidecar = entry.issues?.some(
+		(issue) => issue.code === "missing-utoc" || issue.code === "missing-ucas",
+	);
+	const bundleFiles = [entry.primaryPath, entry.sidecars.utoc, entry.sidecars.ucas]
+		.filter((path): path is string => Boolean(path))
+		.map((path) => path.split("/").pop() ?? path);
+
+	async function handleConfirm() {
+		if (await onConfirm(entry)) onClose();
+	}
+
+	return (
+		<div className="mutation-dialog-backdrop">
+			<section
+				className="mutation-dialog"
+				aria-labelledby="delete-dialog-title"
+				aria-modal="true"
+				role="dialog"
+			>
+				<div>
+					<p className="eyebrow">Mod action</p>
+					<h2 id="delete-dialog-title">Delete mod</h2>
+					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
+				</div>
+				<p className="delete-confirm-summary">
+					Sends {bundleFiles.join(", ")} to the Recycle Bin. You can restore it from there
+					until the Recycle Bin is emptied.
+				</p>
+				{hasMissingSidecar && (
+					<p className="delete-confirm-warning" role="alert">
+						This bundle is missing a recognized file. Only the files listed above will
+						be removed.
+					</p>
+				)}
+				<div className="mutation-dialog-actions">
+					<button
+						type="button"
+						className="quiet-button"
+						disabled={isMutating}
+						onClick={onClose}
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						className="destructive-button"
+						disabled={!ready || isMutating}
+						onClick={() => void handleConfirm()}
+					>
+						{isMutating
+							? "Deleting..."
+							: ready
+								? "Delete"
+								: `Delete (${secondsRemaining})`}
+					</button>
+				</div>
 			</section>
 		</div>
 	);
