@@ -1,7 +1,7 @@
 import { CircleAlert, CircleCheckBig, Grid2X2, List, PanelsTopLeft, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ScanLibrary, SetModEnabled } from "../../wailsjs/go/main/App";
-import { discovery } from "../../wailsjs/go/models";
+import { RenameMod, ScanLibrary, SetModEnabled, SetModPriority } from "../../wailsjs/go/main/App";
+import { discovery, type mutation } from "../../wailsjs/go/models";
 import { entryStateLabel } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
 import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
@@ -26,7 +26,19 @@ type SelectedModPanelProps = {
 	isMutating: boolean;
 	isMutationLocked: boolean;
 	onClear: () => void;
+	onOpenDialog: (dialog: MutationDialog) => void;
 	onSetEnabled: (entry: discovery.Entry) => void;
+};
+
+type MutationDialog = "priority" | "rename";
+
+type ModMutationDialogProps = {
+	entry: discovery.Entry;
+	isMutating: boolean;
+	mode: MutationDialog;
+	onClose: () => void;
+	onRename: (entry: discovery.Entry, name: string) => Promise<boolean>;
+	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
 };
 
 type MutationFeedback = {
@@ -49,6 +61,8 @@ const viewModeIcons = {
 const successToastDurationMilliseconds = 5000;
 // Errors stay visible longer so people can read and dismiss actionable recovery guidance.
 const errorToastDurationMilliseconds = 8000;
+// The backend's compatible filename encoding supports priorities from 0 through 255.
+const maximumModPriority = 255;
 
 // Converts unknown Wails failures into displayable scan errors.
 function errorMessage(error: unknown): string {
@@ -118,6 +132,7 @@ export function LibraryScreen() {
 	const [search, setSearch] = useState("");
 	const [selectedFolder, setSelectedFolder] = useState("all");
 	const [selectedEntryID, setSelectedEntryID] = useState<string | null>(null);
+	const [activeDialog, setActiveDialog] = useState<MutationDialog | null>(null);
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const activeLibraryRootRef = useRef<string | null>(null);
@@ -160,6 +175,32 @@ export function LibraryScreen() {
 		nextMutationFeedbackIDRef.current += 1;
 		setMutationFeedback({ id: nextMutationFeedbackIDRef.current, kind, message });
 	}, []);
+	const updateMutatedEntry = useCallback(
+		(
+			result: mutation.Result,
+			changes: Partial<Pick<discovery.Entry, "displayName" | "priority">>,
+		) => {
+			setLibrary((currentLibrary) => {
+				if (!currentLibrary) return currentLibrary;
+
+				const entries = currentLibrary.entries.map((currentEntry) => {
+					if (currentEntry.id !== result.previousID) return currentEntry;
+
+					return new discovery.Entry({
+						...currentEntry,
+						...changes,
+						id: result.id,
+						primaryPath: result.primaryPath,
+						state: result.state,
+					});
+				});
+
+				return new discovery.Library({ ...currentLibrary, entries });
+			});
+			setSelectedEntryID(result.id);
+		},
+		[],
+	);
 
 	const setModEnabled = useCallback(
 		async (entry: discovery.Entry) => {
@@ -212,6 +253,71 @@ export function LibraryScreen() {
 		[libraryRoot, showMutationFeedback],
 	);
 
+	const renameMod = useCallback(
+		async (entry: discovery.Entry, name: string): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0) return false;
+
+			mutatingEntryIDsRef.current.add(entry.id);
+			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+
+			try {
+				const result = await RenameMod(libraryRoot, entry.id, name);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				updateMutatedEntry(result, { displayName: name });
+				showMutationFeedback("success", `Renamed ${entry.displayName} to ${name}.`);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback(
+						"error",
+						`Could not rename ${entry.displayName}: ${errorMessage(error)}`,
+					);
+				}
+				return false;
+			} finally {
+				mutatingEntryIDsRef.current.delete(entry.id);
+				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+			}
+		},
+		[libraryRoot, showMutationFeedback, updateMutatedEntry],
+	);
+
+	const setModPriority = useCallback(
+		async (entry: discovery.Entry, priority: number): Promise<boolean> => {
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0) return false;
+
+			mutatingEntryIDsRef.current.add(entry.id);
+			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+
+			try {
+				const result = await SetModPriority(libraryRoot, entry.id, priority);
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+
+				updateMutatedEntry(result, {
+					priority: new discovery.Priority({ ...entry.priority, value: priority }),
+				});
+				showMutationFeedback(
+					"success",
+					`Set ${entry.displayName} to priority ${priority}.`,
+				);
+				return true;
+			} catch (error) {
+				if (activeLibraryRootRef.current === libraryRoot) {
+					showMutationFeedback(
+						"error",
+						`Could not set priority for ${entry.displayName}: ${errorMessage(error)}`,
+					);
+				}
+				return false;
+			} finally {
+				mutatingEntryIDsRef.current.delete(entry.id);
+				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+			}
+		},
+		[libraryRoot, showMutationFeedback, updateMutatedEntry],
+	);
+
 	// Replaces the catalog only after a scan finishes successfully.
 	async function scan() {
 		if (isMutationLocked) return;
@@ -225,6 +331,7 @@ export function LibraryScreen() {
 			setSearch("");
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
+			setActiveDialog(null);
 			setLibraryState("initial");
 			return;
 		}
@@ -241,6 +348,7 @@ export function LibraryScreen() {
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
+			setActiveDialog(null);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
 		} catch (error) {
 			if (activeLibraryRootRef.current !== root) return;
@@ -364,7 +472,11 @@ export function LibraryScreen() {
 						entry={selectedEntry}
 						isMutating={selectedEntry ? mutatingEntryIDs.has(selectedEntry.id) : false}
 						isMutationLocked={isMutationLocked}
-						onClear={() => setSelectedEntryID(null)}
+						onClear={() => {
+							setSelectedEntryID(null);
+							setActiveDialog(null);
+						}}
+						onOpenDialog={setActiveDialog}
 						onSetEnabled={setModEnabled}
 					/>
 					<ModCatalog
@@ -389,6 +501,17 @@ export function LibraryScreen() {
 					feedback={mutationFeedback}
 					key={mutationFeedback.id}
 					onDismiss={dismissMutationFeedback}
+				/>
+			)}
+			{activeDialog && selectedEntry && (
+				<ModMutationDialog
+					entry={selectedEntry}
+					isMutating={isMutationLocked}
+					key={`${selectedEntry.id}-${activeDialog}`}
+					mode={activeDialog}
+					onClose={() => setActiveDialog(null)}
+					onRename={renameMod}
+					onSetPriority={setModPriority}
 				/>
 			)}
 		</main>
@@ -427,12 +550,156 @@ function MutationToast({ feedback, onDismiss }: MutationToastProps) {
 	);
 }
 
+function ModMutationDialog({
+	entry,
+	isMutating,
+	mode,
+	onClose,
+	onRename,
+	onSetPriority,
+}: ModMutationDialogProps) {
+	const inputRef = useRef<HTMLInputElement>(null);
+	const [name, setName] = useState(entry.displayName);
+	const [priority, setPriority] = useState(String(entry.priority.value));
+	const [validationError, setValidationError] = useState("");
+	const renameMode = mode === "rename";
+	const title = renameMode ? "Rename mod" : "Set priority";
+
+	useEffect(() => {
+		inputRef.current?.focus();
+	}, []);
+
+	async function submit() {
+		if (renameMode) {
+			const error = renameValidationError(name);
+			if (error) {
+				setValidationError(error);
+				return;
+			}
+
+			if (name === entry.displayName) {
+				setValidationError("Enter a different mod name.");
+				return;
+			}
+
+			if (await onRename(entry, name)) onClose();
+			return;
+		}
+
+		if (priority.trim() === "") {
+			setValidationError("Enter a priority.");
+			return;
+		}
+
+		const value = Number(priority);
+		if (!Number.isSafeInteger(value) || value < 0 || value > maximumModPriority) {
+			setValidationError(`Priority must be a whole number from 0 to ${maximumModPriority}.`);
+			return;
+		}
+
+		if (value === entry.priority.value) {
+			setValidationError("Choose a different priority.");
+			return;
+		}
+
+		if (await onSetPriority(entry, value)) onClose();
+	}
+
+	return (
+		<div className="mutation-dialog-backdrop">
+			<section
+				className="mutation-dialog"
+				aria-labelledby="mutation-dialog-title"
+				aria-modal="true"
+				role="dialog"
+			>
+				<div>
+					<p className="eyebrow">Mod action</p>
+					<h2 id="mutation-dialog-title">{title}</h2>
+					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
+				</div>
+				<form
+					onSubmit={(event) => {
+						event.preventDefault();
+						void submit();
+					}}
+				>
+					{renameMode ? (
+						<label className="mutation-dialog-field" htmlFor="rename-mod-name">
+							<span>New name</span>
+							<input
+								id="rename-mod-name"
+								ref={inputRef}
+								value={name}
+								onChange={(event) => {
+									setName(event.target.value);
+									setValidationError("");
+								}}
+							/>
+						</label>
+					) : (
+						<label className="mutation-dialog-field" htmlFor="set-mod-priority">
+							<span>Priority</span>
+							<input
+								id="set-mod-priority"
+								inputMode="numeric"
+								min="0"
+								ref={inputRef}
+								step="1"
+								type="number"
+								value={priority}
+								onChange={(event) => {
+									setPriority(event.target.value);
+									setValidationError("");
+								}}
+							/>
+						</label>
+					)}
+					{validationError && (
+						<p className="mutation-dialog-error" role="alert">
+							{validationError}
+						</p>
+					)}
+					<div className="mutation-dialog-actions">
+						<button
+							type="button"
+							className="quiet-button"
+							disabled={isMutating}
+							onClick={onClose}
+						>
+							Cancel
+						</button>
+						<button type="submit" disabled={isMutating}>
+							{isMutating ? "Saving..." : renameMode ? "Rename" : "Set priority"}
+						</button>
+					</div>
+				</form>
+			</section>
+		</div>
+	);
+}
+
+function renameValidationError(name: string): string | null {
+	if (name.trim() === "") return "Enter a mod name.";
+	if (name.endsWith(" ") || name.endsWith("."))
+		return "A mod name cannot end with a space or period.";
+	if (hasWindowsReservedCharacter(name))
+		return "A mod name contains a Windows-reserved character.";
+
+	return null;
+}
+
+function hasWindowsReservedCharacter(name: string): boolean {
+	return /[<>:"/\\|?*]/.test(name) || [...name].some((character) => character.charCodeAt(0) < 32);
+}
+
 // Keeps the current selection and its available actions in one stable location.
 function SelectedModPanel({
 	entry,
 	isMutating,
 	isMutationLocked,
 	onClear,
+	onOpenDialog,
 	onSetEnabled,
 }: SelectedModPanelProps) {
 	if (!entry) {
@@ -443,15 +710,19 @@ function SelectedModPanel({
 					<p>Select a mod to organize it.</p>
 				</div>
 				<p className="selected-mod-hint">
-					Rename, priority, move, and deletion controls arrive next.
+					Rename and priority actions are available for complete, unambiguous mods.
 				</p>
 			</section>
 		);
 	}
 
 	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
+	const hasMissingSidecar = entry.issues?.some(
+		(issue) => issue.code === "missing-utoc" || issue.code === "missing-ucas",
+	);
 	const canChangeState =
 		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
+	const canOrganize = canChangeState && !hasMissingSidecar;
 	const enabled = entry.state === "enabled";
 	const stateLabel = entryStateLabel(entry);
 
@@ -466,6 +737,26 @@ function SelectedModPanel({
 				</p>
 			</div>
 			<div className="selected-mod-actions">
+				{canOrganize && (
+					<>
+						<button
+							type="button"
+							className="quiet-button"
+							disabled={isMutationLocked}
+							onClick={() => onOpenDialog("rename")}
+						>
+							Rename
+						</button>
+						<button
+							type="button"
+							className="quiet-button"
+							disabled={isMutationLocked}
+							onClick={() => onOpenDialog("priority")}
+						>
+							Priority
+						</button>
+					</>
+				)}
 				{canChangeState && (
 					<button
 						type="button"
