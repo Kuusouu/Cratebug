@@ -1,8 +1,19 @@
-import { CircleAlert, CircleCheckBig, Grid2X2, List, PanelsTopLeft, X } from "lucide-react";
+import {
+	CircleAlert,
+	CircleCheckBig,
+	Grid2X2,
+	List,
+	PanelsTopLeft,
+	TriangleAlert,
+	X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, type MouseEvent, useRef, useState } from "react";
 import {
+	AssignModTag,
 	CreateFolder,
+	CreateTag,
 	DeleteMod,
+	LoadMetadata,
 	MoveFolder,
 	MoveMod,
 	RenameFolder,
@@ -10,13 +21,16 @@ import {
 	ScanLibrary,
 	SetModEnabled,
 	SetModPriority,
+	SetModRoot,
+	UnassignModTag,
 } from "../../wailsjs/go/main/App";
-import { discovery, type mutation } from "../../wailsjs/go/models";
+import { discovery, type metadata, type mutation } from "../../wailsjs/go/models";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
 	canChangeModState,
 	canDeleteMod,
 	canOrganizeMod,
+	canTagMod,
 	entryStateLabel,
 	hasMissingSidecar,
 } from "./entryPresentation";
@@ -40,13 +54,14 @@ type ViewModeButtonProps = {
 
 type SelectedModPanelProps = {
 	entry: discovery.Entry | null;
+	assignedTags: metadata.Tag[];
 	isMutating: boolean;
 	isMutationLocked: boolean;
 	onClear: () => void;
 	onSetEnabled: (entry: discovery.Entry) => void;
 };
 
-type MutationDialog = "priority" | "rename" | "move" | "delete";
+type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags";
 
 type ModMutationDialogProps = {
 	entry: discovery.Entry;
@@ -79,9 +94,18 @@ type DeleteConfirmDialogProps = {
 	onConfirm: (entry: discovery.Entry) => Promise<boolean>;
 };
 
+type ModTagDialogProps = {
+	entry: discovery.Entry;
+	catalog: metadata.Tag[];
+	assignedTagIDs: ReadonlySet<string>;
+	onClose: () => void;
+	onCreateAndAssign: (name: string) => Promise<boolean>;
+	onToggle: (tag: metadata.Tag, assign: boolean) => Promise<boolean>;
+};
+
 type MutationFeedback = {
 	id: number;
-	kind: "error" | "success";
+	kind: "error" | "success" | "warning";
 	message: string;
 };
 
@@ -154,6 +178,21 @@ function remapFolderSelection(
 	return selectedFolder;
 }
 
+// Mod records are keyed by a persistent identity, not the scanner ID entries
+// carry, so the current entry's tags are found by matching its scanner ID
+// against each record rather than by a direct lookup.
+function tagIDsForScannerID(
+	document: metadata.Document | null,
+	scannerID: string | null,
+): ReadonlySet<string> {
+	if (!document?.mods || !scannerID) return new Set();
+
+	for (const record of Object.values(document.mods)) {
+		if (record.scannerID === scannerID) return new Set(record.tags ?? []);
+	}
+	return new Set();
+}
+
 function folderParent(folder: string): string {
 	const separatorIndex = folder.lastIndexOf("/");
 	return separatorIndex === -1 ? "" : folder.slice(0, separatorIndex);
@@ -203,13 +242,24 @@ export function LibraryScreen() {
 	const [isFolderMutating, setIsFolderMutating] = useState(false);
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
+	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
+	const hasLoadedInitialMetadataRef = useRef(false);
 	const libraryRoot = library?.root;
 
 	const libraryIndex = useMemo(() => indexLibrary(library), [library]);
+	const assignedTagIDsForSelection = useMemo(
+		() => tagIDsForScannerID(metadataDocument, selectedEntryID),
+		[metadataDocument, selectedEntryID],
+	);
+	const tagCatalog = metadataDocument?.tags ?? [];
+	const assignedTagsForSelection = useMemo(
+		() => tagCatalog.filter((tag) => assignedTagIDsForSelection.has(tag.id)),
+		[tagCatalog, assignedTagIDsForSelection],
+	);
 
 	const displayedEntries = useMemo(() => {
 		const normalizedSearch = search.trim().toLocaleLowerCase();
@@ -295,6 +345,17 @@ export function LibraryScreen() {
 		}
 	}, [libraryRoot, showMutationFeedback]);
 
+	// Tags live in Cratebug's own persisted metadata, not the scanned library, so
+	// refreshing after a change re-reads that store instead of rescanning the mod
+	// root. Every mod-level mutation that can change a mod's scanner ID (rename,
+	// priority, move) must also call this: the backend already re-points that
+	// mod's tags at its new scanner ID, but the frontend's cached metadata
+	// document still has the old one until this refetches it.
+	const refreshMetadata = useCallback(async () => {
+		const state = await LoadMetadata();
+		setMetadataDocument(state.document);
+	}, []);
+
 	const setModEnabled = useCallback(
 		async (entry: discovery.Entry) => {
 			if (!libraryRoot) return;
@@ -364,6 +425,7 @@ export function LibraryScreen() {
 				if (activeLibraryRootRef.current !== libraryRoot) return false;
 
 				updateMutatedEntry(result, { displayName: name });
+				await refreshMetadata();
 				showMutationFeedback("success", `Renamed ${entry.displayName} to ${name}.`);
 				return true;
 			} catch (error) {
@@ -379,7 +441,7 @@ export function LibraryScreen() {
 				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 			}
 		},
-		[libraryRoot, showMutationFeedback, updateMutatedEntry],
+		[libraryRoot, refreshMetadata, showMutationFeedback, updateMutatedEntry],
 	);
 
 	const setModPriority = useCallback(
@@ -397,6 +459,7 @@ export function LibraryScreen() {
 				updateMutatedEntry(result, {
 					priority: new discovery.Priority({ ...entry.priority, value: priority }),
 				});
+				await refreshMetadata();
 				showMutationFeedback(
 					"success",
 					`Set ${entry.displayName} to priority ${priority}.`,
@@ -415,7 +478,7 @@ export function LibraryScreen() {
 				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 			}
 		},
-		[libraryRoot, showMutationFeedback, updateMutatedEntry],
+		[libraryRoot, refreshMetadata, showMutationFeedback, updateMutatedEntry],
 	);
 
 	// A folder move changes the destination's scanner identity for every entry it
@@ -436,6 +499,7 @@ export function LibraryScreen() {
 				await reloadLibrary();
 				if (activeLibraryRootRef.current !== libraryRoot) return false;
 
+				await refreshMetadata();
 				setSelectedEntryID(result.id);
 				showMutationFeedback(
 					"success",
@@ -455,7 +519,7 @@ export function LibraryScreen() {
 				setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
 			}
 		},
-		[libraryRoot, reloadLibrary, showMutationFeedback],
+		[libraryRoot, reloadLibrary, refreshMetadata, showMutationFeedback],
 	);
 
 	// The UI-level confirmation delay lives in DeleteConfirmDialog; the backend
@@ -492,6 +556,49 @@ export function LibraryScreen() {
 			}
 		},
 		[libraryRoot, reloadLibrary, showMutationFeedback],
+	);
+
+	// Tag requests use their own dialog-local busy state rather than the
+	// mod/folder mutation lock: unlike rename, move, or delete, they never touch
+	// mod files and cannot race a filesystem operation.
+	const createAndAssignTag = useCallback(
+		async (entry: discovery.Entry, name: string): Promise<boolean> => {
+			try {
+				const tag = await CreateTag(name);
+				await AssignModTag(entry.id, tag.id);
+				await refreshMetadata();
+				showMutationFeedback("success", `Created and assigned tag "${tag.name}".`);
+				return true;
+			} catch (error) {
+				showMutationFeedback("error", `Could not create tag: ${errorMessage(error)}`);
+				return false;
+			}
+		},
+		[refreshMetadata, showMutationFeedback],
+	);
+
+	const toggleModTag = useCallback(
+		async (entry: discovery.Entry, tag: metadata.Tag, assign: boolean): Promise<boolean> => {
+			try {
+				if (assign) {
+					await AssignModTag(entry.id, tag.id);
+				} else {
+					await UnassignModTag(entry.id, tag.id);
+				}
+				await refreshMetadata();
+				showMutationFeedback(
+					"success",
+					assign
+						? `Added tag "${tag.name}" to ${entry.displayName}.`
+						: `Removed tag "${tag.name}" from ${entry.displayName}.`,
+				);
+				return true;
+			} catch (error) {
+				showMutationFeedback("error", `Could not update tags: ${errorMessage(error)}`);
+				return false;
+			}
+		},
+		[refreshMetadata, showMutationFeedback],
 	);
 
 	const createFolder = useCallback(
@@ -647,7 +754,8 @@ export function LibraryScreen() {
 	const openModContextMenu = useCallback((entry: discovery.Entry, event: MouseEvent) => {
 		const organizable = canOrganizeMod(entry);
 		const deletable = canDeleteMod(entry);
-		if (!organizable && !deletable) return;
+		const taggable = canTagMod(entry);
+		if (!organizable && !deletable && !taggable) return;
 
 		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
 		if (!container) return;
@@ -659,6 +767,9 @@ export function LibraryScreen() {
 				{ label: "Priority", onSelect: () => setActiveDialog("priority") },
 				{ label: "Move to...", onSelect: () => setActiveDialog("move") },
 			);
+		}
+		if (taggable) {
+			items.push({ label: "Tags...", onSelect: () => setActiveDialog("tags") });
 		}
 		if (deletable) {
 			items.push({
@@ -678,11 +789,13 @@ export function LibraryScreen() {
 		});
 	}, []);
 
-	// Replaces the catalog only after a scan finishes successfully.
-	async function scan() {
+	// Replaces the catalog only after a scan finishes successfully. Accepts an
+	// explicit root so the initial-launch scan of a persisted mod root does not
+	// have to wait a render cycle for the modRoot input's state to catch up.
+	async function scan(overrideRoot?: string) {
 		if (isMutationLocked) return;
 
-		const root = modRoot.trim();
+		const root = (overrideRoot ?? modRoot).trim();
 		if (!root) {
 			activeLibraryRootRef.current = null;
 			setLibrary(null);
@@ -714,6 +827,15 @@ export function LibraryScreen() {
 			setActiveFolderDialog(null);
 			setContextMenu(null);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+			// Best-effort: a failed save here does not affect the library that
+			// just loaded successfully, so it only surfaces as its own notice.
+			SetModRoot(root).catch((error) => {
+				if (activeLibraryRootRef.current !== root) return;
+				showMutationFeedback(
+					"warning",
+					`Could not remember this library folder for next launch: ${errorMessage(error)}`,
+				);
+			});
 		} catch (error) {
 			if (activeLibraryRootRef.current !== root) return;
 
@@ -721,6 +843,42 @@ export function LibraryScreen() {
 			setLibraryState("error");
 		}
 	}
+
+	// Runs once, even under StrictMode's double-invoked effects: restores the
+	// persisted mod root and scans it automatically, and surfaces a corrupt or
+	// recovered metadata file as a non-crashing warning instead of losing track
+	// of it. Fires after scan() so its own feedback reset cannot clear this
+	// warning immediately after it is shown.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: scan is a plain function recreated every render, not a useCallback; depending on it would rerun this effect on every render instead of once on mount.
+	useEffect(() => {
+		if (hasLoadedInitialMetadataRef.current) return;
+		hasLoadedInitialMetadataRef.current = true;
+
+		void (async () => {
+			try {
+				const state = await LoadMetadata();
+				setMetadataDocument(state.document);
+
+				const persistedRoot = state.document.settings.modRoot?.trim();
+				if (persistedRoot) {
+					setModRoot(persistedRoot);
+					await scan(persistedRoot);
+				}
+
+				if (state.recovered) {
+					showMutationFeedback(
+						"warning",
+						`Cratebug found a problem with your saved settings and recovered them from a backup: ${state.recoveryReason ?? "unknown cause"}.`,
+					);
+				}
+			} catch (error) {
+				showMutationFeedback(
+					"warning",
+					`Could not load saved settings: ${errorMessage(error)}`,
+				);
+			}
+		})();
+	}, [showMutationFeedback]);
 
 	return (
 		<main className="app-shell" data-theme={theme}>
@@ -852,6 +1010,7 @@ export function LibraryScreen() {
 					</div>
 					<SelectedModPanel
 						entry={selectedEntry}
+						assignedTags={assignedTagsForSelection}
 						isMutating={selectedEntry ? mutatingEntryIDs.has(selectedEntry.id) : false}
 						isMutationLocked={isMutationLocked}
 						onClear={() => {
@@ -886,19 +1045,22 @@ export function LibraryScreen() {
 					onDismiss={dismissMutationFeedback}
 				/>
 			)}
-			{activeDialog && activeDialog !== "delete" && selectedEntry && (
-				<ModMutationDialog
-					entry={selectedEntry}
-					folders={libraryIndex.folders}
-					isMutating={isMutationLocked}
-					key={`${selectedEntry.id}-${activeDialog}`}
-					mode={activeDialog}
-					onClose={() => setActiveDialog(null)}
-					onMove={moveModToFolder}
-					onRename={renameMod}
-					onSetPriority={setModPriority}
-				/>
-			)}
+			{activeDialog &&
+				activeDialog !== "delete" &&
+				activeDialog !== "tags" &&
+				selectedEntry && (
+					<ModMutationDialog
+						entry={selectedEntry}
+						folders={libraryIndex.folders}
+						isMutating={isMutationLocked}
+						key={`${selectedEntry.id}-${activeDialog}`}
+						mode={activeDialog}
+						onClose={() => setActiveDialog(null)}
+						onMove={moveModToFolder}
+						onRename={renameMod}
+						onSetPriority={setModPriority}
+					/>
+				)}
 			{activeDialog === "delete" && selectedEntry && (
 				<DeleteConfirmDialog
 					entry={selectedEntry}
@@ -906,6 +1068,17 @@ export function LibraryScreen() {
 					key={selectedEntry.id}
 					onClose={() => setActiveDialog(null)}
 					onConfirm={deleteMod}
+				/>
+			)}
+			{activeDialog === "tags" && selectedEntry && (
+				<ModTagDialog
+					entry={selectedEntry}
+					catalog={tagCatalog}
+					assignedTagIDs={assignedTagIDsForSelection}
+					key={selectedEntry.id}
+					onClose={() => setActiveDialog(null)}
+					onCreateAndAssign={(name) => createAndAssignTag(selectedEntry, name)}
+					onToggle={(tag, assign) => toggleModTag(selectedEntry, tag, assign)}
 				/>
 			)}
 			{activeFolderDialog && library && (
@@ -934,7 +1107,12 @@ function MutationToast({ feedback, onDismiss }: MutationToastProps) {
 		feedback.kind === "success"
 			? successToastDurationMilliseconds
 			: errorToastDurationMilliseconds;
-	const Icon = feedback.kind === "success" ? CircleCheckBig : CircleAlert;
+	const Icon =
+		feedback.kind === "success"
+			? CircleCheckBig
+			: feedback.kind === "warning"
+				? TriangleAlert
+				: CircleAlert;
 
 	useEffect(() => {
 		const timeout = window.setTimeout(onDismiss, duration);
@@ -944,7 +1122,7 @@ function MutationToast({ feedback, onDismiss }: MutationToastProps) {
 	return (
 		<div
 			className={`mutation-toast ${feedback.kind}`}
-			role={feedback.kind === "error" ? "alert" : "status"}
+			role={feedback.kind === "success" ? "status" : "alert"}
 		>
 			<Icon aria-hidden="true" />
 			<p>{feedback.message}</p>
@@ -1441,6 +1619,138 @@ function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteCo
 	);
 }
 
+// Applies each tag toggle and the create-and-assign action immediately
+// rather than staging changes behind a Save button, since every checkbox is
+// already its own independent, atomic backend call.
+function ModTagDialog({
+	entry,
+	catalog,
+	assignedTagIDs,
+	onClose,
+	onCreateAndAssign,
+	onToggle,
+}: ModTagDialogProps) {
+	const inputRef = useRef<HTMLInputElement>(null);
+	const [newTagName, setNewTagName] = useState("");
+	const [validationError, setValidationError] = useState("");
+	const [togglingTagID, setTogglingTagID] = useState<string | null>(null);
+	const [isCreating, setIsCreating] = useState(false);
+	const isBusy = isCreating || togglingTagID !== null;
+	const handleEscape = useCallback(() => {
+		if (!isBusy) onClose();
+	}, [isBusy, onClose]);
+	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
+
+	useEffect(() => {
+		inputRef.current?.focus();
+	}, []);
+
+	async function handleToggle(tag: metadata.Tag, assign: boolean) {
+		setTogglingTagID(tag.id);
+		try {
+			await onToggle(tag, assign);
+		} finally {
+			setTogglingTagID(null);
+		}
+	}
+
+	async function submitNewTag() {
+		const name = newTagName.trim();
+		if (name === "") {
+			setValidationError("Enter a tag name.");
+			return;
+		}
+
+		setIsCreating(true);
+		try {
+			if (await onCreateAndAssign(name)) {
+				setNewTagName("");
+				setValidationError("");
+			}
+		} finally {
+			setIsCreating(false);
+		}
+	}
+
+	return (
+		<div className="mutation-dialog-backdrop">
+			<section
+				ref={dialogRef}
+				className="mutation-dialog"
+				aria-labelledby="tag-dialog-title"
+				aria-modal="true"
+				role="dialog"
+			>
+				<div>
+					<p className="eyebrow">Mod action</p>
+					<h2 id="tag-dialog-title">Tags</h2>
+					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
+				</div>
+				{catalog.length > 0 ? (
+					<ul className="tag-checklist">
+						{catalog.map((tag) => {
+							const assigned = assignedTagIDs.has(tag.id);
+							return (
+								<li key={tag.id}>
+									<label>
+										<input
+											type="checkbox"
+											checked={assigned}
+											disabled={isBusy}
+											onChange={() => void handleToggle(tag, !assigned)}
+										/>
+										<span>{tag.name}</span>
+									</label>
+								</li>
+							);
+						})}
+					</ul>
+				) : (
+					<p className="mutation-dialog-subtitle">No tags yet. Create one below.</p>
+				)}
+				<form
+					onSubmit={(event) => {
+						event.preventDefault();
+						void submitNewTag();
+					}}
+				>
+					<label className="mutation-dialog-field" htmlFor="new-tag-name">
+						<span>New tag</span>
+						<input
+							id="new-tag-name"
+							ref={inputRef}
+							value={newTagName}
+							disabled={isBusy}
+							onChange={(event) => {
+								setNewTagName(event.target.value);
+								setValidationError("");
+							}}
+						/>
+					</label>
+					{validationError && (
+						<p className="mutation-dialog-error" role="alert">
+							{validationError}
+						</p>
+					)}
+					<div className="mutation-dialog-actions">
+						<button
+							type="button"
+							className="quiet-button"
+							disabled={isBusy}
+							onClick={onClose}
+						>
+							Close
+						</button>
+						<button type="submit" disabled={isBusy}>
+							{isCreating ? "Adding..." : "Add tag"}
+						</button>
+					</div>
+				</form>
+			</section>
+		</div>
+	);
+}
+
 function renameValidationError(name: string, subject: "mod" | "folder" = "mod"): string | null {
 	if (name.trim() === "") return `Enter a ${subject} name.`;
 	if (name.endsWith(" ") || name.endsWith("."))
@@ -1478,6 +1788,7 @@ function basename(path: string): string {
 // Keeps the current selection and its available actions in one stable location.
 function SelectedModPanel({
 	entry,
+	assignedTags,
 	isMutating,
 	isMutationLocked,
 	onClear,
@@ -1510,6 +1821,13 @@ function SelectedModPanel({
 					{entry.relativeFolder || "Library root"} · {stateLabel} · Priority{" "}
 					{entry.priority.value}
 				</p>
+				{assignedTags.length > 0 && (
+					<ul className="selected-mod-tags" aria-label="Tags">
+						{assignedTags.map((tag) => (
+							<li key={tag.id}>{tag.name}</li>
+						))}
+					</ul>
+				)}
 			</div>
 			<div className="selected-mod-actions">
 				{canChangeState && (

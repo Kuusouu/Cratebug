@@ -552,6 +552,25 @@ button:disabled {
 	text-align: right;
 }
 
+.selected-mod-tags {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0.5rem 0 0;
+	padding: 0;
+	gap: 0.35rem;
+	list-style: none;
+}
+
+.selected-mod-tags li {
+	padding: 0.2rem 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 50%);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
 .selected-mod-actions {
 	display: flex;
 	flex: 0 0 auto;
@@ -848,6 +867,31 @@ button:disabled {
 	line-height: 1.4;
 }
 
+.tag-checklist {
+	display: grid;
+	max-height: 14rem;
+	margin: 1rem 0 0;
+	padding: 0;
+	gap: 0.35rem;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.tag-checklist label {
+	display: flex;
+	padding: 0.5rem 0.6rem;
+	align-items: center;
+	gap: 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	font-size: 0.85rem;
+	font-weight: 650;
+}
+
+.tag-checklist input {
+	width: auto;
+}
+
 .mutation-dialog-actions {
 	display: flex;
 	justify-content: end;
@@ -887,6 +931,10 @@ button:disabled {
 	border-color: color-mix(in srgb, var(--bad), transparent 38%);
 }
 
+.mutation-toast.warning {
+	border-color: color-mix(in srgb, var(--accent), transparent 38%);
+}
+
 .mutation-toast > svg {
 	width: 1.1rem;
 	height: 1.1rem;
@@ -900,6 +948,10 @@ button:disabled {
 
 .mutation-toast.error > svg {
 	color: var(--bad);
+}
+
+.mutation-toast.warning > svg {
+	color: var(--accent);
 }
 
 .mutation-toast p {
