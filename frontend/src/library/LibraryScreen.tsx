@@ -13,7 +13,13 @@ import {
 } from "../../wailsjs/go/main/App";
 import { discovery, type mutation } from "../../wailsjs/go/models";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
-import { entryStateLabel } from "./entryPresentation";
+import {
+	canChangeModState,
+	canDeleteMod,
+	canOrganizeMod,
+	entryStateLabel,
+	hasMissingSidecar,
+} from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
 import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
@@ -93,8 +99,10 @@ const viewModeIcons = {
 const successToastDurationMilliseconds = 5000;
 // Errors stay visible longer so people can read and dismiss actionable recovery guidance.
 const errorToastDurationMilliseconds = 8000;
-// The backend's compatible filename encoding supports priorities from 0 through 255.
-const maximumModPriority = 255;
+// Mirrors internal/mutation's Windows filename component limit (see maximumFileNameUTF16CodeUnits).
+const maximumFileNameUTF16CodeUnits = 255;
+// Mirrors discovery.MinimumTrailingNines, the shortest trailing-nine priority form.
+const minimumTrailingNines = 7;
 // SPEC.md requires a short deliberate delay before destructive confirmation.
 const deleteConfirmDelaySeconds = 3;
 
@@ -149,27 +157,6 @@ function remapFolderSelection(
 function folderParent(folder: string): string {
 	const separatorIndex = folder.lastIndexOf("/");
 	return separatorIndex === -1 ? "" : folder.slice(0, separatorIndex);
-}
-
-// Rename, priority, and move all require the same complete, unambiguous bundle.
-function canOrganizeMod(entry: discovery.Entry): boolean {
-	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
-	const hasMissingSidecar = entry.issues?.some(
-		(issue) => issue.code === "missing-utoc" || issue.code === "missing-ucas",
-	);
-	return (
-		entry.kind === "mod" &&
-		entry.primaryPath !== undefined &&
-		!hasAmbiguousPrimary &&
-		!hasMissingSidecar
-	);
-}
-
-// Deletion permits incomplete IoStore bundles, unlike rename, priority, and
-// move, because it only sends whichever recognized members are present.
-function canDeleteMod(entry: discovery.Entry): boolean {
-	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
-	return entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
 }
 
 // Keeps live announcements concise when the catalog changes.
@@ -366,7 +353,8 @@ export function LibraryScreen() {
 
 	const renameMod = useCallback(
 		async (entry: discovery.Entry, name: string): Promise<boolean> => {
-			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0) return false;
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
 
 			mutatingEntryIDsRef.current.add(entry.id);
 			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
@@ -396,7 +384,8 @@ export function LibraryScreen() {
 
 	const setModPriority = useCallback(
 		async (entry: discovery.Entry, priority: number): Promise<boolean> => {
-			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0) return false;
+			if (!libraryRoot || mutatingEntryIDsRef.current.size > 0 || isFolderMutatingRef.current)
+				return false;
 
 			mutatingEntryIDsRef.current.add(entry.id);
 			setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
@@ -519,8 +508,9 @@ export function LibraryScreen() {
 				await reloadLibrary();
 				if (activeLibraryRootRef.current !== libraryRoot) return false;
 
+				const createdFolderPath = result.folderPath ?? name;
 				setSelectedFolder(result.folderPath ?? "all");
-				showMutationFeedback("success", `Created folder ${result.folderPath}.`);
+				showMutationFeedback("success", `Created folder ${createdFolderPath}.`);
 				return true;
 			} catch (error) {
 				if (activeLibraryRootRef.current === libraryRoot) {
@@ -970,6 +960,54 @@ function MutationToast({ feedback, onDismiss }: MutationToastProps) {
 	);
 }
 
+const focusableSelector =
+	'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// role="dialog" aria-modal="true" only describes the intent; nothing in the
+// DOM enforces it. This keeps Tab from reaching the catalog behind the
+// overlay and lets Escape close the dialog, matching what aria-modal claims.
+function useDialogFocusTrap<T extends HTMLElement>(onClose: () => void) {
+	const containerRef = useRef<T>(null);
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		// TypeScript cannot narrow `container` across this closure boundary, but the
+		// effect cleanup removes this listener before containerRef could point elsewhere.
+		function handleKeyDown(this: HTMLElement, event: KeyboardEvent) {
+			if (event.key === "Escape") {
+				event.stopPropagation();
+				onClose();
+				return;
+			}
+			if (event.key !== "Tab") return;
+
+			const focusable = Array.from(this.querySelectorAll<HTMLElement>(focusableSelector));
+			const first = focusable.at(0);
+			const last = focusable.at(-1);
+			if (!first || !last) return;
+
+			const isOutside = !this.contains(document.activeElement);
+
+			if (event.shiftKey) {
+				if (isOutside || document.activeElement === first) {
+					event.preventDefault();
+					last.focus();
+				}
+			} else if (isOutside || document.activeElement === last) {
+				event.preventDefault();
+				first.focus();
+			}
+		}
+
+		container.addEventListener("keydown", handleKeyDown);
+		return () => container.removeEventListener("keydown", handleKeyDown);
+	}, [onClose]);
+
+	return containerRef;
+}
+
 function ModMutationDialog({
 	entry,
 	folders,
@@ -986,6 +1024,10 @@ function ModMutationDialog({
 	const [priority, setPriority] = useState(String(entry.priority.value));
 	const [destinationFolder, setDestinationFolder] = useState(entry.relativeFolder);
 	const [validationError, setValidationError] = useState("");
+	const handleEscape = useCallback(() => {
+		if (!isMutating) onClose();
+	}, [isMutating, onClose]);
+	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const renameMode = mode === "rename";
 	const priorityMode = mode === "priority";
 	const moveMode = mode === "move";
@@ -1032,8 +1074,9 @@ function ModMutationDialog({
 		}
 
 		const value = Number(priority);
-		if (!Number.isSafeInteger(value) || value < 0 || value > maximumModPriority) {
-			setValidationError(`Priority must be a whole number from 0 to ${maximumModPriority}.`);
+		const maximumPriority = maximumPriorityFor(entry);
+		if (!Number.isSafeInteger(value) || value < 0 || value > maximumPriority) {
+			setValidationError(`Priority must be a whole number from 0 to ${maximumPriority}.`);
 			return;
 		}
 
@@ -1048,6 +1091,7 @@ function ModMutationDialog({
 	return (
 		<div className="mutation-dialog-backdrop">
 			<section
+				ref={dialogRef}
 				className="mutation-dialog"
 				aria-labelledby="mutation-dialog-title"
 				aria-modal="true"
@@ -1165,6 +1209,10 @@ function FolderMutationDialog({
 	const [name, setName] = useState(renameMode ? currentName : "");
 	const [destinationParent, setDestinationParent] = useState(currentParent);
 	const [validationError, setValidationError] = useState("");
+	const handleEscape = useCallback(() => {
+		if (!isMutating) onClose();
+	}, [isMutating, onClose]);
+	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const title = createMode ? "New folder" : renameMode ? "Rename folder" : "Move folder";
 	const subtitle = createMode
 		? targetFolder
@@ -1222,6 +1270,7 @@ function FolderMutationDialog({
 	return (
 		<div className="mutation-dialog-backdrop">
 			<section
+				ref={dialogRef}
 				className="mutation-dialog"
 				aria-labelledby="folder-dialog-title"
 				aria-modal="true"
@@ -1308,6 +1357,7 @@ function FolderMutationDialog({
 function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteConfirmDialogProps) {
 	const [secondsRemaining, setSecondsRemaining] = useState(deleteConfirmDelaySeconds);
 	const ready = secondsRemaining <= 0;
+	const cancelRef = useRef<HTMLButtonElement>(null);
 
 	useEffect(() => {
 		if (secondsRemaining <= 0) return;
@@ -1318,12 +1368,22 @@ function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteCo
 		return () => window.clearTimeout(timeout);
 	}, [secondsRemaining]);
 
-	const hasMissingSidecar = entry.issues?.some(
-		(issue) => issue.code === "missing-utoc" || issue.code === "missing-ucas",
-	);
+	// Cancel, not the destructive action, gets initial focus. This also puts
+	// focus inside the dialog so the shared focus trap's Escape/Tab handling
+	// (which listens on the dialog element and relies on the keydown bubbling
+	// from whatever currently has focus) actually has something to bubble from.
+	useEffect(() => {
+		cancelRef.current?.focus();
+	}, []);
+
+	const missingSidecar = hasMissingSidecar(entry);
 	const bundleFiles = [entry.primaryPath, entry.sidecars.utoc, entry.sidecars.ucas]
 		.filter((path): path is string => Boolean(path))
 		.map((path) => path.split("/").pop() ?? path);
+	const handleEscape = useCallback(() => {
+		if (!isMutating) onClose();
+	}, [isMutating, onClose]);
+	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	async function handleConfirm() {
 		if (await onConfirm(entry)) onClose();
@@ -1332,6 +1392,7 @@ function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteCo
 	return (
 		<div className="mutation-dialog-backdrop">
 			<section
+				ref={dialogRef}
 				className="mutation-dialog"
 				aria-labelledby="delete-dialog-title"
 				aria-modal="true"
@@ -1346,7 +1407,7 @@ function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteCo
 					Sends {bundleFiles.join(", ")} to the Recycle Bin. You can restore it from there
 					until the Recycle Bin is emptied.
 				</p>
-				{hasMissingSidecar && (
+				{missingSidecar && (
 					<p className="delete-confirm-warning" role="alert">
 						This bundle is missing a recognized file. Only the files listed above will
 						be removed.
@@ -1354,6 +1415,7 @@ function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteCo
 				)}
 				<div className="mutation-dialog-actions">
 					<button
+						ref={cancelRef}
 						type="button"
 						className="quiet-button"
 						disabled={isMutating}
@@ -1393,6 +1455,26 @@ function hasWindowsReservedCharacter(name: string): boolean {
 	return /[<>:"/\\|?*]/.test(name) || [...name].some((character) => character.charCodeAt(0) < 32);
 }
 
+// The trailing-nine priority filename grows with the priority value itself
+// (more nines), so the true ceiling depends on the mod's own name length and
+// its longest present file suffix, not a single constant shared by every mod.
+function maximumPriorityFor(entry: discovery.Entry): number {
+	const currentStemLength = entry.priority.raw.length;
+	const suffixLengths = [entry.primaryPath, entry.sidecars.utoc, entry.sidecars.ucas]
+		.filter((path): path is string => path !== undefined)
+		.map((path) => basename(path).length - currentStemLength);
+	const longestSuffixLength = Math.max(0, ...suffixLengths);
+
+	// Stem length for a positive priority is name + "_" + nines + "_P".
+	const fixedStemOverhead = entry.displayName.length + 1 + (minimumTrailingNines - 1) + 2;
+	const ceiling = maximumFileNameUTF16CodeUnits - longestSuffixLength - fixedStemOverhead;
+	return Math.max(0, Math.min(maximumFileNameUTF16CodeUnits, ceiling));
+}
+
+function basename(path: string): string {
+	return path.split(/[/\\]/).pop() ?? path;
+}
+
 // Keeps the current selection and its available actions in one stable location.
 function SelectedModPanel({
 	entry,
@@ -1415,9 +1497,7 @@ function SelectedModPanel({
 		);
 	}
 
-	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
-	const canChangeState =
-		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
+	const canChangeState = canChangeModState(entry);
 	const enabled = entry.state === "enabled";
 	const stateLabel = entryStateLabel(entry);
 
