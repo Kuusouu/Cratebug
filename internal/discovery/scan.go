@@ -16,8 +16,10 @@ const (
 	entryIDOrphanedSidecarPrefix = "orphaned-sidecar"
 	prioritySuffix               = "_P"
 	prioritySeparator            = "_"
-	minimumTrailingNines         = 7
-	trailingNinePriorityOffset   = minimumTrailingNines - 1
+	// MinimumTrailingNines is the shortest trailing-nine priority form used by
+	// Marvel Rivals mod filenames.
+	MinimumTrailingNines       = 7
+	trailingNinePriorityOffset = MinimumTrailingNines - 1
 )
 
 // Describes whether a primary file is enabled or disabled.
@@ -112,8 +114,9 @@ type Entry struct {
 
 // Provides the deterministic result of scanning one mod root.
 type Library struct {
-	Root    string  `json:"root"`
-	Entries []Entry `json:"entries"`
+	Root    string   `json:"root"`
+	Folders []string `json:"folders"`
+	Entries []Entry  `json:"entries"`
 }
 
 type extension string
@@ -146,12 +149,23 @@ func Scan(root string) (Library, error) {
 	}
 
 	files := make(map[string][]fileRecord)
+	// Keep physical folders separately from recognized files so empty folders
+	// remain available to Phase 4 organization operations.
+	folders := make(map[string]struct{})
 	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 
 		if entry.IsDir() {
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			if relative != "." {
+				folders[filepath.ToSlash(relative)] = struct{}{}
+			}
+
 			return nil
 		}
 
@@ -189,7 +203,12 @@ func Scan(root string) (Library, error) {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	result := Library{Root: root, Entries: []Entry{}}
+	result := Library{Root: root, Folders: make([]string, 0, len(folders)), Entries: []Entry{}}
+	for folder := range folders {
+		result.Folders = append(result.Folders, folder)
+	}
+
+	sort.Strings(result.Folders)
 	for _, key := range keys {
 		records := files[key]
 		sort.Slice(records, func(i, j int) bool { return records[i].path < records[j].path })
@@ -375,7 +394,7 @@ func trailingNinesSuffixStart(stem string) int {
 		return -1
 	}
 	digits := stem[separator+1 : len(stem)-len(prioritySuffix)]
-	if len(digits) < minimumTrailingNines {
+	if len(digits) < MinimumTrailingNines {
 		return -1
 	}
 	for _, digit := range digits {

@@ -1,7 +1,8 @@
 # Cratebug Active Tasks
 
 **Phase:** 4 - Organization and recoverable deletion
-**Status:** Not started
+**Status:** Approved (see docs/reviews/phase-4-review.md). Replace this file
+when Phase 5's active task plan is established.
 
 This file contains only the active phase. Replace it when Phase 4 is complete.
 
@@ -96,12 +97,12 @@ handling, and recovery from injected failures.
 
 ## 4.4 Implement recoverable deletion
 
-* Delete a complete mod bundle through the Windows Recycle Bin using a reviewed
-  platform boundary; do not implement a permanent-delete fallback.
-* Require a clear confirmation with a short destructive-action delay before
-  accepting deletion.
-* Refuse deletion when the bundle is invalid, ambiguous, outside the mod root,
-  or the game-running safety check blocks it.
+* Delete a scanner-recognized mod bundle through the Windows Recycle Bin using
+  a reviewed platform boundary; do not implement a permanent-delete fallback.
+* Require an explicit confirmation request; the destructive-action delay is a
+  Task 4.5 UI safeguard, not backend timing policy.
+* Permit incomplete IoStore bundles to delete their present recognized members;
+  refuse ambiguous, missing-primary, outside-root, or game-running requests.
 * Reconcile the catalog after success or failure and accurately report any
   remaining files.
 
@@ -111,8 +112,47 @@ partial or platform failures report the final state.
 
 ## 4.5 Add organization UI interactions
 
+### 4.5.1 Clarify disabled mods
+
+* Give intentionally disabled mods a clearly muted, non-error card treatment
+  across every catalog view, with a visible Disabled badge and distinct state
+  indicator.
+
+### 4.5.2 Build mutation interaction foundations
+
+* Add selected-mod state, a consistent action area, busy/request locking, and
+  actionable mutation feedback without discarding the current library view.
+* Visually verify selection, loading, duplicate-request prevention, and error
+  states before adding individual mutation dialogs.
+
+### 4.5.3 Add rename and priority controls
+
+* Add focused rename and priority dialogs wired to the existing backend.
+* Visually verify successful updates, invalid names, priority bounds, and busy
+  states against a user-designated disposable library.
+
+### 4.5.4 Add folder and move controls
+
+* Add create, rename, and move-folder controls alongside mod move controls.
+* Visually verify nested folders, collisions, and mod moves between folders
+  against a user-designated disposable library.
+
+### 4.5.5 Add recoverable deletion controls
+
+* Add a destructive confirmation dialog with a short UI delay before sending a
+  deletion request to the backend.
+* Visually verify complete and incomplete bundle deletion against a
+  user-designated disposable library.
+
+### 4.5.6 Polish organization interaction resilience
+
+* Verify empty, error, busy, and narrow-layout states; prevent conflicting
+  actions and capture final interaction screenshots.
+
 * Add focused controls and dialogs for rename, priority, move, folder
 management, and deletion to the existing library UI.
+* Require a clear destructive-deletion confirmation with a short delay before
+  sending the backend request.
 * Keep controls and confirmations consistent with discovered state, including
 folder hierarchy and bundle type.
 * Prevent duplicate and conflicting requests while a mutation is in progress.

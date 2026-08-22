@@ -136,6 +136,9 @@ func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "A", "B"), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, "notes.txt"), []byte("ignored"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -153,6 +156,10 @@ func TestScanIgnoresUnrelatedFilesAndPreservesFolders(t *testing.T) {
 	// Assert
 	if len(library.Entries) != 1 || library.Entries[0].RelativeFolder != "A/B" {
 		t.Fatalf("entries = %#v, want one entry in A/B", library.Entries)
+	}
+	wantFolders := []string{"A", "A/B", "empty"}
+	if !reflect.DeepEqual(library.Folders, wantFolders) {
+		t.Errorf("Folders = %#v, want %#v", library.Folders, wantFolders)
 	}
 }
 
