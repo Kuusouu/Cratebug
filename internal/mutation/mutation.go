@@ -17,8 +17,12 @@ const crateoffSuffix = ".pak_crateoff"
 // Paths are relative to the mod root so callers never need filesystem paths from Go.
 type Result struct {
 	ID                  string          `json:"id"`
+	PreviousID          string          `json:"previousID,omitempty"`
 	PreviousPrimaryPath string          `json:"previousPrimaryPath"`
 	PrimaryPath         string          `json:"primaryPath"`
+	PreviousFolderPath  string          `json:"previousFolderPath,omitempty"`
+	FolderPath          string          `json:"folderPath,omitempty"`
+	Deleted             bool            `json:"deleted,omitempty"`
 	State               discovery.State `json:"state"`
 }
 

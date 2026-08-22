@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { ChevronRight, Folder, LibraryBig } from "lucide-react";
+import { memo, type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 type FolderNode = {
 	path: string;
@@ -12,6 +12,7 @@ type FolderNavigationProps = {
 	folders: string[];
 	selectedFolder: string;
 	onSelect: (folder: string) => void;
+	onContextMenu: (folder: string, event: MouseEvent) => void;
 	entryCount: number;
 	folderEntryCounts: ReadonlyMap<string, number>;
 };
@@ -29,6 +30,7 @@ type FolderTreeItemProps = {
 	expandedFolders: ReadonlySet<string>;
 	entryCounts: ReadonlyMap<string, number>;
 	onSelect: (folder: string) => void;
+	onContextMenu: (folder: string, event: MouseEvent) => void;
 	onHideTooltip: () => void;
 	onShowTooltip: (content: string, target: HTMLElement) => void;
 	onToggle: (folder: string) => void;
@@ -67,6 +69,7 @@ export const FolderNavigation = memo(function FolderNavigation({
 	folders,
 	selectedFolder,
 	onSelect,
+	onContextMenu,
 	entryCount,
 	folderEntryCounts,
 }: FolderNavigationProps) {
@@ -118,6 +121,10 @@ export const FolderNavigation = memo(function FolderNavigation({
 				type="button"
 				className={`folder-row${selectedFolder === "all" ? " selected" : ""}`}
 				onClick={() => onSelect("all")}
+				onContextMenu={(event) => {
+					event.preventDefault();
+					onContextMenu("", event);
+				}}
 			>
 				<LibraryBig aria-hidden="true" className="folder-icon" />
 				<span className="folder-name">All mods</span>
@@ -130,6 +137,7 @@ export const FolderNavigation = memo(function FolderNavigation({
 					key={node.path}
 					node={node}
 					onSelect={onSelect}
+					onContextMenu={onContextMenu}
 					onHideTooltip={hideTooltip}
 					onShowTooltip={showTooltip}
 					onToggle={toggleFolder}
@@ -165,6 +173,7 @@ function sameFolderTreeItemProps(
 		previous.expandedFolders !== next.expandedFolders ||
 		previous.entryCounts !== next.entryCounts ||
 		previous.onSelect !== next.onSelect ||
+		previous.onContextMenu !== next.onContextMenu ||
 		previous.onHideTooltip !== next.onHideTooltip ||
 		previous.onShowTooltip !== next.onShowTooltip ||
 		previous.onToggle !== next.onToggle
@@ -188,6 +197,7 @@ const FolderTreeItem = memo(function FolderTreeItem({
 	expandedFolders,
 	entryCounts,
 	onSelect,
+	onContextMenu,
 	onHideTooltip,
 	onShowTooltip,
 	onToggle,
@@ -220,6 +230,10 @@ const FolderTreeItem = memo(function FolderTreeItem({
 					onBlur={onHideTooltip}
 					onFocus={(event) => onShowTooltip(node.name, event.currentTarget)}
 					onClick={() => onSelect(node.path)}
+					onContextMenu={(event) => {
+						event.preventDefault();
+						onContextMenu(node.path, event);
+					}}
 					onMouseEnter={(event) => onShowTooltip(node.name, event.currentTarget)}
 					onMouseLeave={onHideTooltip}
 				>
@@ -237,6 +251,7 @@ const FolderTreeItem = memo(function FolderTreeItem({
 							key={child.path}
 							node={child}
 							onSelect={onSelect}
+							onContextMenu={onContextMenu}
 							onHideTooltip={onHideTooltip}
 							onShowTooltip={onShowTooltip}
 							onToggle={onToggle}

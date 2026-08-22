@@ -73,13 +73,38 @@ For user-visible changes:
 
 If visual verification cannot be performed, say so clearly.
 
-### Windows screenshots
+### Driving and screenshotting the running app
 
-- Capture the application window, not the full desktop.
-- Wait for a nonzero `MainWindowHandle`, then use Win32 `PrintWindow` through PowerShell/.NET. Avoid `CopyFromScreen`, which can clip windows under display scaling.
-- Before reading the window rectangle, make the PowerShell capture process DPI-aware with `SetProcessDPIAware()`. Wails/WebView windows can render at a higher per-monitor DPI than a non-DPI-aware process reports; without this step, `PrintWindow` output is cropped to virtualized bounds.
+Run `mise exec -c "wails dev"`. Wails serves a fully-bound dev URL alongside the
+native window — the startup log prints it (normally `http://localhost:34115`).
+Navigating a plain browser tab there loads the real frontend with a working
+`window.go.main.App` bridge to the Go backend, identical to the native window.
+Use the `playwright` MCP tools (configured in this repo's `.mcp.json`) to navigate
+there, click, type, read the DOM/console, and screenshot — no native-window capture
+or WebView2 debug-port setup needed.
+
+The `playwright` server launches its own bundled Chromium (`--browser chromium`)
+rather than real Chrome, since installing Chrome requires admin rights this machine
+doesn't have. That bundled build is a separate download from the `playwright` npm
+package's own copy — on a fresh machine, first run
+`mise exec -- bunx @playwright/mcp@latest install-browser chrome-for-testing` once,
+or MCP calls fail with "Chromium distribution ... is not found".
+
 - Save screenshots as `docs/screenshots/<phase>/task-<number>-<state>.png`.
-- Inspect the saved PNG and close only the process launched for verification.
+- Fixtures: build small disposable synthetic fixtures under a temp directory by
+  default and delete them after verification. If a task genuinely needs a real or
+  complex library, ask the user to point at one rather than fabricating something
+  that pretends to be real data.
+- BentoMod can be launched the same way as a live comparison reference when a task
+  calls for it; see `archive/BentoMod/AGENTS.md`. This repo's `.mcp.json` also
+  defines a `playwright-bentomod` server that attaches over CDP to BentoMod's debug
+  port (`http://localhost:9223`) instead of launching its own browser, so both
+  `playwright` and `playwright-bentomod` tools are available in the same session for
+  side-by-side comparison — no directory switching needed. BentoMod must already be
+  running (`pnpm tauri dev` from `bentomod/`) for that port to have anything to
+  attach to.
+- Close the dev process (and its Vite/bindings child processes) once verification
+  is done.
 
 ## Git
 

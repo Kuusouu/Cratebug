@@ -36,3 +36,45 @@ func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Res
 	operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
 	return a.mutationExecutor.Execute(operation)
 }
+
+// Renames one current scanner entry without exposing arbitrary filesystem paths.
+func (a *App) RenameMod(modRoot, entryID, name string) (mutation.Result, error) {
+	operation := mutation.NewRenameModOperation(modRoot, entryID, name)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Changes one current scanner entry's filename-based priority.
+func (a *App) SetModPriority(modRoot, entryID string, priority int) (mutation.Result, error) {
+	operation := mutation.NewSetPriorityOperation(modRoot, entryID, priority)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Moves one current scanner entry to an existing scanner-known folder.
+func (a *App) MoveMod(modRoot, entryID, destinationFolder string) (mutation.Result, error) {
+	operation := mutation.NewMoveModOperation(modRoot, entryID, destinationFolder)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Creates one folder beneath the root or an existing scanner-known folder.
+func (a *App) CreateFolder(modRoot, parentFolder, name string) (mutation.Result, error) {
+	operation := mutation.NewCreateFolderOperation(modRoot, parentFolder, name)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Renames one scanner-known physical folder.
+func (a *App) RenameFolder(modRoot, folder, name string) (mutation.Result, error) {
+	operation := mutation.NewRenameFolderOperation(modRoot, folder, name)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Moves one scanner-known physical folder beneath the root or another scanner-known folder.
+func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Result, error) {
+	operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Deletes one current scanner entry through the Windows Recycle Bin.
+func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Result, error) {
+	operation := mutation.NewDeleteModOperation(modRoot, entryID, confirmed)
+	return a.mutationExecutor.Execute(operation)
+}

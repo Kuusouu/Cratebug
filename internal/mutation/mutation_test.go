@@ -191,18 +191,29 @@ func TestSetEnabledUsesCurrentScannerState(t *testing.T) {
 	writeFile(t, filepath.Join(root, "Example.pak"), "primary")
 	entryID := scannedEntryID(t, root, "Example.pak")
 
-	// Act
-	if _, err := setEnabled(root, entryID, false); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := setEnabled(root, entryID, false); err == nil {
-		t.Fatal("repeated state transition succeeded, want error")
-	}
-	if _, err := setEnabled(root, entryID, true); err != nil {
-		t.Fatal(err)
-	}
+	// Act: disable using the scanner-issued entry ID
+	_, disableErr := setEnabled(root, entryID, false)
 
 	// Assert
+	if disableErr != nil {
+		t.Fatal(disableErr)
+	}
+
+	// Act: repeat the same transition with the now-stale entry ID
+	_, repeatErr := setEnabled(root, entryID, false)
+
+	// Assert
+	if repeatErr == nil {
+		t.Fatal("repeated state transition succeeded, want error")
+	}
+
+	// Act: enable using the same entry ID
+	_, enableErr := setEnabled(root, entryID, true)
+
+	// Assert
+	if enableErr != nil {
+		t.Fatal(enableErr)
+	}
 	if _, err := os.Lstat(filepath.Join(root, "Example.pak")); err != nil {
 		t.Errorf("enabled primary is missing: %v", err)
 	}
@@ -261,10 +272,16 @@ func TestIsMarvelRivalsProcess(t *testing.T) {
 		"MarvelRivals.exe":          false,
 	}
 
-	// Act and assert
+	// Act
+	got := make(map[string]bool, len(processNames))
+	for processName := range processNames {
+		got[processName] = isMarvelRivalsProcess(processName)
+	}
+
+	// Assert
 	for processName, want := range processNames {
-		if got := isMarvelRivalsProcess(processName); got != want {
-			t.Errorf("isMarvelRivalsProcess(%q) = %t, want %t", processName, got, want)
+		if got[processName] != want {
+			t.Errorf("isMarvelRivalsProcess(%q) = %t, want %t", processName, got[processName], want)
 		}
 	}
 }
@@ -306,6 +323,12 @@ func snapshotFiles(t *testing.T, root string, suffixes ...string) map[string]str
 		}
 		if entry.IsDir() || !matchesSuffix(entry.Name(), suffixes) {
 			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			info, err := os.Stat(path)
+			if err == nil && info.IsDir() {
+				return nil
+			}
 		}
 		contents, err := os.ReadFile(path)
 		if err != nil {
