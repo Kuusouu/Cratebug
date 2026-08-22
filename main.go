@@ -13,9 +13,12 @@ import (
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	app, err := NewApp()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title:     "Cratebug",
 		Width:     1400,
 		Height:    950,

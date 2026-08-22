@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
 )
 
@@ -18,9 +19,14 @@ func (checker staticGameRunningChecker) IsGameRunning() (bool, error) {
 	return checker.gameRunning, nil
 }
 
+func testMetadataStore(t *testing.T) metadata.Store {
+	t.Helper()
+	return metadata.NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+}
+
 func TestRuntimeStatus(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{})
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
 
 	// Act
 	got := app.RuntimeStatus()
@@ -40,7 +46,7 @@ func TestSetModEnabledBlocksRunningGame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{gameRunning: true})
+	app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t))
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +72,7 @@ func TestScanLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{})
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
 
 	// Act
 	library, err := app.ScanLibrary(root)
@@ -98,7 +104,7 @@ func TestSetModEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{})
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +190,7 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 			if err := os.Mkdir(filepath.Join(root, "destination"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			app := newApp(staticGameRunningChecker{gameRunning: true})
+			app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t))
 			library, err := app.ScanLibrary(root)
 			if err != nil {
 				t.Fatal(err)
@@ -201,5 +207,139 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 				t.Errorf("blocked operation changed primary: %v", err)
 			}
 		})
+	}
+}
+
+func TestSetModRootPersistsAcrossLoads(t *testing.T) {
+	// Arrange
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+
+	// Act
+	if err := app.SetModRoot(`C:\Mods`); err != nil {
+		t.Fatal(err)
+	}
+	state := app.LoadMetadata()
+
+	// Assert
+	if state.Document.Settings.ModRoot != `C:\Mods` {
+		t.Errorf("Settings.ModRoot = %q, want %q", state.Document.Settings.ModRoot, `C:\Mods`)
+	}
+}
+
+func TestTagLifecycleThroughApp(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	primaryPath := filepath.Join(root, "Example_9999999_P.pak")
+	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryID := library.Entries[0].ID
+
+	// Act
+	tag, err := app.CreateTag("Combat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := app.AssignModTag(entryID, tag.ID); err != nil {
+		t.Fatal(err)
+	}
+	afterAssign := app.LoadMetadata().Document
+	if err := app.UnassignModTag(entryID, tag.ID); err != nil {
+		t.Fatal(err)
+	}
+	afterUnassign := app.LoadMetadata().Document
+
+	// Assert
+	modID, ok := afterAssign.FindModByScannerID(entryID)
+	if !ok {
+		t.Fatal("assigned mod is not tracked in persisted metadata")
+	}
+	if got := afterAssign.Mods[modID].Tags; len(got) != 1 || got[0] != tag.ID {
+		t.Errorf("Tags after assign = %#v, want [%q]", got, tag.ID)
+	}
+	if got := afterUnassign.Mods[modID].Tags; len(got) != 0 {
+		t.Errorf("Tags after unassign = %#v, want none", got)
+	}
+}
+
+// Confirms App wires mutation.Result.PreviousID/ID into metadata
+// reconciliation, so a tag assigned before a rename is still assigned to the
+// same mod's persistent identity afterward.
+func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	primaryPath := filepath.Join(root, "Example_9999999_P.pak")
+	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entryID := library.Entries[0].ID
+
+	tag, err := app.CreateTag("Combat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := app.AssignModTag(entryID, tag.ID); err != nil {
+		t.Fatal(err)
+	}
+	before := app.LoadMetadata().Document
+	modID, ok := before.FindModByScannerID(entryID)
+	if !ok {
+		t.Fatal("assigned mod is not tracked in persisted metadata")
+	}
+
+	// Act
+	result, err := app.RenameMod(root, entryID, "Renamed")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	after := app.LoadMetadata().Document
+	if got := after.Mods[modID].Tags; len(got) != 1 || got[0] != tag.ID {
+		t.Errorf("Tags after rename = %#v, want [%q]", got, tag.ID)
+	}
+	if after.Mods[modID].ScannerID != result.ID {
+		t.Errorf("ScannerID after rename = %q, want %q", after.Mods[modID].ScannerID, result.ID)
+	}
+}
+
+func TestLoadMetadataRecoversFromACorruptedFile(t *testing.T) {
+	// Arrange
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	app := newApp(staticGameRunningChecker{}, metadata.NewStore(path))
+	// Set it twice: the backup only holds what the primary held before its
+	// most recent write, so a single save leaves no backup to recover from.
+	if err := app.SetModRoot(`C:\Mods`); err != nil {
+		t.Fatal(err)
+	}
+	if err := app.SetModRoot(`C:\Mods`); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("{not valid json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	state := app.LoadMetadata()
+
+	// Assert
+	if !state.Recovered {
+		t.Error("Recovered = false, want true after loading a corrupted file")
+	}
+	if state.RecoveryReason == "" {
+		t.Error("RecoveryReason is empty, want an explanation of the corruption")
+	}
+	if state.Document.Settings.ModRoot != `C:\Mods` {
+		t.Errorf("recovered Settings.ModRoot = %q, want %q", state.Document.Settings.ModRoot, `C:\Mods`)
 	}
 }

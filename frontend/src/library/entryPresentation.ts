@@ -36,3 +36,10 @@ export function canOrganizeMod(entry: discovery.Entry): boolean {
 export function canDeleteMod(entry: discovery.Entry): boolean {
 	return canChangeModState(entry);
 }
+
+// Tags attach to a mod's persistent identity independent of its current
+// filename or bundle completeness, so any scanned mod can be tagged even if
+// its file state blocks rename, move, or delete.
+export function canTagMod(entry: discovery.Entry): boolean {
+	return entry.kind === "mod";
+}
