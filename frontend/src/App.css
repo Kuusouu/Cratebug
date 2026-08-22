@@ -639,16 +639,20 @@ button:disabled {
 	outline-offset: 1px;
 }
 
-.mod-card-select {
+.mod-card-select-area {
+	position: relative;
 	display: grid;
 	min-width: 0;
 	gap: 0.85rem;
+}
+
+.mod-card-select {
+	position: absolute;
+	inset: 0;
 	padding: 0;
 	border: 0;
-	border-radius: 0;
+	border-radius: 0.4rem;
 	background: transparent;
-	color: inherit;
-	text-align: left;
 }
 
 .mod-card-select:hover:not(:disabled) {
@@ -1012,7 +1016,7 @@ button:disabled {
 	flex: 1;
 }
 
-.list-mod-row .mod-card-select {
+.list-mod-row .mod-card-select-area {
 	min-width: 0;
 	flex: 1;
 }
