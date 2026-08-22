@@ -385,7 +385,7 @@ func findEntryByPrimaryPath(entries []discovery.Entry, primaryPath string) (disc
 // suffixes.
 func renamedStem(entry discovery.Entry, name string) (string, error) {
 	if err := validateFileStem(name); err != nil {
-		return "", err
+		return "", fmt.Errorf("mod name: %w", err)
 	}
 	if entry.Priority.Kind == discovery.PriorityLeadingBang {
 		name = "!" + name
@@ -450,23 +450,23 @@ func primaryFileSuffix(path string) (string, error) {
 // bundle-plan construction.
 func validateFileStem(stem string) error {
 	if strings.TrimSpace(stem) == "" {
-		return fmt.Errorf("mod name cannot be empty")
+		return fmt.Errorf("name cannot be empty")
 	}
 	if !utf8.ValidString(stem) {
-		return fmt.Errorf("mod name is not valid UTF-8")
+		return fmt.Errorf("name is not valid UTF-8")
 	}
 	if strings.HasSuffix(stem, " ") || strings.HasSuffix(stem, ".") {
-		return fmt.Errorf("mod name cannot end with a space or period")
+		return fmt.Errorf("name cannot end with a space or period")
 	}
 	if strings.ContainsAny(stem, `<>:"/\|?*`) {
-		return fmt.Errorf("mod name contains a Windows-reserved character")
+		return fmt.Errorf("name contains a Windows-reserved character")
 	}
 	if isReservedDeviceName(stem) {
-		return fmt.Errorf("mod name is reserved by Windows for a device")
+		return fmt.Errorf("name is reserved by Windows for a device")
 	}
 	for _, character := range stem {
 		if character < 32 {
-			return fmt.Errorf("mod name contains a control character")
+			return fmt.Errorf("name contains a control character")
 		}
 	}
 	return nil

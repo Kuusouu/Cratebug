@@ -1,6 +1,6 @@
 import { memo, type MouseEvent } from "react";
 import type { discovery } from "../../wailsjs/go/models";
-import { entryStateLabel } from "./entryPresentation";
+import { canChangeModState, entryStateLabel } from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
 type ModCatalogProps = {
@@ -137,9 +137,7 @@ const ModCard = memo(function ModCard({
 	selected,
 	viewMode,
 }: ModCardProps) {
-	const hasAmbiguousPrimary = entry.issues?.some((issue) => issue.code === "ambiguous-primary");
-	const canChangeState =
-		entry.kind === "mod" && entry.primaryPath !== undefined && !hasAmbiguousPrimary;
+	const canChangeState = canChangeModState(entry);
 	const enabled = entry.state === "enabled";
 	const disabled = entry.state === "disabled";
 	const actionLabel = enabled ? "Disable" : "Enable";
@@ -164,25 +162,32 @@ const ModCard = memo(function ModCard({
 			</div>
 		</div>
 	);
-	function selection(includeFacts: boolean) {
+	// Renders heading (and facts, for grid cards) as plain siblings rather than
+	// button children, since <button> only permits phrasing content and the
+	// heading/facts blocks contain <h3>/<p>/<div>. The overlay button below
+	// covers the same area and carries the keyboard/click target instead.
+	function selectionArea(includeFacts: boolean) {
 		return (
-			<button
-				type="button"
-				aria-pressed={selected}
-				className="mod-card-select"
-				onClick={(event) => {
-					event.stopPropagation();
-					onSelect(entry);
-				}}
-				onContextMenu={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-					onContextMenu(entry, event);
-				}}
-			>
+			<div className="mod-card-select-area">
 				{heading}
 				{includeFacts && facts}
-			</button>
+				<button
+					type="button"
+					aria-pressed={selected}
+					className="mod-card-select"
+					onClick={(event) => {
+						event.stopPropagation();
+						onSelect(entry);
+					}}
+					onContextMenu={(event) => {
+						event.preventDefault();
+						event.stopPropagation();
+						onContextMenu(entry, event);
+					}}
+				>
+					<span className="visually-hidden">Select {entry.displayName}</span>
+				</button>
+			</div>
 		);
 	}
 	const action = canChangeState ? (
@@ -220,7 +225,7 @@ const ModCard = memo(function ModCard({
 				}}
 			>
 				<div className="list-mod-summary">
-					{selection(false)}
+					{selectionArea(false)}
 					<div className="list-mod-controls">
 						{facts}
 						{action}
@@ -240,7 +245,7 @@ const ModCard = memo(function ModCard({
 				onContextMenu(entry, event);
 			}}
 		>
-			{selection(true)}
+			{selectionArea(true)}
 			{action}
 			{issues}
 		</article>

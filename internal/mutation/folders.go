@@ -147,12 +147,6 @@ func moveFolderToParent(modRoot, folder, destinationParent string) (Result, erro
 	return moveFolderWithMove(library.Root, library.Folders, folder, destinationFolder, moveFileWithoutReplace)
 }
 
-// Applies a no-replace directory move and returns the folder paths needed for
-// targeted UI reconciliation.
-func moveFolder(modRoot string, folders []string, sourceFolder, destinationFolder string) (Result, error) {
-	return moveFolderWithMove(modRoot, folders, sourceFolder, destinationFolder, moveFileWithoutReplace)
-}
-
 // Allows folder-move tests to inject a filesystem failure after planning and
 // exercise the same reconciliation path as production code.
 func moveFolderWithMove(modRoot string, folders []string, sourceFolder, destinationFolder string, move func(string, string) error) (Result, error) {
