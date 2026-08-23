@@ -51,6 +51,8 @@ import {
 } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
 import {
+	type DraggedItem,
+	isValidDropTarget,
 	type LibraryState,
 	type Theme,
 	themes,
@@ -291,6 +293,7 @@ export function LibraryScreen() {
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
 	const [accentColor, setAccentColor] = useState("");
+	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
@@ -890,6 +893,33 @@ export function LibraryScreen() {
 		[libraryRoot, reloadLibrary, showMutationFeedback],
 	);
 
+	// Reuses isValidDropTarget rather than re-deriving the cycle check here,
+	// matching the same validity FolderNavigation already used to decide
+	// whether to show the drag-over highlight before this ever fires.
+	const handleDropOnFolder = useCallback(
+		(destinationFolder: string) => {
+			const item = draggedItem;
+			setDraggedItem(null);
+			if (!isValidDropTarget(item, destinationFolder)) return;
+			if (item?.type === "folder") {
+				void moveFolder(item.path, destinationFolder);
+			} else if (item?.type === "mod") {
+				void moveModToFolder(item.entry, destinationFolder);
+			}
+		},
+		[draggedItem, moveFolder, moveModToFolder],
+	);
+
+	const startDragFolder = useCallback((path: string) => {
+		setDraggedItem({ type: "folder", path });
+	}, []);
+
+	const startDragMod = useCallback((entry: discovery.Entry) => {
+		setDraggedItem({ type: "mod", entry });
+	}, []);
+
+	const endDrag = useCallback(() => setDraggedItem(null), []);
+
 	// Lets a folder's actions reach it without first navigating into it.
 	const openFolderContextMenu = useCallback((folder: string, event: MouseEvent) => {
 		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
@@ -1195,6 +1225,11 @@ export function LibraryScreen() {
 						selectedFolder={selectedFolder}
 						onSelect={setSelectedFolder}
 						onContextMenu={openFolderContextMenu}
+						draggedItem={draggedItem}
+						dragDisabled={isMutationLocked}
+						onDragStartFolder={startDragFolder}
+						onDragEnd={endDrag}
+						onDropOnFolder={handleDropOnFolder}
 						entryCount={library?.entries?.length ?? 0}
 						folderEntryCounts={libraryIndex.folderEntryCounts}
 					/>
@@ -1256,6 +1291,7 @@ export function LibraryScreen() {
 						mutatingEntryIDs={mutatingEntryIDs}
 						isMutationLocked={isMutationLocked}
 						tagsByEntryID={entryTags}
+						draggedEntryID={draggedItem?.type === "mod" ? draggedItem.entry.id : null}
 						onSetEnabled={setModEnabled}
 						onSelect={(entry) =>
 							setSelectedEntryID((currentEntryID) =>
@@ -1264,6 +1300,8 @@ export function LibraryScreen() {
 						}
 						onContextMenu={openModContextMenu}
 						onRemoveTag={removeModTagFromCard}
+						onDragStartMod={startDragMod}
+						onDragEndMod={endDrag}
 						selectedEntryID={selectedEntryID}
 						viewMode={viewMode}
 					/>
