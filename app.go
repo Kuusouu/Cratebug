@@ -154,6 +154,33 @@ func (a *App) SetModRoot(modRoot string) error {
 	return a.metadataStore.Save(doc)
 }
 
+// Persists the appearance theme (system, light, or dark).
+func (a *App) SetTheme(theme string) error {
+	doc := a.loadMetadataDocument()
+	if err := doc.SetTheme(theme); err != nil {
+		return err
+	}
+	return a.metadataStore.Save(doc)
+}
+
+// Persists the view mode Cratebug opens to on the next launch.
+func (a *App) SetDefaultViewMode(mode string) error {
+	doc := a.loadMetadataDocument()
+	if err := doc.SetDefaultViewMode(mode); err != nil {
+		return err
+	}
+	return a.metadataStore.Save(doc)
+}
+
+// Persists the accent color override, or clears it if color is empty.
+func (a *App) SetAccentColor(color string) error {
+	doc := a.loadMetadataDocument()
+	if err := doc.SetAccentColor(color); err != nil {
+		return err
+	}
+	return a.metadataStore.Save(doc)
+}
+
 // Adds a new tag to the persisted catalog.
 func (a *App) CreateTag(name string) (metadata.Tag, error) {
 	doc := a.loadMetadataDocument()

@@ -54,6 +54,14 @@ export function ScanLibrary(arg1) {
   return window['go']['main']['App']['ScanLibrary'](arg1);
 }
 
+export function SetAccentColor(arg1) {
+  return window['go']['main']['App']['SetAccentColor'](arg1);
+}
+
+export function SetDefaultViewMode(arg1) {
+  return window['go']['main']['App']['SetDefaultViewMode'](arg1);
+}
+
 export function SetModEnabled(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetModEnabled'](arg1, arg2, arg3);
 }
@@ -64,6 +72,10 @@ export function SetModPriority(arg1, arg2, arg3) {
 
 export function SetModRoot(arg1) {
   return window['go']['main']['App']['SetModRoot'](arg1);
+}
+
+export function SetTheme(arg1) {
+  return window['go']['main']['App']['SetTheme'](arg1);
 }
 
 export function UnassignModTag(arg1, arg2) {

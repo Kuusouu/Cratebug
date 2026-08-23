@@ -4,27 +4,42 @@ import {
 	Grid2X2,
 	List,
 	PanelsTopLeft,
+	Settings as SettingsIcon,
 	TriangleAlert,
 	X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, type MouseEvent, useRef, useState } from "react";
+import {
+	useCallback,
+	type CSSProperties,
+	useEffect,
+	useMemo,
+	type MouseEvent,
+	useRef,
+	useState,
+} from "react";
 import {
 	AssignModTag,
 	CreateFolder,
 	CreateTag,
 	DeleteMod,
+	DeleteTag,
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
 	RenameFolder,
 	RenameMod,
+	RenameTag,
 	ScanLibrary,
+	SetAccentColor,
+	SetDefaultViewMode,
 	SetModEnabled,
 	SetModPriority,
 	SetModRoot,
+	SetTheme,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import { discovery, type metadata, type mutation } from "../../wailsjs/go/models";
+import { contrastingInk, isValidHexColor } from "./accentColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
 	canChangeModState,
@@ -35,10 +50,18 @@ import {
 	hasMissingSidecar,
 } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
-import { type LibraryState, type ViewMode, viewModeLabels, viewModes } from "./libraryTypes";
+import {
+	type LibraryState,
+	type Theme,
+	themes,
+	type ViewMode,
+	viewModeLabels,
+	viewModes,
+} from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
-
-type Theme = "system" | "light" | "dark";
+import { SettingsDialog } from "./SettingsDialog";
+import { TagMenu } from "./TagMenu";
+import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type LibraryIndex = {
 	folders: string[];
@@ -193,6 +216,28 @@ function tagIDsForScannerID(
 	return new Set();
 }
 
+// Resolves every mod's assigned tags against the catalog once per metadata
+// change, keyed by scanner ID for a direct per-card lookup. This is a
+// separate structure from tagIDsForScannerID, not a shared helper: that
+// helper scans every mod record for one selected entry, which is fine for
+// the single-selection panel but would become O(entries x mods) if reused
+// per card on every render.
+function tagsByEntryID(document: metadata.Document | null): ReadonlyMap<string, metadata.Tag[]> {
+	const map = new Map<string, metadata.Tag[]>();
+	if (!document) return map;
+
+	const catalogByID = new Map(document.tags?.map((tag) => [tag.id, tag]) ?? []);
+	for (const record of Object.values(document.mods ?? {})) {
+		const tags = (record.tags ?? [])
+			.map((tagID) => catalogByID.get(tagID))
+			.filter((tag): tag is metadata.Tag => tag !== undefined);
+		if (tags.length > 0) {
+			map.set(record.scannerID, tags);
+		}
+	}
+	return map;
+}
+
 function folderParent(folder: string): string {
 	const separatorIndex = folder.lastIndexOf("/");
 	return separatorIndex === -1 ? "" : folder.slice(0, separatorIndex);
@@ -242,12 +287,16 @@ export function LibraryScreen() {
 	const [isFolderMutating, setIsFolderMutating] = useState(false);
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
+	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
+	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
+	const [accentColor, setAccentColor] = useState("");
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
 	const hasLoadedInitialMetadataRef = useRef(false);
+	const accentColorSaveTimeoutRef = useRef<number | undefined>(undefined);
 	const libraryRoot = library?.root;
 
 	const libraryIndex = useMemo(() => indexLibrary(library), [library]);
@@ -260,6 +309,7 @@ export function LibraryScreen() {
 		() => tagCatalog.filter((tag) => assignedTagIDsForSelection.has(tag.id)),
 		[tagCatalog, assignedTagIDsForSelection],
 	);
+	const entryTags = useMemo(() => tagsByEntryID(metadataDocument), [metadataDocument]);
 
 	const displayedEntries = useMemo(() => {
 		const normalizedSearch = search.trim().toLocaleLowerCase();
@@ -267,18 +317,24 @@ export function LibraryScreen() {
 			selectedFolder === "all"
 				? (library?.entries ?? [])
 				: (libraryIndex.folderEntries.get(selectedFolder) ?? []);
-		if (normalizedSearch === "") {
-			return scopedEntries;
-		}
 
 		return scopedEntries.filter((entry) => {
-			const matchesSearch =
-				entry.displayName.toLocaleLowerCase().includes(normalizedSearch) ||
-				entry.primaryPath?.toLocaleLowerCase().includes(normalizedSearch) ||
-				entry.relativeFolder.toLocaleLowerCase().includes(normalizedSearch);
-			return matchesSearch;
+			if (normalizedSearch !== "") {
+				const matchesSearch =
+					entry.displayName.toLocaleLowerCase().includes(normalizedSearch) ||
+					entry.primaryPath?.toLocaleLowerCase().includes(normalizedSearch) ||
+					entry.relativeFolder.toLocaleLowerCase().includes(normalizedSearch);
+				if (!matchesSearch) return false;
+			}
+
+			if (tagFilterIDs.size > 0) {
+				const tags = entryTags.get(entry.id) ?? [];
+				if (!tags.some((tag) => tagFilterIDs.has(tag.id))) return false;
+			}
+
+			return true;
 		});
-	}, [library, libraryIndex, search, selectedFolder]);
+	}, [library, libraryIndex, search, selectedFolder, tagFilterIDs, entryTags]);
 	const statusMessage = libraryStatusMessage(
 		libraryState,
 		scanError,
@@ -355,6 +411,57 @@ export function LibraryScreen() {
 		const state = await LoadMetadata();
 		setMetadataDocument(state.document);
 	}, []);
+
+	// Applies immediately, matching every other single-click preference in the
+	// app: the icon shows the new theme right away, and only reverts if the
+	// backend save actually fails.
+	const selectTheme = useCallback(
+		async (nextTheme: Theme) => {
+			const previousTheme = theme;
+			setTheme(nextTheme);
+			try {
+				await SetTheme(nextTheme);
+			} catch (error) {
+				setTheme(previousTheme);
+				showMutationFeedback("error", `Could not save theme: ${errorMessage(error)}`);
+			}
+		},
+		[theme, showMutationFeedback],
+	);
+
+	// The view mode a user leaves the catalog in is remembered automatically;
+	// there is no separate "default view" setting to configure.
+	const selectViewMode = useCallback(
+		(nextViewMode: ViewMode) => {
+			setViewMode(nextViewMode);
+			SetDefaultViewMode(nextViewMode).catch((error) => {
+				showMutationFeedback(
+					"warning",
+					`Could not remember this view for next launch: ${errorMessage(error)}`,
+				);
+			});
+		},
+		[showMutationFeedback],
+	);
+
+	// Applies locally on every keystroke for instant feedback, but debounces
+	// the actual save so typing a hex value doesn't write to disk on every
+	// character.
+	const selectAccentColor = useCallback(
+		(hex: string) => {
+			setAccentColor(hex);
+			window.clearTimeout(accentColorSaveTimeoutRef.current);
+			accentColorSaveTimeoutRef.current = window.setTimeout(() => {
+				SetAccentColor(hex).catch((error) => {
+					showMutationFeedback(
+						"warning",
+						`Could not save accent color: ${errorMessage(error)}`,
+					);
+				});
+			}, 400);
+		},
+		[showMutationFeedback],
+	);
 
 	const setModEnabled = useCallback(
 		async (entry: discovery.Entry) => {
@@ -599,6 +706,83 @@ export function LibraryScreen() {
 			}
 		},
 		[refreshMetadata, showMutationFeedback],
+	);
+
+	const toggleTagFilter = useCallback((tagID: string) => {
+		setTagFilterIDs((current) => {
+			const next = new Set(current);
+			if (next.has(tagID)) {
+				next.delete(tagID);
+			} else {
+				next.add(tagID);
+			}
+			return next;
+		});
+	}, []);
+
+	const createTag = useCallback(
+		async (name: string): Promise<boolean> => {
+			try {
+				const tag = await CreateTag(name);
+				await refreshMetadata();
+				showMutationFeedback("success", `Created tag "${tag.name}".`);
+				return true;
+			} catch (error) {
+				showMutationFeedback("error", `Could not create tag: ${errorMessage(error)}`);
+				return false;
+			}
+		},
+		[refreshMetadata, showMutationFeedback],
+	);
+
+	const renameTag = useCallback(
+		async (tag: metadata.Tag, name: string): Promise<boolean> => {
+			try {
+				await RenameTag(tag.id, name);
+				await refreshMetadata();
+				showMutationFeedback("success", `Renamed tag "${tag.name}" to "${name}".`);
+				return true;
+			} catch (error) {
+				showMutationFeedback("error", `Could not rename tag: ${errorMessage(error)}`);
+				return false;
+			}
+		},
+		[refreshMetadata, showMutationFeedback],
+	);
+
+	// Also drops the tag from the active filter so a stale, now-nonexistent
+	// tag ID cannot keep the catalog silently filtered down.
+	const deleteTag = useCallback(
+		async (tag: metadata.Tag): Promise<boolean> => {
+			try {
+				await DeleteTag(tag.id);
+				await refreshMetadata();
+				setTagFilterIDs((current) => {
+					if (!current.has(tag.id)) return current;
+					const next = new Set(current);
+					next.delete(tag.id);
+					return next;
+				});
+				showMutationFeedback("success", `Deleted tag "${tag.name}".`);
+				return true;
+			} catch (error) {
+				showMutationFeedback("error", `Could not delete tag: ${errorMessage(error)}`);
+				return false;
+			}
+		},
+		[refreshMetadata, showMutationFeedback],
+	);
+
+	// Fire-and-forget, matching the plan's "immediate, not confirmed" removal:
+	// unassigning only edits Cratebug's own metadata, never mod files, so it
+	// doesn't need the busy-state gating a filesystem mutation would.
+	const removeModTagFromCard = useCallback(
+		(entry: discovery.Entry, tagID: string) => {
+			const tag = tagCatalog.find((candidate) => candidate.id === tagID);
+			if (!tag) return;
+			void toggleModTag(entry, tag, false);
+		},
+		[tagCatalog, toggleModTag],
 	);
 
 	const createFolder = useCallback(
@@ -859,6 +1043,19 @@ export function LibraryScreen() {
 				const state = await LoadMetadata();
 				setMetadataDocument(state.document);
 
+				const persistedTheme = state.document.settings.theme;
+				if (persistedTheme && themes.includes(persistedTheme as Theme)) {
+					setTheme(persistedTheme as Theme);
+				}
+				const persistedViewMode = state.document.settings.defaultViewMode;
+				if (persistedViewMode && viewModes.includes(persistedViewMode as ViewMode)) {
+					setViewMode(persistedViewMode as ViewMode);
+				}
+				const persistedAccentColor = state.document.settings.accentColor;
+				if (persistedAccentColor && isValidHexColor(persistedAccentColor)) {
+					setAccentColor(persistedAccentColor);
+				}
+
 				const persistedRoot = state.document.settings.modRoot?.trim();
 				if (persistedRoot) {
 					setModRoot(persistedRoot);
@@ -881,29 +1078,51 @@ export function LibraryScreen() {
 	}, [showMutationFeedback]);
 
 	return (
-		<main className="app-shell" data-theme={theme}>
+		<main
+			className="app-shell"
+			data-theme={theme}
+			style={
+				accentColor
+					? ({
+							"--accent": accentColor,
+							"--accent-ink": contrastingInk(accentColor),
+						} as CSSProperties)
+					: undefined
+			}
+		>
 			<header className="app-header">
 				<div className="brand">
 					<div className="brand-mark" aria-hidden="true">
-						C
+						<svg
+							aria-hidden="true"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="1.8"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<rect x="3" y="5" width="18" height="14" rx="1.2" />
+							<line x1="3" y1="10" x2="21" y2="10" />
+							<line x1="3" y1="10" x2="21" y2="19" />
+							<line x1="21" y1="10" x2="3" y2="19" />
+						</svg>
 					</div>
 					<div>
 						<p className="brand-kicker">Marvel Rivals mod manager</p>
-						<h1>Cratebug</h1>
+						<h1 className="wordmark">Cratebug</h1>
 					</div>
 				</div>
 				<div className="header-controls">
-					<label className="theme-control">
-						<span>Appearance</span>
-						<select
-							value={theme}
-							onChange={(event) => setTheme(event.target.value as Theme)}
-						>
-							<option value="system">System</option>
-							<option value="light">Light</option>
-							<option value="dark">Dark</option>
-						</select>
-					</label>
+					<button
+						type="button"
+						className="icon-button"
+						onClick={() => setSettingsOpen(true)}
+						aria-label="Settings"
+						title="Settings"
+					>
+						<SettingsIcon aria-hidden="true" />
+					</button>
 				</div>
 			</header>
 
@@ -987,15 +1206,25 @@ export function LibraryScreen() {
 							<p className="eyebrow">Mod library</p>
 							<h2>{selectedFolder === "all" ? "All mods" : selectedFolder}</h2>
 						</div>
-						<label className="search-control">
-							<span className="visually-hidden">Search mods</span>
-							<input
-								value={search}
-								onChange={(event) => setSearch(event.target.value)}
-								placeholder="Search mods"
-								type="search"
+						<div className="catalog-controls">
+							<label className="search-control">
+								<span className="visually-hidden">Search mods</span>
+								<input
+									value={search}
+									onChange={(event) => setSearch(event.target.value)}
+									placeholder="Search mods"
+									type="search"
+								/>
+							</label>
+							<TagMenu
+								catalog={tagCatalog}
+								filterIDs={tagFilterIDs}
+								onToggleFilter={toggleTagFilter}
+								onCreateTag={createTag}
+								onRenameTag={renameTag}
+								onDeleteTag={deleteTag}
 							/>
-						</label>
+						</div>
 						<fieldset className="view-mode-controls">
 							<legend className="visually-hidden">Catalog view</legend>
 							{viewModes.map((mode) => (
@@ -1003,7 +1232,7 @@ export function LibraryScreen() {
 									active={viewMode === mode}
 									key={mode}
 									mode={mode}
-									onSelect={setViewMode}
+									onSelect={selectViewMode}
 								/>
 							))}
 						</fieldset>
@@ -1026,6 +1255,7 @@ export function LibraryScreen() {
 						hasLibrary={library !== null}
 						mutatingEntryIDs={mutatingEntryIDs}
 						isMutationLocked={isMutationLocked}
+						tagsByEntryID={entryTags}
 						onSetEnabled={setModEnabled}
 						onSelect={(entry) =>
 							setSelectedEntryID((currentEntryID) =>
@@ -1033,6 +1263,7 @@ export function LibraryScreen() {
 							)
 						}
 						onContextMenu={openModContextMenu}
+						onRemoveTag={removeModTagFromCard}
 						selectedEntryID={selectedEntryID}
 						viewMode={viewMode}
 					/>
@@ -1097,6 +1328,15 @@ export function LibraryScreen() {
 			{contextMenu && (
 				<ContextMenu state={contextMenu} onClose={() => setContextMenu(null)} />
 			)}
+			{settingsOpen && (
+				<SettingsDialog
+					theme={theme}
+					accentColor={accentColor}
+					onClose={() => setSettingsOpen(false)}
+					onSelectTheme={selectTheme}
+					onSelectAccentColor={selectAccentColor}
+				/>
+			)}
 		</main>
 	);
 }
@@ -1136,54 +1376,6 @@ function MutationToast({ feedback, onDismiss }: MutationToastProps) {
 			</button>
 		</div>
 	);
-}
-
-const focusableSelector =
-	'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-// role="dialog" aria-modal="true" only describes the intent; nothing in the
-// DOM enforces it. This keeps Tab from reaching the catalog behind the
-// overlay and lets Escape close the dialog, matching what aria-modal claims.
-function useDialogFocusTrap<T extends HTMLElement>(onClose: () => void) {
-	const containerRef = useRef<T>(null);
-
-	useEffect(() => {
-		const container = containerRef.current;
-		if (!container) return;
-
-		// TypeScript cannot narrow `container` across this closure boundary, but the
-		// effect cleanup removes this listener before containerRef could point elsewhere.
-		function handleKeyDown(this: HTMLElement, event: KeyboardEvent) {
-			if (event.key === "Escape") {
-				event.stopPropagation();
-				onClose();
-				return;
-			}
-			if (event.key !== "Tab") return;
-
-			const focusable = Array.from(this.querySelectorAll<HTMLElement>(focusableSelector));
-			const first = focusable.at(0);
-			const last = focusable.at(-1);
-			if (!first || !last) return;
-
-			const isOutside = !this.contains(document.activeElement);
-
-			if (event.shiftKey) {
-				if (isOutside || document.activeElement === first) {
-					event.preventDefault();
-					last.focus();
-				}
-			} else if (isOutside || document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		}
-
-		container.addEventListener("keydown", handleKeyDown);
-		return () => container.removeEventListener("keydown", handleKeyDown);
-	}, [onClose]);
-
-	return containerRef;
 }
 
 function ModMutationDialog({

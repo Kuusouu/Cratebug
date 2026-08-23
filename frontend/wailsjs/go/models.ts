@@ -206,6 +206,9 @@ export namespace metadata {
 	}
 	export class Settings {
 	    modRoot?: string;
+	    theme?: string;
+	    defaultViewMode?: string;
+	    accentColor?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -214,6 +217,9 @@ export namespace metadata {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.modRoot = source["modRoot"];
+	        this.theme = source["theme"];
+	        this.defaultViewMode = source["defaultViewMode"];
+	        this.accentColor = source["accentColor"];
 	    }
 	}
 	export class Document {

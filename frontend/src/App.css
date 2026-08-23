@@ -5,7 +5,7 @@
 	--text: #f5f7fb;
 	--muted: #9ca8ba;
 	--line: rgba(255, 255, 255, 0.11);
-	--accent: #f0a54d;
+	--accent: #d9a066;
 	--accent-ink: #231509;
 	--good: #74d29b;
 	--bad: #ee8d83;
@@ -26,7 +26,7 @@
 	--text: #1b2230;
 	--muted: #5e6a7d;
 	--line: rgba(25, 36, 52, 0.14);
-	--accent: #bd641d;
+	--accent: #9c6b2f;
 	--accent-ink: #ffffff;
 	--good: #23834c;
 	--bad: #bd3d37;
@@ -42,7 +42,7 @@
 		--text: #1b2230;
 		--muted: #5e6a7d;
 		--line: rgba(25, 36, 52, 0.14);
-		--accent: #bd641d;
+		--accent: #9c6b2f;
 		--accent-ink: #ffffff;
 		--good: #23834c;
 		--bad: #bd3d37;
@@ -77,11 +77,15 @@
 	width: 2.55rem;
 	height: 2.55rem;
 	place-items: center;
+	border: 1px solid var(--line);
 	border-radius: 0.75rem;
-	background: linear-gradient(145deg, #ffbf69, #d8752c);
-	color: #291809;
-	font-weight: 900;
-	box-shadow: 0 0.6rem 1.7rem rgba(226, 131, 47, 0.28);
+	background: color-mix(in srgb, var(--muted), transparent 82%);
+	color: var(--text);
+}
+
+.brand-mark svg {
+	width: 1.35rem;
+	height: 1.35rem;
 }
 
 .brand-kicker,
@@ -107,17 +111,59 @@ h1 {
 	letter-spacing: -0.03em;
 }
 
+.wordmark {
+	font-family: "Bungee", "Segoe UI", sans-serif;
+	/* h1 is bold by default; Bungee only has a 400 weight, and
+	   font-synthesis:none means a mismatched weight falls through to the
+	   next family instead of getting faked. */
+	font-weight: 400;
+	font-size: 1.55rem;
+	letter-spacing: 0.01em;
+	color: var(--text);
+	transition: text-shadow 0.25s ease;
+	cursor: default;
+}
+
+.wordmark:hover {
+	text-shadow:
+		0 0 0.45rem color-mix(in srgb, var(--accent), transparent 25%),
+		0 0 1.4rem color-mix(in srgb, var(--accent), transparent 45%),
+		0 0 3rem color-mix(in srgb, var(--accent), transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wordmark {
+		transition: none;
+	}
+}
+
 .header-controls {
 	display: flex;
 	gap: 0.75rem;
 }
 
-.theme-control {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
+.icon-button {
+	display: grid;
+	width: 2.4rem;
+	height: 2.4rem;
+	place-items: center;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 0.6rem;
+	background: var(--panel-raised);
 	color: var(--muted);
-	font-size: 0.78rem;
+}
+
+.icon-button:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--accent), transparent 52%);
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	filter: none;
+}
+
+.icon-button svg {
+	width: 1.15rem;
+	height: 1.15rem;
 }
 
 select,
@@ -583,6 +629,191 @@ button:disabled {
 	padding: 0.65rem 0.75rem;
 }
 
+.catalog-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.catalog-controls .search-control {
+	flex: 1;
+	min-width: 0;
+}
+
+.tag-menu-trigger {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.65rem 0.8rem;
+	border: 1px solid var(--line);
+	border-radius: 0.55rem;
+	background: var(--panel-raised);
+	color: var(--text);
+	font-weight: 700;
+}
+
+.tag-menu-trigger:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--accent), transparent 52%);
+	filter: none;
+}
+
+.tag-menu-trigger.active {
+	border-color: color-mix(in srgb, var(--accent), transparent 40%);
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--accent);
+}
+
+.tag-menu-trigger svg {
+	width: 1rem;
+	height: 1rem;
+}
+
+.tag-menu-popover {
+	position: fixed;
+	z-index: 25;
+	display: grid;
+	width: 16rem;
+	padding: 0.5rem;
+	gap: 0.4rem;
+	border: 1px solid var(--line);
+	border-radius: 0.65rem;
+	background: color-mix(in srgb, var(--panel-raised), var(--page) 6%);
+	box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.28);
+}
+
+.tag-menu-list {
+	display: grid;
+	max-height: 16rem;
+	margin: 0;
+	padding: 0;
+	gap: 0.15rem;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.tag-menu-row {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+}
+
+.tag-menu-toggle {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	align-items: center;
+	gap: 0.45rem;
+	padding: 0.45rem 0.5rem;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	font-size: 0.85rem;
+	font-weight: 650;
+}
+
+.tag-menu-toggle:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	filter: none;
+}
+
+.tag-menu-toggle[aria-pressed="true"] {
+	color: var(--accent);
+}
+
+.tag-menu-toggle svg {
+	width: 0.95rem;
+	height: 0.95rem;
+	flex-shrink: 0;
+}
+
+.tag-menu-toggle span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tag-menu-row-actions {
+	display: flex;
+	flex-shrink: 0;
+	gap: 0.15rem;
+}
+
+.tag-menu-icon-action {
+	display: grid;
+	width: 1.9rem;
+	height: 1.9rem;
+	place-items: center;
+	padding: 0;
+	border-radius: 0.4rem;
+	background: transparent;
+	color: var(--muted);
+}
+
+.tag-menu-icon-action:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	filter: none;
+}
+
+.tag-menu-icon-action.destructive:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--bad), transparent 88%);
+	color: var(--bad);
+}
+
+.tag-menu-icon-action svg {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+.tag-menu-edit-form {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.tag-menu-edit-form input {
+	min-width: 0;
+	flex: 1;
+	padding: 0.4rem 0.5rem;
+	font-size: 0.85rem;
+}
+
+.tag-menu-empty {
+	margin: 0.2rem 0;
+	padding: 0.3rem 0.5rem;
+	color: var(--muted);
+	font-size: 0.8rem;
+}
+
+.tag-menu-create-form {
+	display: flex;
+	gap: 0.35rem;
+	padding-top: 0.4rem;
+	border-top: 1px solid var(--line);
+}
+
+.tag-menu-create-form input {
+	min-width: 0;
+	flex: 1;
+	padding: 0.5rem 0.6rem;
+	font-size: 0.85rem;
+}
+
+.tag-menu-create-form .icon-button {
+	flex-shrink: 0;
+	width: 2.15rem;
+	height: 2.15rem;
+}
+
+.tag-menu-error {
+	margin: 0;
+	color: var(--bad);
+	font-size: 0.75rem;
+	font-weight: 650;
+}
+
 .mod-grid {
 	display: grid;
 	overflow: auto;
@@ -590,6 +821,13 @@ button:disabled {
 	padding-right: 1rem;
 	scrollbar-gutter: stable;
 	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+	/* max-content, not the auto default: a card's own nested grid (tags row
+	   included) otherwise doesn't reliably contribute its true content
+	   height back into this row's auto-sizing under stretch, and the row
+	   settles under min-height, letting tall cards' content spill past
+	   their own border into the row below. Matches the same fix view-list
+	   already applies below for the same underlying reason. */
+	grid-auto-rows: max-content;
 	gap: 0.75rem;
 	padding-top: 1rem;
 }
@@ -627,10 +865,17 @@ button:disabled {
 }
 
 .mod-card {
-	display: grid;
+	/* flex column, not grid: when the outer .mod-grid row stretches every
+	   card in it to match its tallest sibling (e.g. one card carrying tags),
+	   a grid container's own leftover vertical space gets distributed
+	   across its row tracks in ways that pushed content like the toggle
+	   away from its neighbors with an ugly gap. A flex column with no
+	   flex-grow on its children puts unclaimed leftover space in one
+	   predictable place: after the last child. */
+	display: flex;
 	min-width: 0;
 	min-height: 10.75rem;
-	grid-template-rows: auto auto;
+	flex-direction: column;
 	gap: 0.85rem;
 	padding: 1rem;
 	border: 1px solid var(--line);
@@ -645,10 +890,6 @@ button:disabled {
 		linear-gradient(90deg, color-mix(in srgb, var(--muted), transparent 78%), transparent 28%),
 		color-mix(in srgb, var(--panel), var(--muted) 12%);
 	box-shadow: inset 0.25rem 0 color-mix(in srgb, var(--muted), transparent 20%);
-}
-
-.mod-card.has-action {
-	grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .mod-card.is-selected,
@@ -685,19 +926,29 @@ button:disabled {
 .mod-card-heading {
 	display: flex;
 	min-width: 0;
-	align-items: start;
-	gap: 0.55rem;
+	align-items: center;
+	gap: 0.6rem;
 }
 
-.mod-card-heading > div {
+.mod-card-heading-info {
 	min-width: 0;
 }
 
-.mod-title-row {
-	display: flex;
-	min-width: 0;
-	align-items: start;
-	gap: 0.45rem;
+.mod-thumbnail {
+	display: grid;
+	width: 2.75rem;
+	height: 2.75rem;
+	flex: 0 0 auto;
+	place-items: center;
+	border: 1px solid var(--line);
+	border-radius: 0.55rem;
+	background: color-mix(in srgb, var(--panel), var(--muted) 8%);
+	color: var(--muted);
+}
+
+.mod-thumbnail svg {
+	width: 1.3rem;
+	height: 1.3rem;
 }
 
 .mod-card-heading h3 {
@@ -726,38 +977,6 @@ button:disabled {
 	-webkit-line-clamp: 2;
 }
 
-.status-dot {
-	width: 0.6rem;
-	height: 0.6rem;
-	margin-top: 0.26rem;
-	flex: 0 0 auto;
-	border-radius: 50%;
-	background: var(--muted);
-}
-
-.status-dot.enabled {
-	background: var(--good);
-}
-
-.status-dot.disabled {
-	border: 1px solid color-mix(in srgb, var(--muted), var(--panel) 40%);
-	background: transparent;
-}
-
-.disabled-badge {
-	flex: 0 0 auto;
-	padding: 0.16rem 0.35rem;
-	border: 1px solid color-mix(in srgb, var(--muted), transparent 28%);
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--muted), transparent 84%);
-	color: var(--muted);
-	font-size: 0.62rem;
-	font-weight: 800;
-	letter-spacing: 0.08em;
-	line-height: 1;
-	text-transform: uppercase;
-}
-
 .mod-facts {
 	display: flex;
 	flex-wrap: wrap;
@@ -773,15 +992,132 @@ button:disabled {
 	font-weight: 700;
 }
 
+/* IoStore ties to the app's own accent (it's the newer, currently-shipping
+   format); Classic gets a fixed slate tone so the pair always contrasts
+   regardless of which accent color is active. */
+.bundle-format-badge.iostore {
+	border-color: color-mix(in srgb, var(--accent), transparent 50%);
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: color-mix(in srgb, var(--accent), var(--text) 25%);
+}
+
+.bundle-format-badge.classic {
+	border-color: color-mix(in srgb, #5b8dae, transparent 50%);
+	background: color-mix(in srgb, #5b8dae, transparent 88%);
+	color: color-mix(in srgb, #5b8dae, var(--text) 25%);
+}
+
+.mod-card-tags {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	gap: 0.35rem;
+	list-style: none;
+}
+
+.mod-card-tags li {
+	display: flex;
+	max-width: 100%;
+	padding: 0.2rem 0.2rem 0.2rem 0.5rem;
+	align-items: center;
+	gap: 0.25rem;
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 50%);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+.mod-card-tags li span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mod-card-tags button {
+	display: grid;
+	width: 1.15rem;
+	height: 1.15rem;
+	flex-shrink: 0;
+	place-items: center;
+	padding: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: color-mix(in srgb, var(--accent), var(--text) 30%);
+}
+
+.mod-card-tags button:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 65%);
+	color: var(--text);
+	filter: none;
+}
+
+.mod-card-tags button svg {
+	width: 0.7rem;
+	height: 0.7rem;
+}
+
+.mod-card-tags-overflow {
+	padding: 0.2rem 0.55rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--muted);
+}
+
 .mod-action {
 	align-self: start;
 	padding: 0.45rem 0.65rem;
 	font-size: 0.78rem;
 }
 
-.mod-card.has-action .mod-action {
-	align-self: end;
-	justify-self: start;
+.mod-toggle {
+	position: relative;
+	display: inline-flex;
+	width: 2.5rem;
+	height: 1.4rem;
+	flex: 0 0 auto;
+	align-items: center;
+	padding: 0.15rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel);
+}
+
+.mod-toggle:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--muted), var(--line) 40%);
+	filter: none;
+}
+
+.mod-toggle[aria-checked="true"] {
+	border-color: color-mix(in srgb, var(--good), transparent 40%);
+	background: var(--good);
+}
+
+.mod-toggle[aria-busy="true"] {
+	opacity: 0.7;
+}
+
+/* align-self, not justify-self: .mod-card is a flex column, so cross-axis
+   alignment (this card's horizontal axis) is align-self, not the grid
+   property. Harmless no-op in the list row's flex layout, which already
+   right-aligns the toggle via DOM order instead. */
+.mod-card > .mod-toggle {
+	align-self: flex-end;
+}
+
+.mod-toggle-knob {
+	width: 1.05rem;
+	height: 1.05rem;
+	border-radius: 50%;
+	background: var(--page);
+	box-shadow: 0 0.05rem 0.15rem rgba(0, 0, 0, 0.35);
+	transition: transform 0.15s ease;
+}
+
+.mod-toggle[aria-checked="true"] .mod-toggle-knob {
+	transform: translateX(1.05rem);
 }
 
 .selected-mod-actions .mod-action,
@@ -844,6 +1180,154 @@ button:disabled {
 	padding: 0.65rem 0.75rem;
 }
 
+.setting-section {
+	display: grid;
+	gap: 0.6rem;
+}
+
+.setting-section + .setting-section {
+	margin-top: 1.4rem;
+}
+
+.setting-section h3 {
+	margin: 0;
+	color: var(--accent);
+	font-size: 0.7rem;
+	font-weight: 800;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.theme-picker {
+	display: flex;
+	gap: 0.6rem;
+}
+
+.theme-option {
+	position: relative;
+	display: grid;
+	width: 3.4rem;
+	height: 3.4rem;
+	place-items: center;
+	border: 1px solid var(--line);
+	border-radius: 0.7rem;
+	background: var(--panel-raised);
+	color: var(--muted);
+}
+
+.theme-option:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--accent), transparent 52%);
+	color: var(--text);
+	filter: none;
+}
+
+.theme-option.selected {
+	border-color: var(--accent);
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+}
+
+.theme-option svg {
+	width: 1.3rem;
+	height: 1.3rem;
+}
+
+.theme-option-check {
+	position: absolute;
+	top: -0.45rem;
+	right: -0.45rem;
+	width: 1.15rem;
+	height: 1.15rem;
+	padding: 0.18rem;
+	border: 2px solid var(--panel);
+	border-radius: 999px;
+	background: var(--accent);
+	color: var(--accent-ink);
+}
+
+.accent-picker {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.accent-swatch {
+	display: grid;
+	width: 2.2rem;
+	height: 2.2rem;
+	flex: 0 0 auto;
+	place-items: center;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	/* Preset swatches set their own background inline (the color itself is
+	   the content); this is only the "Default" reset button's ground. */
+	background: var(--panel-raised);
+}
+
+.accent-swatch:hover:not(:disabled) {
+	filter: none;
+	outline: 2px solid color-mix(in srgb, var(--text), transparent 65%);
+	outline-offset: 2px;
+}
+
+.accent-swatch.selected {
+	outline: 2px solid var(--text);
+	outline-offset: 2px;
+}
+
+.accent-swatch.reset {
+	color: var(--muted);
+}
+
+.accent-swatch.reset:hover:not(:disabled) {
+	color: var(--text);
+}
+
+.accent-swatch svg {
+	width: 1rem;
+	height: 1rem;
+	color: #fff;
+	filter: drop-shadow(0 0 0.1rem rgba(0, 0, 0, 0.6));
+}
+
+.accent-swatch.reset svg {
+	color: inherit;
+	filter: none;
+}
+
+.accent-hex-field {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.2rem 0.6rem 0.2rem 0.3rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel-raised);
+}
+
+.accent-hex-preview {
+	width: 1.6rem;
+	height: 1.6rem;
+	flex: 0 0 auto;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+}
+
+.accent-hex-field input {
+	width: 5.5rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text);
+	font-family: ui-monospace, "SF Mono", Consolas, monospace;
+	font-size: 0.8rem;
+}
+
+.accent-hex-field input:focus-visible {
+	outline: none;
+}
+
 .mutation-dialog-error {
 	margin: 0;
 	color: var(--bad);
@@ -896,6 +1380,10 @@ button:disabled {
 	display: flex;
 	justify-content: end;
 	gap: 0.5rem;
+}
+
+.setting-section + .mutation-dialog-actions {
+	margin-top: 1.4rem;
 }
 
 .mutation-dialog-actions button {
@@ -1000,12 +1488,6 @@ button:disabled {
 	}
 }
 
-.mod-card.is-disabled .mod-action,
-.list-mod-row.is-disabled .mod-action {
-	background: var(--accent);
-	color: var(--accent-ink);
-}
-
 .issues {
 	margin: -0.25rem 0 0;
 	padding-left: 1.05rem;
@@ -1059,18 +1541,28 @@ button:disabled {
 	gap: 0.65rem;
 }
 
-.list-mod-controls .mod-action {
-	margin-top: 0;
-}
-
 .list-mod-row .mod-card-heading {
 	min-width: 0;
 	flex: 1;
 }
 
+.list-mod-row .mod-thumbnail {
+	width: 2.1rem;
+	height: 2.1rem;
+}
+
+.list-mod-row .mod-thumbnail svg {
+	width: 1rem;
+	height: 1rem;
+}
+
 .list-mod-row .mod-card-select-area {
 	min-width: 0;
 	flex: 1;
+}
+
+.list-mod-row .mod-card-tags {
+	margin: 0.5rem 0 0;
 }
 
 .list-mod-row .issues {
@@ -1125,10 +1617,6 @@ button:disabled {
 		min-height: 4.6rem;
 	}
 
-	.theme-control > span {
-		display: none;
-	}
-
 	.library-toolbar {
 		align-items: stretch;
 		flex-direction: column;
@@ -1181,6 +1669,10 @@ button:disabled {
 
 	.search-control input {
 		width: 100%;
+	}
+
+	.catalog-controls {
+		align-self: stretch;
 	}
 
 	.list-mod-summary {

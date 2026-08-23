@@ -25,7 +25,10 @@ type Recovery struct {
 
 // Settings holds app-level preferences that persist across sessions.
 type Settings struct {
-	ModRoot string `json:"modRoot,omitempty"`
+	ModRoot         string `json:"modRoot,omitempty"`
+	Theme           string `json:"theme,omitempty"`
+	DefaultViewMode string `json:"defaultViewMode,omitempty"`
+	AccentColor     string `json:"accentColor,omitempty"`
 }
 
 // Document is the versioned envelope persisted to disk.

@@ -1,7 +1,13 @@
+import { Package, X } from "lucide-react";
 import { memo, type MouseEvent } from "react";
-import type { discovery } from "../../wailsjs/go/models";
-import { canChangeModState, entryStateLabel } from "./entryPresentation";
+import type { discovery, metadata } from "../../wailsjs/go/models";
+import { canChangeModState, canTagMod, entryStateLabel } from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
+
+// Caps visible chips so a heavily-tagged mod cannot push a card's other
+// controls out of a reasonable height; the rest collapse into a "+N" chip
+// whose title lists the overflow by name.
+const maximumVisibleTagChips = 4;
 
 type ModCatalogProps = {
 	entries: discovery.Entry[];
@@ -10,9 +16,11 @@ type ModCatalogProps = {
 	hasLibrary: boolean;
 	mutatingEntryIDs: ReadonlySet<string>;
 	isMutationLocked: boolean;
+	tagsByEntryID: ReadonlyMap<string, metadata.Tag[]>;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
 	onContextMenu: (entry: discovery.Entry, event: MouseEvent) => void;
+	onRemoveTag: (entry: discovery.Entry, tagID: string) => void;
 	selectedEntryID: string | null;
 	viewMode: ViewMode;
 };
@@ -27,9 +35,11 @@ type ModCardProps = {
 	entry: discovery.Entry;
 	isMutating: boolean;
 	isMutationLocked: boolean;
+	tags: metadata.Tag[];
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	onSelect: ModCatalogProps["onSelect"];
 	onContextMenu: ModCatalogProps["onContextMenu"];
+	onRemoveTag: ModCatalogProps["onRemoveTag"];
 	selected: boolean;
 	viewMode: ModCatalogProps["viewMode"];
 };
@@ -87,9 +97,11 @@ export function ModCatalog({
 	hasLibrary,
 	mutatingEntryIDs,
 	isMutationLocked,
+	tagsByEntryID,
 	onSetEnabled,
 	onSelect,
 	onContextMenu,
+	onRemoveTag,
 	selectedEntryID,
 	viewMode,
 }: ModCatalogProps) {
@@ -115,9 +127,11 @@ export function ModCatalog({
 					key={entryKey(entry)}
 					isMutating={mutatingEntryIDs.has(entry.id)}
 					isMutationLocked={isMutationLocked}
+					tags={tagsByEntryID.get(entry.id) ?? []}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
 					onContextMenu={onContextMenu}
+					onRemoveTag={onRemoveTag}
 					selected={selectedEntryID === entry.id}
 					viewMode={viewMode}
 				/>
@@ -131,37 +145,73 @@ const ModCard = memo(function ModCard({
 	entry,
 	isMutating,
 	isMutationLocked,
+	tags,
 	onSetEnabled,
 	onSelect,
 	onContextMenu,
+	onRemoveTag,
 	selected,
 	viewMode,
 }: ModCardProps) {
 	const canChangeState = canChangeModState(entry);
 	const enabled = entry.state === "enabled";
 	const disabled = entry.state === "disabled";
-	const actionLabel = enabled ? "Disable" : "Enable";
 	const facts = (
 		<div className="mod-facts">
-			{!disabled && <span>{entryStateLabel(entry)}</span>}
+			<span>{entryStateLabel(entry)}</span>
 			{entry.bundleFormat && (
-				<span>{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}</span>
+				<span className={`bundle-format-badge ${entry.bundleFormat}`}>
+					{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}
+				</span>
 			)}
 			<span>Priority {entry.priority.value}</span>
 		</div>
 	);
 	const heading = (
 		<div className="mod-card-heading">
-			<span className={`status-dot ${entry.state ?? "unknown"}`} aria-hidden="true" />
-			<div>
-				<div className="mod-title-row">
-					<h3>{entry.displayName}</h3>
-					{disabled && <span className="disabled-badge">Disabled</span>}
-				</div>
+			<div className="mod-thumbnail" aria-hidden="true">
+				<Package aria-hidden="true" />
+			</div>
+			<div className="mod-card-heading-info">
+				<h3>{entry.displayName}</h3>
 				<p>{entry.relativeFolder || "Library root"}</p>
 			</div>
 		</div>
 	);
+	const visibleTags = tags.slice(0, maximumVisibleTagChips);
+	const overflowTags = tags.slice(maximumVisibleTagChips);
+	// Rendered as a sibling of mod-card-select-area, never inside it: that
+	// area's select button is absolutely positioned over its own children to
+	// make the whole heading/facts region clickable, which would swallow
+	// pointer events meant for a remove chip nested underneath it.
+	const tagsRow =
+		canTagMod(entry) && tags.length > 0 ? (
+			<ul className="mod-card-tags" aria-label="Tags">
+				{visibleTags.map((tag) => (
+					<li key={tag.id}>
+						<span>{tag.name}</span>
+						<button
+							type="button"
+							aria-label={`Remove tag ${tag.name}`}
+							onClick={(event) => {
+								event.stopPropagation();
+								onRemoveTag(entry, tag.id);
+							}}
+						>
+							<X aria-hidden="true" />
+						</button>
+					</li>
+				))}
+				{overflowTags.length > 0 && (
+					<li
+						className="mod-card-tags-overflow"
+						title={overflowTags.map((tag) => tag.name).join(", ")}
+					>
+						+{overflowTags.length}
+					</li>
+				)}
+			</ul>
+		) : null;
 	// Renders heading (and facts, for grid cards) as plain siblings rather than
 	// button children, since <button> only permits phrasing content and the
 	// heading/facts blocks contain <h3>/<p>/<div>. The overlay button below
@@ -190,18 +240,26 @@ const ModCard = memo(function ModCard({
 			</div>
 		);
 	}
-	const action = canChangeState ? (
+	// A switch, not a button: the previous status dot + "DISABLED" badge +
+	// Enable/Disable button said the same thing three ways. Rename, priority,
+	// move, and delete stay context-menu-only, unchanged (see
+	// docs/decisions/0002-organize-action-pattern.md) — this only changes
+	// enable/disable's existing front-facing control from a button to a switch.
+	const toggleControl = canChangeState ? (
 		<button
 			type="button"
+			role="switch"
+			aria-checked={enabled}
 			aria-busy={isMutating}
-			className="mod-action"
+			aria-label={`${enabled ? "Disable" : "Enable"} ${entry.displayName}`}
+			className="mod-toggle"
 			disabled={isMutationLocked}
 			onClick={(event) => {
 				event.stopPropagation();
 				onSetEnabled(entry);
 			}}
 		>
-			{isMutating ? (enabled ? "Disabling..." : "Enabling...") : actionLabel}
+			<span className="mod-toggle-knob" aria-hidden="true" />
 		</button>
 	) : null;
 	const issues = entry.issues?.length ? (
@@ -228,9 +286,10 @@ const ModCard = memo(function ModCard({
 					{selectionArea(false)}
 					<div className="list-mod-controls">
 						{facts}
-						{action}
+						{toggleControl}
 					</div>
 				</div>
+				{tagsRow}
 				{issues}
 			</article>
 		);
@@ -238,7 +297,7 @@ const ModCard = memo(function ModCard({
 		// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
 		<article
 			aria-busy={isMutating}
-			className={`mod-card${action ? " has-action" : ""}${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
+			className={`mod-card${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
 			onClick={() => onSelect(entry)}
 			onContextMenu={(event) => {
 				event.preventDefault();
@@ -246,7 +305,8 @@ const ModCard = memo(function ModCard({
 			}}
 		>
 			{selectionArea(true)}
-			{action}
+			{tagsRow}
+			{toggleControl}
 			{issues}
 		</article>
 	);
