@@ -1,4 +1,26 @@
+import type { discovery } from "../../wailsjs/go/models";
+
 export type LibraryState = "initial" | "loading" | "populated" | "empty" | "error";
+
+// A drag can carry either a folder (dragged from the sidebar, drop target
+// must not be itself or a descendant) or a mod (dragged from the catalog,
+// any folder is a valid destination). Shared between LibraryScreen (which
+// owns the drag), FolderNavigation (the drop target), and ModCatalog (a
+// second drag source) since the source and target live in sibling components.
+export type DraggedItem =
+	| { type: "folder"; path: string }
+	| { type: "mod"; entry: discovery.Entry };
+
+// A dragged folder cannot be dropped into itself or its own descendant; a
+// dragged mod has no such constraint, any folder is a valid destination.
+// Shared by FolderNavigation (deciding whether to show drag-over highlight
+// and allow the drop) and LibraryScreen (deciding whether to execute the
+// move once dropped) so the two can't drift out of sync.
+export function isValidDropTarget(draggedItem: DraggedItem | null, targetFolder: string): boolean {
+	if (!draggedItem) return false;
+	if (draggedItem.type === "mod") return true;
+	return draggedItem.path !== targetFolder && !targetFolder.startsWith(`${draggedItem.path}/`);
+}
 
 export const viewModes = ["compact", "large", "list"] as const;
 

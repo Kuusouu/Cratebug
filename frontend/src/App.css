@@ -361,6 +361,23 @@ button:disabled {
 	background: color-mix(in srgb, var(--accent), transparent 78%);
 }
 
+.folder-select {
+	cursor: grab;
+}
+
+.folder-row.dragging .folder-select {
+	cursor: grabbing;
+	opacity: 0.45;
+}
+
+.folder-navigation > .folder-row.drag-over,
+.folder-row.drag-over .folder-select {
+	background: color-mix(in srgb, var(--accent), transparent 70%);
+	outline: 2px dashed color-mix(in srgb, var(--accent), transparent 30%);
+	outline-offset: -2px;
+	color: var(--accent);
+}
+
 .folder-toggle,
 .folder-toggle-placeholder {
 	display: grid;
@@ -897,6 +914,17 @@ button:disabled {
 	border: 2px solid var(--accent);
 	outline: 1px solid color-mix(in srgb, var(--accent), transparent 58%);
 	outline-offset: 1px;
+}
+
+.mod-card[draggable="true"],
+.list-mod-row[draggable="true"] {
+	cursor: grab;
+}
+
+.mod-card.dragging,
+.list-mod-row.dragging {
+	cursor: grabbing;
+	opacity: 0.45;
 }
 
 .mod-card-select-area {

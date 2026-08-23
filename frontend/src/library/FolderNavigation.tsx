@@ -1,6 +1,7 @@
 import { ChevronRight, Folder, LibraryBig } from "lucide-react";
 import { memo, type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { type DraggedItem, isValidDropTarget } from "./libraryTypes";
 
 type FolderNode = {
 	path: string;
@@ -13,6 +14,11 @@ type FolderNavigationProps = {
 	selectedFolder: string;
 	onSelect: (folder: string) => void;
 	onContextMenu: (folder: string, event: MouseEvent) => void;
+	draggedItem: DraggedItem | null;
+	dragDisabled: boolean;
+	onDragStartFolder: (path: string) => void;
+	onDragEnd: () => void;
+	onDropOnFolder: (destinationFolder: string) => void;
 	entryCount: number;
 	folderEntryCounts: ReadonlyMap<string, number>;
 };
@@ -29,11 +35,18 @@ type FolderTreeItemProps = {
 	selectedFolder: string;
 	expandedFolders: ReadonlySet<string>;
 	entryCounts: ReadonlyMap<string, number>;
+	draggedItem: DraggedItem | null;
+	dragOverFolder: string | null;
+	dragDisabled: boolean;
 	onSelect: (folder: string) => void;
 	onContextMenu: (folder: string, event: MouseEvent) => void;
 	onHideTooltip: () => void;
 	onShowTooltip: (content: string, target: HTMLElement) => void;
 	onToggle: (folder: string) => void;
+	onDragStartFolder: (path: string) => void;
+	onDragEnd: () => void;
+	onDragOverTarget: (folder: string) => void;
+	onDropOnFolder: (folder: string) => void;
 };
 
 // Turns flat relative paths into the expandable sidebar hierarchy.
@@ -70,12 +83,35 @@ export const FolderNavigation = memo(function FolderNavigation({
 	selectedFolder,
 	onSelect,
 	onContextMenu,
+	draggedItem,
+	dragDisabled,
+	onDragStartFolder,
+	onDragEnd,
+	onDropOnFolder,
 	entryCount,
 	folderEntryCounts,
 }: FolderNavigationProps) {
 	const tree = useMemo(() => buildFolderTree(folders), [folders]);
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
 	const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+	const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+
+	const handleDragOverTarget = useCallback((folder: string) => {
+		setDragOverFolder((current) => (current === folder ? current : folder));
+	}, []);
+
+	const handleDragEnd = useCallback(() => {
+		setDragOverFolder(null);
+		onDragEnd();
+	}, [onDragEnd]);
+
+	const handleDrop = useCallback(
+		(destinationFolder: string) => {
+			setDragOverFolder(null);
+			onDropOnFolder(destinationFolder);
+		},
+		[onDropOnFolder],
+	);
 
 	const toggleFolder = useCallback((path: string) => {
 		setExpandedFolders((current) => {
@@ -119,11 +155,21 @@ export const FolderNavigation = memo(function FolderNavigation({
 		<nav className="folder-navigation">
 			<button
 				type="button"
-				className={`folder-row${selectedFolder === "all" ? " selected" : ""}`}
+				className={`folder-row${selectedFolder === "all" ? " selected" : ""}${isValidDropTarget(draggedItem, "") && dragOverFolder === "" ? " drag-over" : ""}`}
 				onClick={() => onSelect("all")}
 				onContextMenu={(event) => {
 					event.preventDefault();
 					onContextMenu("", event);
+				}}
+				onDragOver={(event) => {
+					if (!isValidDropTarget(draggedItem, "")) return;
+					event.preventDefault();
+					handleDragOverTarget("");
+				}}
+				onDrop={(event) => {
+					if (!isValidDropTarget(draggedItem, "")) return;
+					event.preventDefault();
+					handleDrop("");
 				}}
 			>
 				<LibraryBig aria-hidden="true" className="folder-icon" />
@@ -136,11 +182,18 @@ export const FolderNavigation = memo(function FolderNavigation({
 					expandedFolders={expandedFolders}
 					key={node.path}
 					node={node}
+					draggedItem={draggedItem}
+					dragOverFolder={dragOverFolder}
+					dragDisabled={dragDisabled}
 					onSelect={onSelect}
 					onContextMenu={onContextMenu}
 					onHideTooltip={hideTooltip}
 					onShowTooltip={showTooltip}
 					onToggle={toggleFolder}
+					onDragStartFolder={onDragStartFolder}
+					onDragEnd={handleDragEnd}
+					onDragOverTarget={handleDragOverTarget}
+					onDropOnFolder={handleDrop}
 					selectedFolder={selectedFolder}
 				/>
 			))}
@@ -163,7 +216,44 @@ function selectionTouchesBranch(selectedFolder: string, folderPath: string): boo
 	return selectedFolder === folderPath || selectedFolder.startsWith(`${folderPath}/`);
 }
 
-// Limits selection updates to the old and new folder branches.
+function withinSubtree(path: string | null, root: string): boolean {
+	return path !== null && (path === root || path.startsWith(`${root}/`));
+}
+
+// A FolderTreeItem's memo check must ask "did anything in MY SUBTREE change",
+// not just "did my own row change" — it also renders its own children, so a
+// "no" here freezes them too. A child-only change (e.g. the drag-over target
+// moved to a grandchild) must still return true for every ancestor on the
+// path down to it, or React never re-renders far enough for that grandchild
+// to receive its new props. This is the same cascade selectionTouchesBranch
+// already uses for the selected-folder highlight; checking only the exact
+// node's own path (this function's first version) silently broke drag-over
+// highlighting and drop-target validity for every subfolder.
+function hasRelevantDragStateChanged(
+	previousItem: DraggedItem | null,
+	nextItem: DraggedItem | null,
+	previousDragOver: string | null,
+	nextDragOver: string | null,
+	subtreeRoot: string,
+): boolean {
+	const previousDraggedPath = previousItem?.type === "folder" ? previousItem.path : null;
+	const nextDraggedPath = nextItem?.type === "folder" ? nextItem.path : null;
+	const draggedFolderInSubtreeBefore = withinSubtree(previousDraggedPath, subtreeRoot)
+		? previousDraggedPath
+		: null;
+	const draggedFolderInSubtreeAfter = withinSubtree(nextDraggedPath, subtreeRoot)
+		? nextDraggedPath
+		: null;
+	if (draggedFolderInSubtreeBefore !== draggedFolderInSubtreeAfter) return true;
+
+	const dragOverInSubtreeBefore = withinSubtree(previousDragOver, subtreeRoot)
+		? previousDragOver
+		: null;
+	const dragOverInSubtreeAfter = withinSubtree(nextDragOver, subtreeRoot) ? nextDragOver : null;
+	return dragOverInSubtreeBefore !== dragOverInSubtreeAfter;
+}
+
+// Limits selection and drag-state updates to the branches they actually touch.
 function sameFolderTreeItemProps(
 	previous: FolderTreeItemProps,
 	next: FolderTreeItemProps,
@@ -172,13 +262,30 @@ function sameFolderTreeItemProps(
 		previous.node !== next.node ||
 		previous.expandedFolders !== next.expandedFolders ||
 		previous.entryCounts !== next.entryCounts ||
+		previous.dragDisabled !== next.dragDisabled ||
 		previous.onSelect !== next.onSelect ||
 		previous.onContextMenu !== next.onContextMenu ||
 		previous.onHideTooltip !== next.onHideTooltip ||
 		previous.onShowTooltip !== next.onShowTooltip ||
-		previous.onToggle !== next.onToggle
+		previous.onToggle !== next.onToggle ||
+		previous.onDragStartFolder !== next.onDragStartFolder ||
+		previous.onDragEnd !== next.onDragEnd ||
+		previous.onDragOverTarget !== next.onDragOverTarget ||
+		previous.onDropOnFolder !== next.onDropOnFolder
 	)
 		return false;
+
+	if (
+		hasRelevantDragStateChanged(
+			previous.draggedItem,
+			next.draggedItem,
+			previous.dragOverFolder,
+			next.dragOverFolder,
+			next.node.path,
+		)
+	) {
+		return false;
+	}
 
 	if (previous.selectedFolder === next.selectedFolder) {
 		return true;
@@ -196,18 +303,30 @@ const FolderTreeItem = memo(function FolderTreeItem({
 	selectedFolder,
 	expandedFolders,
 	entryCounts,
+	draggedItem,
+	dragOverFolder,
+	dragDisabled,
 	onSelect,
 	onContextMenu,
 	onHideTooltip,
 	onShowTooltip,
 	onToggle,
+	onDragStartFolder,
+	onDragEnd,
+	onDragOverTarget,
+	onDropOnFolder,
 }: FolderTreeItemProps) {
 	const hasChildren = node.children.length > 0;
 	const expanded = expandedFolders.has(node.path);
+	const isDragging = draggedItem?.type === "folder" && draggedItem.path === node.path;
+	const canDropHere = isValidDropTarget(draggedItem, node.path);
+	const isDragOver = canDropHere && dragOverFolder === node.path;
 
 	return (
 		<div className="folder-tree-item">
-			<div className={`folder-row${selectedFolder === node.path ? " selected" : ""}`}>
+			<div
+				className={`folder-row${selectedFolder === node.path ? " selected" : ""}${isDragging ? " dragging" : ""}${isDragOver ? " drag-over" : ""}`}
+			>
 				{hasChildren ? (
 					<button
 						aria-expanded={expanded}
@@ -227,6 +346,7 @@ const FolderTreeItem = memo(function FolderTreeItem({
 				<button
 					className="folder-select"
 					type="button"
+					draggable={!dragDisabled}
 					onBlur={onHideTooltip}
 					onFocus={(event) => onShowTooltip(node.name, event.currentTarget)}
 					onClick={() => onSelect(node.path)}
@@ -236,6 +356,23 @@ const FolderTreeItem = memo(function FolderTreeItem({
 					}}
 					onMouseEnter={(event) => onShowTooltip(node.name, event.currentTarget)}
 					onMouseLeave={onHideTooltip}
+					onDragStart={(event) => {
+						event.dataTransfer.effectAllowed = "move";
+						event.dataTransfer.setData("text/plain", node.path);
+						onDragStartFolder(node.path);
+					}}
+					onDragEnd={onDragEnd}
+					onDragOver={(event) => {
+						if (!canDropHere) return;
+						event.preventDefault();
+						event.dataTransfer.dropEffect = "move";
+						onDragOverTarget(node.path);
+					}}
+					onDrop={(event) => {
+						if (!canDropHere) return;
+						event.preventDefault();
+						onDropOnFolder(node.path);
+					}}
 				>
 					<Folder aria-hidden="true" className="folder-icon" />
 					<span className="folder-name">{node.name}</span>
@@ -250,11 +387,18 @@ const FolderTreeItem = memo(function FolderTreeItem({
 							expandedFolders={expandedFolders}
 							key={child.path}
 							node={child}
+							draggedItem={draggedItem}
+							dragOverFolder={dragOverFolder}
+							dragDisabled={dragDisabled}
 							onSelect={onSelect}
 							onContextMenu={onContextMenu}
 							onHideTooltip={onHideTooltip}
 							onShowTooltip={onShowTooltip}
 							onToggle={onToggle}
+							onDragStartFolder={onDragStartFolder}
+							onDragEnd={onDragEnd}
+							onDragOverTarget={onDragOverTarget}
+							onDropOnFolder={onDropOnFolder}
 							selectedFolder={selectedFolder}
 						/>
 					))}

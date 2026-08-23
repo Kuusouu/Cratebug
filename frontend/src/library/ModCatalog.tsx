@@ -1,7 +1,7 @@
 import { Package, X } from "lucide-react";
-import { memo, type MouseEvent } from "react";
+import { type DragEvent, memo, type MouseEvent } from "react";
 import type { discovery, metadata } from "../../wailsjs/go/models";
-import { canChangeModState, canTagMod, entryStateLabel } from "./entryPresentation";
+import { canChangeModState, canOrganizeMod, canTagMod, entryStateLabel } from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
 // Caps visible chips so a heavily-tagged mod cannot push a card's other
@@ -17,10 +17,13 @@ type ModCatalogProps = {
 	mutatingEntryIDs: ReadonlySet<string>;
 	isMutationLocked: boolean;
 	tagsByEntryID: ReadonlyMap<string, metadata.Tag[]>;
+	draggedEntryID: string | null;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
 	onContextMenu: (entry: discovery.Entry, event: MouseEvent) => void;
 	onRemoveTag: (entry: discovery.Entry, tagID: string) => void;
+	onDragStartMod: (entry: discovery.Entry) => void;
+	onDragEndMod: () => void;
 	selectedEntryID: string | null;
 	viewMode: ViewMode;
 };
@@ -36,10 +39,13 @@ type ModCardProps = {
 	isMutating: boolean;
 	isMutationLocked: boolean;
 	tags: metadata.Tag[];
+	isDragging: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	onSelect: ModCatalogProps["onSelect"];
 	onContextMenu: ModCatalogProps["onContextMenu"];
 	onRemoveTag: ModCatalogProps["onRemoveTag"];
+	onDragStartMod: ModCatalogProps["onDragStartMod"];
+	onDragEndMod: ModCatalogProps["onDragEndMod"];
 	selected: boolean;
 	viewMode: ModCatalogProps["viewMode"];
 };
@@ -98,10 +104,13 @@ export function ModCatalog({
 	mutatingEntryIDs,
 	isMutationLocked,
 	tagsByEntryID,
+	draggedEntryID,
 	onSetEnabled,
 	onSelect,
 	onContextMenu,
 	onRemoveTag,
+	onDragStartMod,
+	onDragEndMod,
 	selectedEntryID,
 	viewMode,
 }: ModCatalogProps) {
@@ -128,10 +137,13 @@ export function ModCatalog({
 					isMutating={mutatingEntryIDs.has(entry.id)}
 					isMutationLocked={isMutationLocked}
 					tags={tagsByEntryID.get(entry.id) ?? []}
+					isDragging={draggedEntryID === entry.id}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
 					onContextMenu={onContextMenu}
 					onRemoveTag={onRemoveTag}
+					onDragStartMod={onDragStartMod}
+					onDragEndMod={onDragEndMod}
 					selected={selectedEntryID === entry.id}
 					viewMode={viewMode}
 				/>
@@ -146,14 +158,25 @@ const ModCard = memo(function ModCard({
 	isMutating,
 	isMutationLocked,
 	tags,
+	isDragging,
 	onSetEnabled,
 	onSelect,
 	onContextMenu,
 	onRemoveTag,
+	onDragStartMod,
+	onDragEndMod,
 	selected,
 	viewMode,
 }: ModCardProps) {
 	const canChangeState = canChangeModState(entry);
+	const canDrag = canOrganizeMod(entry) && !isMutationLocked;
+	// Shared by both the grid-card and list-row branches below, which are
+	// otherwise identical for drag purposes.
+	function handleDragStart(event: DragEvent<HTMLElement>) {
+		event.dataTransfer.effectAllowed = "move";
+		event.dataTransfer.setData("text/plain", entry.id);
+		onDragStartMod(entry);
+	}
 	const enabled = entry.state === "enabled";
 	const disabled = entry.state === "disabled";
 	const facts = (
@@ -275,12 +298,15 @@ const ModCard = memo(function ModCard({
 			// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the row click only extends selection to its empty pointer area.
 			<article
 				aria-busy={isMutating}
-				className={`list-mod-row${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
+				className={`list-mod-row${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}${isDragging ? " dragging" : ""}`}
+				draggable={canDrag}
 				onClick={() => onSelect(entry)}
 				onContextMenu={(event) => {
 					event.preventDefault();
 					onContextMenu(entry, event);
 				}}
+				onDragStart={handleDragStart}
+				onDragEnd={onDragEndMod}
 			>
 				<div className="list-mod-summary">
 					{selectionArea(false)}
@@ -297,12 +323,15 @@ const ModCard = memo(function ModCard({
 		// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
 		<article
 			aria-busy={isMutating}
-			className={`mod-card${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}`}
+			className={`mod-card${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}${isDragging ? " dragging" : ""}`}
+			draggable={canDrag}
 			onClick={() => onSelect(entry)}
 			onContextMenu={(event) => {
 				event.preventDefault();
 				onContextMenu(entry, event);
 			}}
+			onDragStart={handleDragStart}
+			onDragEnd={onDragEndMod}
 		>
 			{selectionArea(true)}
 			{tagsRow}
