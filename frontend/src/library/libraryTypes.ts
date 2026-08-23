@@ -9,3 +9,13 @@ export const viewModeLabels: Record<ViewMode, string> = {
 	large: "Large",
 	list: "List",
 };
+
+export const themes = ["system", "light", "dark"] as const;
+
+export type Theme = (typeof themes)[number];
+
+export const themeLabels: Record<Theme, string> = {
+	system: "System",
+	light: "Light",
+	dark: "Dark",
+};

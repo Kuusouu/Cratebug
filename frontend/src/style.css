@@ -1,3 +1,19 @@
+@font-face {
+	font-family: "Inter";
+	src: url("./assets/fonts/Inter-Variable-source.ttf") format("truetype-variations");
+	font-weight: 400 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: "Bungee";
+	src: url("./assets/fonts/Bungee-Regular-source.ttf") format("truetype");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
 	font-family:
 		Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

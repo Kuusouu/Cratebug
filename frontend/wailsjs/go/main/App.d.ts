@@ -31,10 +31,16 @@ export function RuntimeStatus():Promise<string>;
 
 export function ScanLibrary(arg1:string):Promise<discovery.Library>;
 
+export function SetAccentColor(arg1:string):Promise<void>;
+
+export function SetDefaultViewMode(arg1:string):Promise<void>;
+
 export function SetModEnabled(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
 
 export function SetModPriority(arg1:string,arg2:string,arg3:number):Promise<mutation.Result>;
 
 export function SetModRoot(arg1:string):Promise<void>;
+
+export function SetTheme(arg1:string):Promise<void>;
 
 export function UnassignModTag(arg1:string,arg2:string):Promise<void>;

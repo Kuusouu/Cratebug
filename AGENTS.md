@@ -51,7 +51,9 @@ Before editing, identify the active task and confirm that the work belongs in th
 ## Safety
 
 - Never test mutations against the user's real Marvel Rivals mod directory without explicit permission.
-- Use temporary directories and disposable fixtures by default.
+- Use temporary directories and disposable fixtures by default. For manually driving the
+  running app (not automated Go tests, which use `t.TempDir()`), `C:\ModsFixtures` is the
+  standing fixture library — see "Driving and screenshotting the running app" below.
 - Never weaken a filesystem safety check merely to make a test pass.
 - Do not modify the BentoMod repository or its persisted state.
 - Treat BentoMod as a behavioral and visual reference, not an architectural template.
@@ -91,10 +93,16 @@ package's own copy — on a fresh machine, first run
 or MCP calls fail with "Chromium distribution ... is not found".
 
 - Save screenshots as `docs/screenshots/<phase>/task-<number>-<state>.png`.
-- Fixtures: build small disposable synthetic fixtures under a temp directory by
-  default and delete them after verification. If a task genuinely needs a real or
-  complex library, ask the user to point at one rather than fabricating something
-  that pretends to be real data.
+- Fixtures: `C:\ModsFixtures` is the standing library for manually driving the app —
+  a small, varied set of classic and IoStore bundles (enabled, disabled via each
+  recognized suffix, and one with a missing sidecar) across a few folders. Point the
+  app's mod root there instead of creating throwaway fixtures per task; add to it if
+  a task needs a shape it doesn't already cover, but don't delete what's there
+  afterward. It is disposable, synthetic data, not a real Marvel Rivals installation,
+  so the real-mod-directory restriction above doesn't apply to it. If a task
+  genuinely needs a real or complex library beyond what synthetic fixtures can
+  represent, ask the user to point at one rather than fabricating something that
+  pretends to be real data.
 - BentoMod can be launched the same way as a live comparison reference when a task
   calls for it; see `archive/BentoMod/AGENTS.md`. This repo's `.mcp.json` also
   defines a `playwright-bentomod` server that attaches over CDP to BentoMod's debug
