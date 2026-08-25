@@ -50,3 +50,86 @@ func TestDefaultWorkerPoolSizeMatchesRuntimeCores(t *testing.T) {
 		t.Errorf("DefaultWorkerPoolSize() = %d, want a value between %d and %d inclusive", got, minWorkerPoolSize, maxWorkerPoolSize)
 	}
 }
+
+func TestPoolCapForEntryCountFollowsSizeTiers(t *testing.T) {
+	cases := []struct {
+		name       string
+		entryCount int
+		wantCap    int
+	}{
+		{"tiny library", 72, maxWorkerPoolSize},
+		{"just under the small threshold", smallLibraryThreshold - 1, maxWorkerPoolSize},
+		{"at the small threshold", smallLibraryThreshold, mediumLibraryPoolCap},
+		{"medium library", 864, mediumLibraryPoolCap},
+		{"just under the large threshold", largeLibraryThreshold - 1, mediumLibraryPoolCap},
+		{"at the large threshold", largeLibraryThreshold, largeLibraryPoolCap},
+		{"large library", 2592, largeLibraryPoolCap},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Act
+			got := poolCapForEntryCount(testCase.entryCount)
+
+			// Assert
+			if got != testCase.wantCap {
+				t.Errorf("poolCapForEntryCount(%d) = %d, want %d", testCase.entryCount, got, testCase.wantCap)
+			}
+		})
+	}
+}
+
+func TestWorkerPoolSizeForLibraryScalesWithEntryCountOnAPlentifulMachine(t *testing.T) {
+	// A high core count so the core-aware ceiling never binds first, isolating
+	// the entry-count tier's own effect on the result.
+	const plentifulCores = 128
+
+	cases := []struct {
+		name       string
+		entryCount int
+		wantSize   int
+	}{
+		{"tiny library capped at 4", 72, maxWorkerPoolSize},
+		{"medium library capped at 8", 864, mediumLibraryPoolCap},
+		{"large library capped at 16", 2592, largeLibraryPoolCap},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			// Act
+			got := WorkerPoolSizeForLibrary(plentifulCores, testCase.entryCount)
+
+			// Assert
+			if got != testCase.wantSize {
+				t.Errorf("WorkerPoolSizeForLibrary(%d, %d) = %d, want %d", plentifulCores, testCase.entryCount, got, testCase.wantSize)
+			}
+		})
+	}
+}
+
+// A large library's higher cap must never push the result past what the
+// machine's own core count justifies; a modest machine stays modest
+// regardless of how much work is queued.
+func TestWorkerPoolSizeForLibraryNeverExceedsTheCoreAwareCeiling(t *testing.T) {
+	// Act
+	got := WorkerPoolSizeForLibrary(4, 2592)
+
+	// Assert
+	want := coreAwarePoolSize(4, largeLibraryPoolCap)
+	if got != want {
+		t.Errorf("WorkerPoolSizeForLibrary(4, 2592) = %d, want %d", got, want)
+	}
+	if got >= largeLibraryPoolCap {
+		t.Errorf("WorkerPoolSizeForLibrary(4, 2592) = %d, want it bounded well below the large-library cap of %d on a 4-core machine", got, largeLibraryPoolCap)
+	}
+}
+
+func TestDefaultWorkerPoolSizeForLibraryMatchesRuntimeCores(t *testing.T) {
+	// Act
+	got := DefaultWorkerPoolSizeForLibrary(2592)
+
+	// Assert
+	if got < minWorkerPoolSize || got > largeLibraryPoolCap {
+		t.Errorf("DefaultWorkerPoolSizeForLibrary(2592) = %d, want a value between %d and %d inclusive", got, minWorkerPoolSize, largeLibraryPoolCap)
+	}
+}
