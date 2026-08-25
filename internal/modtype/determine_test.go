@@ -199,7 +199,7 @@ func TestDeterminePropagatesUnderlyingCallError(t *testing.T) {
 	}
 }
 
-const pinnedWorkerSourceRevision = "952bd331976c6f28efb36ca320c82c27e2456023"
+const pinnedWorkerSourceRevision = uassettool.PinnedSourceRevision
 
 func pinnedWorkerExecutablePath(t *testing.T) string {
 	t.Helper()

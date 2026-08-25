@@ -248,3 +248,125 @@ func TestWorkerCallReturnsMalformedResponse(t *testing.T) {
 		t.Fatalf("Call() error = %v, want ErrMalformedResponse", callErr)
 	}
 }
+
+func TestResolveExecutablePathPrefersEnvironmentVariable(t *testing.T) {
+	// Arrange
+	const envTarget = `C:\custom\UAssetTool.exe`
+	fileExists := func(p string) bool {
+		return filepath.Clean(p) == filepath.Clean(envTarget)
+	}
+
+	// Act
+	got, err := resolveExecutablePath(envTarget, nil, nil, fileExists)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("resolveExecutablePath() error = %v, want nil", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(envTarget) {
+		t.Errorf("got %q, want %q", got, envTarget)
+	}
+}
+
+func TestResolveExecutablePathRejectsMissingEnvironmentVariablePath(t *testing.T) {
+	// Arrange
+	const envTarget = `C:\missing\UAssetTool.exe`
+	fileExists := func(string) bool { return false }
+
+	// Act
+	got, err := resolveExecutablePath(envTarget, nil, nil, fileExists)
+
+	// Assert
+	if got != "" {
+		t.Errorf("got path %q, want empty", got)
+	}
+	if !errors.Is(err, ErrWorkerNotFound) {
+		t.Fatalf("resolveExecutablePath() error = %v, want ErrWorkerNotFound", err)
+	}
+}
+
+func TestResolveExecutablePathFindsProductionInstalledLayout(t *testing.T) {
+	// Arrange
+	const (
+		mockExe = `C:\Program Files\Cratebug\Cratebug.exe`
+		want    = `C:\Program Files\Cratebug\uassettool\UAssetTool.exe`
+	)
+	fileExists := func(p string) bool {
+		return filepath.Clean(p) == filepath.Clean(want)
+	}
+
+	// Act
+	got, err := resolveExecutablePath("", func() (string, error) { return mockExe, nil }, nil, fileExists)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("resolveExecutablePath() error = %v, want nil", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestResolveExecutablePathFindsDevelopmentLayout(t *testing.T) {
+	// Arrange
+	const (
+		mockCwd = `C:\repos\Cratebug`
+		want    = `C:\repos\Cratebug\build\uassettool\UAssetTool.exe`
+	)
+	fileExists := func(p string) bool {
+		return filepath.Clean(p) == filepath.Clean(want)
+	}
+
+	// Act
+	got, err := resolveExecutablePath("", nil, func() (string, error) { return mockCwd, nil }, fileExists)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("resolveExecutablePath() error = %v, want nil", err)
+	}
+	if filepath.Clean(got) != filepath.Clean(want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestResolveExecutablePathReturnsNotFoundWhenMissing(t *testing.T) {
+	// Arrange
+	fileExists := func(string) bool { return false }
+
+	// Act
+	got, err := resolveExecutablePath("", func() (string, error) { return `C:\Cratebug.exe`, nil }, func() (string, error) { return `C:\Cratebug`, nil }, fileExists)
+
+	// Assert
+	if got != "" {
+		t.Errorf("got path %q, want empty", got)
+	}
+	if !errors.Is(err, ErrWorkerNotFound) {
+		t.Fatalf("resolveExecutablePath() error = %v, want ErrWorkerNotFound", err)
+	}
+}
+
+func TestNewPinnedWorkerLaunchesWithPinnedRevision(t *testing.T) {
+	// Arrange
+	installFakeWorker(t, "functioning")
+	tempDir := t.TempDir()
+	fakeExe := filepath.Join(tempDir, "UAssetTool.exe")
+	if err := os.WriteFile(fakeExe, []byte("stub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvWorkerPath, fakeExe)
+
+	// Act
+	worker, err := NewWorker(WorkerConfig{
+		ExecutablePath:         fakeExe,
+		ExpectedSourceRevision: testSourceRevision,
+	})
+	if err != nil {
+		t.Fatalf("NewWorker() error = %v", err)
+	}
+	defer worker.Close()
+
+	// Assert
+	if !worker.Alive() {
+		t.Errorf("worker.Alive() = false, want true")
+	}
+}
