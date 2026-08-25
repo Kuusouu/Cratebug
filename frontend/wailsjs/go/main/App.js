@@ -6,6 +6,10 @@ export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
+export function ClassifyLibrary(arg1, arg2) {
+  return window['go']['main']['App']['ClassifyLibrary'](arg1, arg2);
+}
+
 export function CreateFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
 }

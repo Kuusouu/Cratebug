@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
@@ -15,6 +16,9 @@ type App struct {
 	mutationExecutor mutation.Executor
 	metadataStore    metadata.Store
 	classifier       *modtype.SessionClassifier
+	tableMu          sync.Mutex
+	characterTable   modtype.CharacterTable
+	tableLoaded      bool
 }
 
 // Creates the application binding.
@@ -24,20 +28,30 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("resolve metadata storage location: %w", err)
 	}
 	classifier := modtype.NewSessionClassifier(modtype.DefaultWorkerLauncher(nil))
-	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier), nil
+	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier, nil), nil
 }
 
 // Lets tests inject a deterministic game-running detector, a disposable
-// metadata store, and a custom classifier without exposing either to Wails.
-func newApp(gameRunningChecker mutation.GameRunningChecker, metadataStore metadata.Store, classifier *modtype.SessionClassifier) *App {
+// metadata store, a custom classifier, and an optional character table without exposing either to Wails.
+func newApp(
+	gameRunningChecker mutation.GameRunningChecker,
+	metadataStore metadata.Store,
+	classifier *modtype.SessionClassifier,
+	characterTable *modtype.CharacterTable,
+) *App {
 	if classifier == nil {
 		classifier = modtype.NewSessionClassifier(nil)
 	}
-	return &App{
+	app := &App{
 		mutationExecutor: mutation.NewExecutor(gameRunningChecker),
 		metadataStore:    metadataStore,
 		classifier:       classifier,
 	}
+	if characterTable != nil {
+		app.characterTable = *characterTable
+		app.tableLoaded = true
+	}
+	return app
 }
 
 // Confirms that the frontend can reach the Go application.
@@ -48,6 +62,27 @@ func (a *App) RuntimeStatus() string {
 // Returns the read-only catalog discovered beneath modRoot.
 func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
 	return discovery.Scan(modRoot)
+}
+
+// ClassifyLibrary determines the category and hero/skin identity for discovered entries.
+func (a *App) ClassifyLibrary(modRoot string, entries []discovery.Entry) (map[string]modtype.Identity, error) {
+	table := a.getCharacterTable()
+	return a.classifier.Classify(modRoot, entries, table)
+}
+
+func (a *App) getCharacterTable() modtype.CharacterTable {
+	a.tableMu.Lock()
+	defer a.tableMu.Unlock()
+
+	if a.tableLoaded {
+		return a.characterTable
+	}
+
+	cachePath, _ := modtype.DefaultCharacterTableCachePath()
+	table := modtype.LoadCharacterTable(context.Background(), cachePath, modtype.DefaultCharacterTableMaxAge)
+	a.characterTable = table
+	a.tableLoaded = true
+	return a.characterTable
 }
 
 // Changes one current scanner entry to the requested enabled state.

@@ -6,9 +6,9 @@ import "github.com/Kuusouu/Cratebug/internal/discovery"
 // the same internal path listing makes one determinable. CharacterName and
 // SkinName are empty when unresolved: absence of a hero name is not an error.
 type Identity struct {
-	Category      Category
-	CharacterName string
-	SkinName      string
+	Category      Category `json:"category"`
+	CharacterName string   `json:"characterName"`
+	SkinName      string   `json:"skinName"`
 }
 
 // Resolves entry's category and, where possible, its hero and skin name,
