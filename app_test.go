@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -342,4 +343,12 @@ func TestLoadMetadataRecoversFromACorruptedFile(t *testing.T) {
 	if state.Document.Settings.ModRoot != `C:\Mods` {
 		t.Errorf("recovered Settings.ModRoot = %q, want %q", state.Document.Settings.ModRoot, `C:\Mods`)
 	}
+}
+
+func TestAppShutdown(t *testing.T) {
+	// Arrange
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+
+	// Act & Assert (shutdown must complete cleanly without panic)
+	app.shutdown(context.Background())
 }

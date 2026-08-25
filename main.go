@@ -34,6 +34,7 @@ func main() {
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,
 		},
+		OnShutdown: app.shutdown,
 	})
 	if err != nil {
 		log.Fatal(err)
