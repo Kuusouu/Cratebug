@@ -240,6 +240,28 @@ function tagsByEntryID(document: metadata.Document | null): ReadonlyMap<string, 
 	return map;
 }
 
+// Counts tagged mod records whose scanner ID matches nothing in the current
+// scan. The record itself is never deleted (see
+// internal/metadata/identity.go's OrphanedMods), so this exists to tell the
+// user rather than let a tag silently vanish from a card with no
+// explanation — for example when a stale metadata backup is restored after
+// a mod has already moved on disk.
+function orphanedTaggedModCount(
+	document: metadata.Document | null,
+	liveEntries: readonly discovery.Entry[],
+): number {
+	if (!document?.mods) return 0;
+
+	const liveScannerIDs = new Set(liveEntries.map((entry) => entry.id));
+	let count = 0;
+	for (const record of Object.values(document.mods)) {
+		if ((record.tags?.length ?? 0) > 0 && !liveScannerIDs.has(record.scannerID)) {
+			count++;
+		}
+	}
+	return count;
+}
+
 function folderParent(folder: string): string {
 	const separatorIndex = folder.lastIndexOf("/");
 	return separatorIndex === -1 ? "" : folder.slice(0, separatorIndex);
@@ -299,6 +321,7 @@ export function LibraryScreen() {
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
 	const hasLoadedInitialMetadataRef = useRef(false);
+	const lastOrphanedTagNoticeCountRef = useRef(0);
 	const accentColorSaveTimeoutRef = useRef<number | undefined>(undefined);
 	const libraryRoot = library?.root;
 
@@ -1106,6 +1129,31 @@ export function LibraryScreen() {
 			}
 		})();
 	}, [showMutationFeedback]);
+
+	// Surfaces orphaned tag records once the scan and the metadata that might
+	// reference it are both loaded. Runs on every library or metadata change
+	// (not just the initial load), since a scan can outlive a metadata
+	// recovery or vice versa; the ref only reshows the warning when the count
+	// actually changes, so routine metadata reloads (assigning a tag, for
+	// example) do not repeat it.
+	useEffect(() => {
+		if (!library) {
+			lastOrphanedTagNoticeCountRef.current = 0;
+			return;
+		}
+
+		const count = orphanedTaggedModCount(metadataDocument, library.entries);
+		if (count === lastOrphanedTagNoticeCountRef.current) return;
+		lastOrphanedTagNoticeCountRef.current = count;
+		if (count === 0) return;
+
+		showMutationFeedback(
+			"warning",
+			count === 1
+				? "1 tagged mod record no longer matches anything in this scan. Its tags are kept in case the mod reappears."
+				: `${count} tagged mod records no longer match anything in this scan. Their tags are kept in case the mods reappear.`,
+		);
+	}, [library, metadataDocument, showMutationFeedback]);
 
 	return (
 		<main
