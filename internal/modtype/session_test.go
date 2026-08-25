@@ -236,6 +236,74 @@ func TestSessionClassifierDegradesToUnknownOnLauncherFailure(t *testing.T) {
 	}
 }
 
+func TestSessionClassifierDoesNotCacheFailedOutcomes(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	mod := filepath.Join(root, "Mod1_P.pak")
+	if err := os.WriteFile(mod, []byte("pak"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	shouldFail := true
+	launcher := func() (PoolWorker, error) {
+		return newMockPoolWorker(func(action string, params map[string]any, result any) error {
+			if shouldFail {
+				return errors.New("transient worker failure")
+			}
+			if action == "list_pak" {
+				return json.Unmarshal([]byte(`{"files":[{"path":"Marvel/Content/Characters/1044/SK_Blade.uasset"}]}`), result)
+			}
+			return nil
+		}), nil
+	}
+
+	classifier := NewSessionClassifier(launcher)
+	defer classifier.Close()
+
+	entries := []discovery.Entry{
+		{
+			ID:           "mod-1",
+			Kind:         discovery.EntryMod,
+			BundleFormat: discovery.BundleFormatClassic,
+			PrimaryPath:  "Mod1_P.pak",
+		},
+	}
+
+	// Act 1: First scan fails -> returns Unknown, should NOT write to cache
+	firstResults, err := classifier.Classify(root, entries, CharacterTable{})
+	if err != nil {
+		t.Fatalf("first Classify() error = %v", err)
+	}
+	if firstResults["mod-1"].Category != CategoryUnknown {
+		t.Errorf("firstResults[mod-1].Category = %q, want %q", firstResults["mod-1"].Category, CategoryUnknown)
+	}
+
+	// Check cache directly - must be a miss
+	fi, err := os.Stat(mod)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := classifier.Cache().Get("mod-1", fi.ModTime()); ok {
+		t.Error("classifier cached a failed outcome; expected cache miss")
+	}
+
+	// Act 2: Worker heals (transient failure resolved) -> second scan succeeds and populates cache
+	shouldFail = false
+	table := CharacterTable{CharacterNames: map[string]string{"1044": "Blade"}}
+	secondResults, err := classifier.Classify(root, entries, table)
+	if err != nil {
+		t.Fatalf("second Classify() error = %v", err)
+	}
+	if secondResults["mod-1"].CharacterName != "Blade" || secondResults["mod-1"].Category != CategoryMesh {
+		t.Errorf("secondResults[mod-1] = %#v, want Blade / Mesh", secondResults["mod-1"])
+	}
+
+	// Now cache should have it
+	if cached, ok := classifier.Cache().Get("mod-1", fi.ModTime()); !ok || cached.CharacterName != "Blade" {
+		t.Errorf("cache get = (%#v, %v), want Blade and hit", cached, ok)
+	}
+}
+
 func TestSessionClassifierReplacesDeadWorker(t *testing.T) {
 	// Arrange
 	root := t.TempDir()

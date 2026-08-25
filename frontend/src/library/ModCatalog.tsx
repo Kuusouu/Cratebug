@@ -224,7 +224,10 @@ const ModCard = memo(function ModCard({
 			<button
 				type="button"
 				className="mod-thumbnail"
-				onClick={() => onSelect(entry)}
+				onClick={(event) => {
+					event.stopPropagation();
+					onSelect(entry);
+				}}
 				disabled={isMutationLocked}
 				aria-label={
 					characterLabel ? `Hero: ${characterLabel}` : `Select ${entry.displayName}`

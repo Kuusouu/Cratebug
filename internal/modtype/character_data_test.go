@@ -71,6 +71,28 @@ func TestParseCharacterMarkdownSkipsUnreleasedAndMalformedRows(t *testing.T) {
 	}
 }
 
+func TestParseCharacterMarkdownAllowsFuturePlayableHeroesUpTo1099(t *testing.T) {
+	markdown := `# Marvel Rivals Character IDs
+
+|  ID  | NAME | SKIN IDs | SKIN NAMES
+| :--: | :--: | :--: | :--: |
+| 1067 | Future Hero 1 | 1067100 | Future Skin 1 |
+| 1099 | Future Hero 2 | 1099100 | Future Skin 2 |
+| 1100 | Out Of Range Hero | | |
+`
+	table := parseCharacterMarkdown(markdown)
+
+	if table.CharacterNames["1067"] != "Future Hero 1" {
+		t.Errorf("CharacterNames[1067] = %q, want Future Hero 1", table.CharacterNames["1067"])
+	}
+	if table.CharacterNames["1099"] != "Future Hero 2" {
+		t.Errorf("CharacterNames[1099] = %q, want Future Hero 2", table.CharacterNames["1099"])
+	}
+	if _, ok := table.CharacterNames["1100"]; ok {
+		t.Errorf("CharacterNames[1100] was parsed, want out-of-range hero skipped")
+	}
+}
+
 func TestParseCharacterMarkdownReturnsEmptyTableForEmptyInput(t *testing.T) {
 	// Act
 	table := parseCharacterMarkdown("")
