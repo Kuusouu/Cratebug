@@ -59,6 +59,11 @@ func (a *App) RuntimeStatus() string {
 	return "Go backend connected"
 }
 
+// ClassificationType anchors modtype.Identity so Wails emits its TypeScript model into models.ts.
+func (a *App) ClassificationType() modtype.Identity {
+	return modtype.Identity{}
+}
+
 // Returns the read-only catalog discovered beneath modRoot.
 func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
 	return discovery.Scan(modRoot)

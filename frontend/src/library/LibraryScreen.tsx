@@ -19,6 +19,7 @@ import {
 } from "react";
 import {
 	AssignModTag,
+	ClassifyLibrary,
 	CreateFolder,
 	CreateTag,
 	DeleteMod,
@@ -38,7 +39,7 @@ import {
 	SetTheme,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
-import { discovery, type metadata, type mutation } from "../../wailsjs/go/models";
+import { discovery, type metadata, type modtype, type mutation } from "../../wailsjs/go/models";
 import { contrastingInk, isValidHexColor } from "./accentColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
@@ -46,6 +47,8 @@ import {
 	canDeleteMod,
 	canOrganizeMod,
 	canTagMod,
+	entryCategoryLabel,
+	entryCharacterLabel,
 	entryStateLabel,
 	hasMissingSidecar,
 } from "./entryPresentation";
@@ -79,6 +82,7 @@ type ViewModeButtonProps = {
 
 type SelectedModPanelProps = {
 	entry: discovery.Entry | null;
+	identity?: modtype.Identity | undefined;
 	assignedTags: metadata.Tag[];
 	isMutating: boolean;
 	isMutationLocked: boolean;
@@ -315,8 +319,12 @@ export function LibraryScreen() {
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
 	const [accentColor, setAccentColor] = useState("");
+	const [identitiesByEntryID, setIdentitiesByEntryID] = useState<
+		Record<string, modtype.Identity>
+	>({});
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const activeLibraryRootRef = useRef<string | null>(null);
+	const classificationRequestIDRef = useRef(0);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
@@ -376,6 +384,23 @@ export function LibraryScreen() {
 		nextMutationFeedbackIDRef.current += 1;
 		setMutationFeedback({ id: nextMutationFeedbackIDRef.current, kind, message });
 	}, []);
+	const classify = useCallback(async (root: string, entries: discovery.Entry[]) => {
+		if (entries.length === 0) return;
+		classificationRequestIDRef.current += 1;
+		const requestID = classificationRequestIDRef.current;
+		try {
+			const results = await ClassifyLibrary(root, entries);
+			if (
+				activeLibraryRootRef.current !== root ||
+				classificationRequestIDRef.current !== requestID
+			) {
+				return;
+			}
+			setIdentitiesByEntryID((prev) => ({ ...prev, ...results }));
+		} catch {
+			// Non-blocking background classification
+		}
+	}, []);
 	const updateMutatedEntry = useCallback(
 		(
 			result: mutation.Result,
@@ -398,6 +423,17 @@ export function LibraryScreen() {
 
 				return new discovery.Library({ ...currentLibrary, entries });
 			});
+			if (result.previousID && result.previousID !== result.id) {
+				setIdentitiesByEntryID((prev) => {
+					if (!result.previousID) return prev;
+					const prevIdentity = prev[result.previousID];
+					if (!prevIdentity) return prev;
+					const next = { ...prev };
+					next[result.id] = prevIdentity;
+					delete next[result.previousID];
+					return next;
+				});
+			}
 			setSelectedEntryID(result.id);
 		},
 		[],
@@ -415,6 +451,7 @@ export function LibraryScreen() {
 
 			setLibrary(result);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+			classify(requestRoot, result.entries);
 			return result;
 		} catch (error) {
 			if (activeLibraryRootRef.current === requestRoot) {
@@ -425,7 +462,7 @@ export function LibraryScreen() {
 			}
 			return null;
 		}
-	}, [libraryRoot, showMutationFeedback]);
+	}, [libraryRoot, showMutationFeedback, classify]);
 
 	// Tags live in Cratebug's own persisted metadata, not the scanned library, so
 	// refreshing after a change re-reads that store instead of rescanning the mod
@@ -1044,6 +1081,7 @@ export function LibraryScreen() {
 			setActiveDialog(null);
 			setActiveFolderDialog(null);
 			setContextMenu(null);
+			setIdentitiesByEntryID({});
 			setLibraryState("initial");
 			return;
 		}
@@ -1057,6 +1095,8 @@ export function LibraryScreen() {
 			if (activeLibraryRootRef.current !== root) return;
 
 			setLibrary(result);
+			setIdentitiesByEntryID({});
+			classify(root, result.entries);
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
@@ -1322,6 +1362,7 @@ export function LibraryScreen() {
 					</div>
 					<SelectedModPanel
 						entry={selectedEntry}
+						identity={selectedEntry ? identitiesByEntryID[selectedEntry.id] : undefined}
 						assignedTags={assignedTagsForSelection}
 						isMutating={selectedEntry ? mutatingEntryIDs.has(selectedEntry.id) : false}
 						isMutationLocked={isMutationLocked}
@@ -1339,6 +1380,7 @@ export function LibraryScreen() {
 						mutatingEntryIDs={mutatingEntryIDs}
 						isMutationLocked={isMutationLocked}
 						tagsByEntryID={entryTags}
+						identitiesByEntryID={identitiesByEntryID}
 						draggedEntryID={draggedItem?.type === "mod" ? draggedItem.entry.id : null}
 						onSetEnabled={setModEnabled}
 						onSelect={(entry) =>
@@ -2066,6 +2108,7 @@ function basename(path: string): string {
 // Keeps the current selection and its available actions in one stable location.
 function SelectedModPanel({
 	entry,
+	identity,
 	assignedTags,
 	isMutating,
 	isMutationLocked,
@@ -2089,6 +2132,8 @@ function SelectedModPanel({
 	const canChangeState = canChangeModState(entry);
 	const enabled = entry.state === "enabled";
 	const stateLabel = entryStateLabel(entry);
+	const categoryLabel = entryCategoryLabel(identity);
+	const characterLabel = entryCharacterLabel(identity);
 
 	return (
 		<section className="selected-mod-panel" aria-label="Selected mod actions">
@@ -2096,8 +2141,10 @@ function SelectedModPanel({
 				<p className="eyebrow">Selected mod</p>
 				<h3>{entry.displayName}</h3>
 				<p>
-					{entry.relativeFolder || "Library root"} · {stateLabel} · Priority{" "}
-					{entry.priority.value}
+					{entry.relativeFolder || "Library root"} · {stateLabel}
+					{categoryLabel ? ` · ${categoryLabel}` : ""}
+					{characterLabel ? ` · ${characterLabel}` : ""}
+					{" · "}Priority {entry.priority.value}
 				</p>
 				{assignedTags.length > 0 && (
 					<ul className="selected-mod-tags" aria-label="Tags">

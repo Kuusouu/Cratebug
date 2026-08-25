@@ -1,7 +1,14 @@
 import { Package, X } from "lucide-react";
 import { type DragEvent, memo, type MouseEvent } from "react";
-import type { discovery, metadata } from "../../wailsjs/go/models";
-import { canChangeModState, canOrganizeMod, canTagMod, entryStateLabel } from "./entryPresentation";
+import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
+import {
+	canChangeModState,
+	canOrganizeMod,
+	canTagMod,
+	categorySlug,
+	entryCategoryLabel,
+	entryCharacterLabel,
+} from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
 // Caps visible chips so a heavily-tagged mod cannot push a card's other
@@ -17,6 +24,7 @@ type ModCatalogProps = {
 	mutatingEntryIDs: ReadonlySet<string>;
 	isMutationLocked: boolean;
 	tagsByEntryID: ReadonlyMap<string, metadata.Tag[]>;
+	identitiesByEntryID?: Record<string, modtype.Identity> | undefined;
 	draggedEntryID: string | null;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
@@ -39,6 +47,7 @@ type ModCardProps = {
 	isMutating: boolean;
 	isMutationLocked: boolean;
 	tags: metadata.Tag[];
+	identity?: modtype.Identity | undefined;
 	isDragging: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	onSelect: ModCatalogProps["onSelect"];
@@ -104,6 +113,7 @@ export function ModCatalog({
 	mutatingEntryIDs,
 	isMutationLocked,
 	tagsByEntryID,
+	identitiesByEntryID,
 	draggedEntryID,
 	onSetEnabled,
 	onSelect,
@@ -137,6 +147,7 @@ export function ModCatalog({
 					isMutating={mutatingEntryIDs.has(entry.id)}
 					isMutationLocked={isMutationLocked}
 					tags={tagsByEntryID.get(entry.id) ?? []}
+					identity={identitiesByEntryID?.[entry.id]}
 					isDragging={draggedEntryID === entry.id}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
@@ -158,6 +169,7 @@ const ModCard = memo(function ModCard({
 	isMutating,
 	isMutationLocked,
 	tags,
+	identity,
 	isDragging,
 	onSetEnabled,
 	onSelect,
@@ -179,12 +191,20 @@ const ModCard = memo(function ModCard({
 	}
 	const enabled = entry.state === "enabled";
 	const disabled = entry.state === "disabled";
+	const categoryLabel = entryCategoryLabel(identity);
+	const characterLabel = entryCharacterLabel(identity);
+	const isOrphaned = entry.kind === "orphaned_sidecar";
 	const facts = (
 		<div className="mod-facts">
-			<span>{entryStateLabel(entry)}</span>
+			{isOrphaned && <span>Orphaned sidecar</span>}
 			{entry.bundleFormat && (
 				<span className={`bundle-format-badge ${entry.bundleFormat}`}>
 					{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}
+				</span>
+			)}
+			{categoryLabel && (
+				<span className={`mod-category-badge category-${categorySlug(categoryLabel)}`}>
+					{categoryLabel}
 				</span>
 			)}
 			<span>Priority {entry.priority.value}</span>
@@ -192,9 +212,22 @@ const ModCard = memo(function ModCard({
 	);
 	const heading = (
 		<div className="mod-card-heading">
-			<div className="mod-thumbnail" aria-hidden="true">
+			<button
+				type="button"
+				className="mod-thumbnail"
+				onClick={() => onSelect(entry)}
+				disabled={isMutationLocked}
+				aria-label={
+					characterLabel ? `Hero: ${characterLabel}` : `Select ${entry.displayName}`
+				}
+			>
 				<Package aria-hidden="true" />
-			</div>
+				{characterLabel && (
+					<span className="mod-thumbnail-tooltip" role="tooltip">
+						{characterLabel}
+					</span>
+				)}
+			</button>
 			<div className="mod-card-heading-info">
 				<h3>{entry.displayName}</h3>
 				<p>{entry.relativeFolder || "Library root"}</p>
