@@ -97,7 +97,7 @@ func (s *SessionClassifier) Classify(root string, entries []discovery.Entry, tab
 	for i := 0; i < len(missJobs); i++ {
 		outcome := <-outcomeChan
 		results[outcome.entryID] = outcome.identity
-		if !outcome.mtime.IsZero() {
+		if !outcome.mtime.IsZero() && !outcome.failed {
 			s.cache.Put(outcome.entryID, outcome.mtime, outcome.identity)
 		}
 	}

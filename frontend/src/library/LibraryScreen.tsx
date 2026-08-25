@@ -387,9 +387,12 @@ export function LibraryScreen() {
 		setMutationFeedback({ id: nextMutationFeedbackIDRef.current, kind, message });
 	}, []);
 	const classify = useCallback(async (root: string, entries: discovery.Entry[]) => {
-		if (entries.length === 0) return;
 		classificationRequestIDRef.current += 1;
 		const requestID = classificationRequestIDRef.current;
+		if (entries.length === 0) {
+			setIsClassifying(false);
+			return;
+		}
 		setIsClassifying(true);
 		try {
 			const results = await ClassifyLibrary(root, entries);
