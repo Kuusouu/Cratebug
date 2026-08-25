@@ -209,4 +209,373 @@ content) plus the real on-disk metadata file, rather than pixel screenshots
 
 ## Review approval
 
-**Decision:** Pending user review.
+**Decision:** Approved. See the addendum's own visual verification pass below,
+which exercised this review's persistence, identity, and recovery behavior
+directly in the running app in addition to the addendum's own UI.
+
+---
+
+# Addendum: UI overhaul (settings, tags, cards, visual identity, drag-and-drop)
+
+**Date:** 2026-08-23
+**Status:** Awaiting review
+
+## Outcome
+
+The Phase 5 review above was accepted functionally, but the user rejected the
+frontend it shipped with as "really bad design": tags were reachable only
+through a per-mod context-menu dialog, there was no settings UI despite the
+backend already supporting persisted settings, and the header was a single
+letter "C" in a gradient box. This addendum covers everything built in
+response, using a plan drafted during that conversation (not checked into
+this repository — a Claude Code session artifact, not a project file) as the
+starting point. Two tracks ran beyond that plan's original scope —
+an accent-color theming system and folder/mod drag-and-drop — both added
+mid-stream at the user's request rather than planned upfront; this addendum
+documents them alongside the planned work rather than pretending the plan was
+followed to the letter. No `TASKS.md`/`ROADMAP.md`/`SPEC.md` changes were
+needed, matching the plan's own assessment that SPEC.md's BentoMod-reference
+mandate (sections 14 and 16) already covered this work.
+
+Every user-visible step in this pass was shown to the user for their own look
+before the next one started, per their standing hard-stop requirement — this
+addendum is written after that full review cycle, not instead of it.
+
+## Settings UI, accent-color theming, and self-hosted fonts
+
+- `internal/metadata/store.go`'s `Settings` struct gained `Theme`,
+  `DefaultViewMode`, and `AccentColor` (all `omitempty`, purely additive, no
+  schema-version bump). `internal/metadata/settings.go` validates each
+  server-side (`SetTheme`, `SetDefaultViewMode`, `SetAccentColor`), since
+  Wails bindings are callable from devtools, not just the intended UI.
+  `AccentColor` accepts a 6-digit hex string or an empty string, which
+  doubles as the "reset to theme default" path. `app.go` exposes matching
+  scalar methods, mirroring the existing load-mutate-save shape.
+- **Deviation from the plan:** the plan specified buffered Save/Cancel for
+  `SettingsDialog.tsx`, mirroring BentoMod. The user asked for immediate
+  apply instead once they saw the mockup ("most of these settings should
+  apply immediately"), matching `ModTagDialog`'s existing precedent. The
+  shipped dialog has no Save/Cancel pair, only Close; every control (theme,
+  accent) applies on click, with local optimistic state reverted only on a
+  save failure.
+- **Deviation from the plan:** "Default view mode" was dropped from Settings
+  entirely, also per user feedback — the existing toolbar view-mode buttons
+  now persist silently on every click instead, so whatever the user last
+  picked is what the catalog opens to next time.
+- Theme is a 3-icon picker (System/Light/Dark), not BentoMod's cycling
+  toggle — the user's own preference, "like how discord has it."
+- Accent color (not in the original plan, added after the wordmark
+  discussion below) is a 5-preset-plus-custom-hex picker
+  (`frontend/src/library/accentColor.ts`), applied via an inline
+  `--accent`/`--accent-ink` override on `.app-shell` so it composes with
+  existing theme tokens rather than replacing them. `contrastingInk()`
+  computes a readable ink color for arbitrary accents via a perceived-
+  brightness threshold, since the app's own `--accent-ink` is only tuned for
+  each theme's specific default. Typing a hex applies live on every
+  keystroke but persists on a 400ms debounce, so it isn't writing to disk on
+  every character. The cream "Crate" preset became the actual theme default
+  for both light and dark (`App.css`'s `.app-shell` token blocks), not just
+  a selectable option, at the user's request.
+- Inter and Bungee are both self-hosted now (`@font-face` in `style.css`),
+  where Inter previously had none at all — every user was silently getting
+  their OS default sans-serif. Both ship as raw `.ttf`, not `.woff2`,
+  documented in the bug below.
+
+## Tag filter and catalog management
+
+- `frontend/src/library/TagMenu.tsx`: a toolbar popover next to the search
+  input, listing the tag catalog with per-tag filter toggling (OR semantics),
+  inline rename/delete, and a create-tag form. `RenameTag`/`DeleteTag`
+  existed on the backend since Phase 5 with zero frontend callers; this
+  wires them up. Deleting a tag currently in the active filter also clears
+  it from the filter.
+- `usePositionedPopover.ts` extracts `ContextMenu.tsx`'s viewport-clamped
+  positioning and outside-pointerdown/Escape/scroll/resize dismissal into a
+  shared hook, used by both components instead of a second copy.
+- `LibraryScreen.tsx` gained `tagFilterIDs` state and a `tagsByEntryID` memo
+  (one pass over every mod record per metadata change, resolved against the
+  tag catalog once) — a deliberate perf choice distinct from the existing
+  `tagIDsForScannerID` helper, which is fine for the single-selection panel
+  but would be O(entries × mods) if reused per card on every render.
+
+## Card redesign
+
+Tags-on-cards was planned; the rest of the redesign below was not — it came
+from the user's direct reaction to a screenshot of the first cut ("the top
+cards are bigger still... looks disproportionate").
+
+- `ModCatalog.tsx` cards show up to 4 tag chips with a "+N" overflow
+  indicator, each chip removable inline (`UnassignModTag`, immediate, not
+  confirmed — unassigning only edits Cratebug's own metadata, never mod
+  files).
+- The status-dot + "DISABLED" badge + Enable/Disable button trio was
+  replaced with a single `role="switch"` toggle — the three were saying the
+  same thing three ways. Rename/priority/move/delete stay context-menu-only,
+  unchanged.
+- A `.mod-thumbnail` placeholder (a generic package glyph in a bordered
+  square) reserves the layout space a real mod thumbnail would occupy later;
+  `internal/discovery` has no icon-scanning capability today, so this is
+  reserved space for a feature that doesn't exist yet, not a hidden one.
+- The `.brand-mark` header icon became an inline crate SVG (rounded square,
+  lid line, corner bracing) in a neutral, non-accent-tinted treatment (muted
+  border + subtle `color-mix()` background) rather than the old orange
+  gradient box. The same mark, filled and rendered at each standard Windows
+  icon size, became the actual app icon (`build/appicon.png`,
+  `build/windows/icon.ico` — both gitignored, generated via a hand-rolled
+  multi-resolution ICO writer since Wails only regenerates `icon.ico` when
+  the file is absent and has a known bug where it doesn't always propagate a
+  replaced `appicon.png` even then).
+
+## Folder and mod drag-and-drop
+
+Not in the original plan at all — added afterward at the user's request,
+after confirming the existing `MoveFolder`/`MoveMod` mutation operations
+already did the necessary work and only needed a new frontend trigger.
+
+- `FolderNavigation.tsx`: sidebar folders are draggable onto other folders
+  (including onto "All mods" to move to the library root), gated behind the
+  existing cycle check (a folder cannot be dropped into itself or its own
+  descendant).
+- `ModCatalog.tsx`: mod cards are draggable onto sidebar folders, gated
+  behind the existing `canOrganizeMod` predicate (the same one already
+  guarding Rename/Priority/Move in the context menu).
+- The drag state (`DraggedItem`, a `{type: "folder"|"mod", ...}` union) and
+  its validity check (`isValidDropTarget`) both live in
+  `frontend/src/library/libraryTypes.ts`, shared by `LibraryScreen` (which
+  owns the drag and decides whether to execute the move), `FolderNavigation`
+  (the drop target), and `ModCatalog` (a second drag source) — the state had
+  to move up from a first draft that kept it local to `FolderNavigation`,
+  once mods needed to be draggable from a sibling component.
+
+## Real bugs found and fixed
+
+- **WOFF2 rendering bug in WebView2/DirectWrite.** The Bungee wordmark's
+  woff2 build reported `status: "loaded"` via the CSS Font Loading API and
+  laid out with correct metrics, but silently painted a different font's
+  glyphs — confirmed by measuring the real element's shrink-wrapped width
+  against controlled references before concluding it was genuinely
+  mis-rendering, not a caching artifact. The identical file rendered
+  correctly in a non-Windows test browser. Root cause narrowed to Windows'
+  DirectWrite text rasterizer specifically mishandling this file's woff2
+  encoding; the raw `.ttf` source doesn't have the problem. Both bundled
+  fonts ship as `.ttf` because of this, not for file-size reasons. Two
+  smaller, real (if less severe) findings surfaced during the same
+  investigation and are documented in code comments where they were fixed:
+  `<h1>`'s default bold weight combined with `font-synthesis: none` silently
+  falls through to the next font in the stack when the custom font doesn't
+  register that weight (`App.css`'s `.wordmark` rule), and this codebase's
+  test sandbox has its own unrelated, non-standard font-fallback-list
+  resolution quirk that was initially and incorrectly suspected as the root
+  cause before the woff2 theory was confirmed against the user's real
+  environment.
+- **CSS Grid stretch-space redistribution.** When `.mod-grid` stretched every
+  card in a row to match the tallest one (a card carrying tags), a card's
+  own leftover vertical space was distributed across its internal grid
+  tracks in a way that pushed the enable/disable toggle away from the tag
+  row with an inconsistent gap, and in one case let tag chips render past
+  the card's own border into the row below. Fixed by switching `.mod-card`
+  from `display: grid` to `display: flex; flex-direction: column`, whose
+  leftover-space rule is simple and consistent across browsers: unclaimed
+  space goes after the last child, not redistributed across siblings.
+- **React memo subtree cascade.** `FolderTreeItem`'s memo comparator checked
+  only whether a row's own exact path matched the current drag state. Since
+  the component also recursively renders its own children, a parent that
+  judged itself "unchanged" skipped re-rendering its whole subtree —
+  including a child whose drag-over highlight genuinely needed to update.
+  This made dragging over subfolders feel unresponsive while top-level
+  folders worked fine, since top-level folders have no such parent to get
+  blocked behind. Fixed by making the comparator check the whole subtree a
+  node roots, the same pattern `selectionTouchesBranch` already used
+  correctly for the selected-folder highlight.
+
+## Commands and tests run
+
+```powershell
+.\check.ps1
+```
+
+86 Go tests pass (up from 77 at the Phase 5 baseline — the 9 new tests are
+`internal/metadata/settings_test.go`'s theme/view-mode/accent-color
+validation and persistence-round-trip cases), the same 3 pre-existing `SKIP`
+results for directory-symlink tests remain (unrelated, documented above).
+`bun run check` (Biome format/lint, `tsc --noEmit`, `vite build`) is clean.
+
+## Manual checks
+
+Performed via `mise exec -c "wails dev"` against `C:\ModsFixtures` (the
+repo's standing fixture library, per the updated `AGENTS.md` guidance this
+addendum's work also added — a small varied set of Classic/IoStore bundles
+across nested folders, replacing the old per-task disposable-fixture-only
+guidance since this addendum's testing needed a folder hierarchy to
+exercise). As in the Phase 5 review, this session's Browser tooling could
+not composite frames, so verification is DOM-level (accessibility tree,
+computed styles, measured element geometry) and on-disk state, not pixel
+screenshots — with one exception: raster icon previews
+(`build/appicon.png` and a scaled-up 16×16 render) were inspected visually
+via the Read tool's image support, since those are static generated files
+rather than live browser-rendered UI.
+
+Notably, most of the deepest verification in this pass was adversarial
+measurement rather than passive observation — confirming the WOFF2 bug and
+the memo cascade bug both required comparing a real rendered element's
+geometry against deliberately-constructed reference elements, because
+surface-level checks (`document.fonts.check()`, the presence of a CSS class)
+reported success in both cases despite the underlying behavior being wrong.
+
+Every UI-visible change was shown to the user directly in the running app
+between steps, per their hard-stop requirement; several rounds of this
+surfaced real regressions before they shipped (the card-height issue above,
+the settings-dialog spacing, the font weight, all fixed in the same pass
+they were found).
+
+## Known limitations and deferred findings
+
+- The original plan's exclusion table mostly still holds (self-update,
+  launcher picker, processing-speed settings, hero icons/backgrounds, help
+  tour, bypass-game-running-lock — all still excluded for the reasons
+  already stated there). Two entries changed status: the **accent color
+  picker**, listed as "Deferred" in the original table, was built in this
+  pass at the user's request; **hold-to-delete** and **"Auto Detect" game
+  path** remain deferred, unchanged.
+- The Classic/IoStore badge two-tint treatment, listed as optional/low-
+  priority in the original plan, was also built (`bundle-format-badge`
+  classes in `ModCatalog.tsx`/`App.css`).
+- Screenshots still were not captured for the same environment reason as the
+  Phase 5 review; see Manual checks above for how this was mitigated.
+- The `wails dev` session in this addendum exhibited HMR staleness several
+  times (stale CSS/JS not propagating to the native WebView2 window even
+  after a hard refresh, requiring a full process restart) — none of it was
+  a real regression once verified against a clean reload, but it repeatedly
+  cost verification time and is worth knowing about for future sessions
+  rather than immediately trusting a "still broken" report without checking
+  whether a restart (not just a refresh) resolves it first.
+
+## Visual verification pass (screenshots)
+
+**Date:** 2026-08-25
+
+The prior passes above could not capture pixel screenshots (no compositing
+browser). This pass fixed that: the repo's `playwright` MCP server had no
+browser binary installed (`~/AppData/Local/ms-playwright` did not exist), so
+`mise exec -- bunx @playwright/mcp@latest install-browser chrome-for-testing`
+was run once and the server reconnected on session restart. All screenshots
+below are real WebView2/Wails-served renders at `http://localhost:34115`,
+driven against `C:\ModsFixtures` (the running `wails dev` instance was
+temporarily repointed from the user's real Marvel Rivals folder to fixtures
+for this pass, with the user's explicit approval, and repointed back
+afterward). Screenshots are in `docs/screenshots/phase-5/`.
+
+- `task-5.6-library-baseline.png` — compact-view catalog on fixtures.
+- `task-5.6-settings-default.png`, `task-5.6-settings-dark-teal.png` —
+  Settings dialog; confirmed System/Light/Dark and all six accent options
+  (five presets plus custom hex) apply immediately and live, including to
+  the dialog's own chrome.
+- `task-5.6-tagmenu-empty.png`, `task-5.6-tagmenu-created.png` — toolbar tag
+  catalog popover empty state and after creating two tags ("Favorites",
+  "WIP"), including the success toast.
+- `task-5.6-mod-context-menu.png`, `task-5.6-tagdialog-checklist.png` —
+  mod context menu showing "Tags..." alongside Rename/Priority/Move/Delete,
+  and the resulting checklist dialog.
+- `task-5.6-card-tag-chip.png` — assigned "Favorites" tag rendering as a
+  removable chip on both the card and the selected-mod panel.
+- `task-5.6-tag-filter-active.png` — toolbar tag filter narrowing the
+  catalog to the one tagged mod, with the active filter count badge.
+- `task-5.6-dragdrop-mod-result.png` — a mod card dragged onto a sidebar
+  folder, confirmed via the resulting toast and updated folder counts.
+- `task-5.6-dragdrop-folder-result.png` — a folder dragged onto another
+  folder (nesting), confirmed via toast and the sidebar tree collapsing to
+  the new structure.
+- `task-5.6-dragdrop-tag-reconcile.png` — the tagged mod dragged to a new
+  folder; the "Favorites" chip survived the move. This specifically
+  exercises `App.executeAndReconcile` through the new drag-and-drop trigger
+  added in this addendum, which the addendum's own manual checks had only
+  exercised through the context-menu Rename/Priority/Move dialogs, not drag.
+- `task-5.4-corrupt-recovery-toast.png` — corrupting the real
+  `metadata.json` and reloading: no crash, the same recovery toast text
+  documented above, and the library scanned normally.
+- `task-5.6-large-view.png`, `task-5.6-list-view.png` — the other two
+  catalog view modes, for layout consistency with the compact view above.
+
+**Finding, not a regression:** the corrupt/recovery test above was run after
+two prior drag-and-drop moves in the same session. The restored `.bak` was
+one save generation behind the live state (by design — `Store.Save` copies
+the *previous* primary to `.bak` before writing the new one), so it still
+described the tagged mod at its pre-move scanner ID. `App.executeAndReconcile`
+only re-points a mod record when a mutation call is made through it
+(Rename/Priority/Move); a plain load-then-scan after a backup restore has no
+equivalent step. The result: the tag silently disappeared from the UI (not
+from the underlying data — it remains in `metadata.json` under the old
+scanner ID) with no indication to the user. This is not a new gap: it is a
+concrete, reproduced instance of the limitation already disclosed above
+("`Document.OrphanedMods` has no App binding or UI surface yet"). It does not
+violate the Phase 5 exit criteria (metadata is retained, not discarded), but
+it's worth recording that this specific failure mode — a recovery-restored
+backup racing an already-applied filesystem mutation — is how that gap
+actually surfaces to a user, as a tag that appears to vanish rather than an
+explicit "orphaned" state. A future task closing the `OrphanedMods` UI gap
+should use this as a concrete repro case.
+
+## Follow-up fix: surface orphaned tagged mods
+
+**Date:** 2026-08-25
+
+Closes the finding above: a tagged mod record whose scanner ID no longer
+matches anything in a fresh scan (whether from a stale backup restore, a
+folder-rename/move gap, or otherwise) previously vanished from the UI with
+no indication, even though `internal/metadata/identity.go`'s
+`Document.OrphanedMods` already detected exactly this case — task 5.4 built
+the detection but no task wired it to the frontend.
+
+- No Go changes. `MetadataState`/`LoadMetadata` already return the full
+  `Document`, including every mod record's `scannerID` and `tags`, and a
+  scan's `discovery.Library.entries` already carry each entry's `id`
+  (`json:"id"`, `internal/discovery/scan.go`). Recomputing the orphan set
+  from data the frontend already holds avoids a second filesystem scan or a
+  new Wails binding, so `internal/metadata/identity.go`'s existing
+  `OrphanedMods` logic is duplicated in TypeScript rather than called
+  directly — the two are intentionally the same one-line membership check.
+- `frontend/src/library/LibraryScreen.tsx`: `orphanedTaggedModCount` counts
+  mod records that carry at least one tag but whose `scannerID` is absent
+  from the current scan's entry IDs (records with no tags are excluded,
+  since nothing user-visible would be missing for those). A `useEffect`
+  depending on `[library, metadataDocument]` recomputes this on every scan
+  or metadata change and shows a warning toast through the existing
+  `showMutationFeedback` path when the count changes to something nonzero.
+  A ref (`lastOrphanedTagNoticeCountRef`) suppresses re-showing the same
+  count, so routine metadata reloads (assigning a tag, for example) do not
+  repeat the notice, and resets on an empty scan so a later scan can notify
+  again.
+- **First draft had a bug, caught before landing:** the effect's initial
+  version called `orphanedTaggedModCount` directly inside `scan()`, which
+  closes over `metadataDocument` from the render that created that specific
+  `scan` closure. On the automatic first-launch scan, that closure was
+  created before the mount effect's `setMetadataDocument` call resolved, so
+  it always saw `metadataDocument` as `null` and never fired. Moving the
+  check into its own `useEffect` over `[library, metadataDocument]` fixes
+  this regardless of which of the two resolves first.
+- **Two grammar bugs in the first live checks, also fixed:** the singular
+  case initially read "1 tagged mod record no longer match anything"
+  (subject-verb disagreement) from one pluralized template covering both
+  cases, and the plural case's second sentence initially read "...in case
+  the mod reappears" (singular noun for a message about multiple records).
+  Split into an explicit singular/plural pair of full sentences — "Its tags
+  are kept in case the mod reappears" versus "Their tags are kept in case
+  the mods reappear" — instead of trying to interpolate one template both
+  ways.
+
+**Verify:** `.\check.ps1` passed (Go tests, `go vet`, Biome format/lint,
+`tsc`, `vite build`) after each change. Manually reproduced against
+`C:\ModsFixtures`: reused the same orphaned "Favorites" tag record from the
+finding above (still present in `metadata.json` at its stale pre-move
+scanner ID), reloaded the app, and confirmed the toast "1 tagged mod record
+no longer matches anything in this scan. Its tags are kept in case the mod
+reappears." appears
+(`docs/screenshots/phase-5/task-5.4-orphan-notice.png`). Clicking "Scan
+library" again with no state change did not re-show the toast, confirming
+the dedup ref. No fixture files were modified; the underlying orphaned
+record was left in place afterward since it is pre-existing test debris
+from the finding above, not new data this fix created.
+
+## Review approval
+
+**Decision:** Approved.
