@@ -36,23 +36,85 @@ Because both transports share one JSON contract by upstream's own design, the Go
 - Task 6.4's crash/hang handling can rely on normal process supervision (exit code, timeout, kill, restart) rather than needing to guard against an in-process native fault.
 - The adapter's request/response types should mirror `UAssetRequest`/`UAssetResponse` closely enough that swapping in an FFI implementation later does not require changing call sites, in case Phase 8 or later produces the concrete performance reason this decision did not find.
 - `uasset_toolkit/README.md` in the BentoMod archive is known to be stale relative to its own code; any future reference to that crate for precedent should re-read `lib.rs` directly rather than trust its README.
-- Task 6.6's concurrency policy is decided below, not deferred: cap any worker pool at 4, and prefer no pooling at all for routine per-mod operations. See "Concurrency policy (task 6.6 evidence)."
+- Task 6.6's concurrency policy is decided below, not deferred: task 6.6 itself capped any worker pool at 4; task 6.7's later, wider benchmark refined this into an entry-count-tiered cap (4/8/16). See "Concurrency policy (task 6.6 evidence)."
 
 ## Concurrency policy (task 6.6 evidence)
 
 Task 6.6 asks for measured evidence before adopting any concurrency policy rather than assuming more workers is better. Two prototypes ran a 1/4/8/16/32-worker pooled sweep against the same representative library — the user's real, live `~mods` folder (60 mods, read-only source) — using the same pooled-worker model: N long-lived `UAssetTool.exe` processes, each reused across its share of the 60 mods, matching what an actual Cratebug worker pool would look like rather than a fresh process per mod.
 
-**Heavy operation** (`extract_iostore` + `detect_type` per extracted asset — full Zen-to-legacy conversion, exercising the `FZenPackageContext` reload described above): 1 worker took 3m27s; 4 workers took 1m23s (2.51x); 8 workers took 1m14s (2.81x); 16 workers took 1m11s (2.90x, the peak); 32 workers took 1m14s (2.81x, worse than 16). Real work overlaps here, so concurrency genuinely helps, but returns are clearly diminishing well before 32 cores and 32 is measurably worse than 16.
+| Workers | Heavy op (`extract_iostore`+`detect_type`) | Speedup | Cheap op (`is_iostore_encrypted`+`list_pak`) | Speedup |
+|---|---|---|---|---|
+| 1 | 3m27s | 1.00x | 136ms | 1.00x |
+| 4 | 1m23s | 2.51x | 122ms | 1.12x |
+| 8 | 1m14s | 2.81x | 165ms | 0.83x |
+| 16 | 1m11s | **2.90x (peak)** | 266ms | 0.51x |
+| 32 | 1m14s | 2.81x | 565ms | 0.24x |
 
-**Cheap operation** (`is_iostore_encrypted` + `list_pak` on the companion `.pak` — the only two actions a separate investigation confirmed BentoMod's own "instant" type/conflict UI actually calls into UAssetTool for; everything else in that UI is BentoMod's own native `.utoc` parsing and filename heuristics, not a tool call at all): 1 worker took 136ms for the entire 60-mod library; 4 workers took 122ms (1.12x); 8 workers took 165ms (0.83x, worse than 1); 16 workers took 266ms (0.51x); 32 workers took 565ms (0.24x, over 4x worse than 1 worker). Per-call work here is a few milliseconds, so process-spawn overhead dominates as soon as the pool grows past a handful of workers, and concurrency actively hurts.
+The heavy operation (full Zen-to-legacy conversion, exercising the `FZenPackageContext` reload described above) genuinely benefits from concurrency, peaking at 16 workers. The cheap operation gets steadily worse past 4 workers — at 60 mods, per-call work is only a few milliseconds, so process-spawn overhead dominates almost immediately.
 
-**Decided policy: cap any worker pool at 4, and default to no pooling (1 worker) for routine per-mod operations like the cheap case above.** 4 is not the single best number for the heavy case (16 measured higher), but the gain from 4 to 16 is modest (2.51x to 2.90x) against real added cost — more concurrent self-contained .NET processes competing for memory and disk I/O — and 4 is safely inside the range where the cheap case still wins outright over 1 worker rather than losing to it. A policy that has to pick different pool sizes per operation weight is more moving parts than task 6.6's scope needs; one small bound that never regresses either measured case is preferable to chasing the heavy case's peak.
+**Correction, found while investigating task 6.7:** the cheap operation's "only two actions BentoMod calls" framing was incomplete. BentoMod's own IoStore type-display path also calls `list_iostore_files` (via `bentomod/src/utoc_utils.rs`'s `read_utoc`), not just `is_iostore_encrypted`/`list_pak` — `list_iostore_files` was never actually included in this sweep. Task 6.7's own benchmark below fills that gap.
 
-Practical implication for whichever task ends up calling these actions (most plausibly Phase 8's conflict UI): routine, cheap per-mod checks should not be parallelized at all — a single reused worker handling the whole library is both simpler and faster than any pool size measured. A bounded pool is only worth reaching for on genuinely heavy operations, and even then capped at 4.
-
-The cap of 4 is a ceiling, not a fixed size: `internal/uassettool.WorkerPoolSize` derives the actual pool size from the machine's core count rather than always requesting the ceiling, so a modest machine is not asked to run 4 concurrent self-contained .NET processes just because 4 was the measured sweet spot on the machine that ran this benchmark. Below the cap, the pool tracks half the available cores; at exactly the cap (8 cores), it backs off further to half of that (2) rather than defaulting straight to the maximum; the floor is always 1 worker, matching the no-pooling default above for small or single-core machines. `DefaultWorkerPoolSize` wraps it with `runtime.NumCPU()` for production callers.
+**Decided policy at the time (task 6.6): cap any worker pool at 4.** This held up as the right call for the library size tested (60 mods) — see the entry-count-tiered policy below for how this was later refined once task 6.7 measured the same shape of operation across a much wider range of library sizes.
 
 This benchmarking used disposable scratch Go harnesses (pooled-worker NDJSON clients against the released `UAssetTool.exe`, not checked into this repository), run against the user's real mod library with their explicit permission, read-only throughout. Any extracted output was written to per-run temp directories and deleted after each pass.
+
+### Task 6.7 evidence: Cratebug's own type-classification layer, at four library sizes
+
+Task 6.7 built `internal/modtype`, a Cratebug-owned category classifier (`Classify`, pure Go, no worker calls) plus an orchestration function (`Determine`) that resolves one mod's bundle format, calls `uassettool.ListPak` or (`IsIoStoreEncrypted` then `ListIoStoreFiles`) for its internal path listing, and runs `Classify` over the result. Per task 6.7's own instruction, this was benchmarked on its own terms rather than assuming the numbers above transfer, since this is a different, lighter operation shape and now genuinely exercises `list_iostore_files`, which the sweep above did not.
+
+**A first pass at 72 entries (the real `~mods` folder) found a "no pooling" conclusion, which turned out to be a methodology artifact, not a real result.** Pool size 1 ran first in that sweep and so uniquely absorbed the one-time cost of the OS file cache being cold for every archive file being touched for the first time; every larger pool size inherited an already-warm cache from pool 1's own run, making the comparison unfair. The fix — a throwaway warmup pass at the largest pool size before any timed measurement — was applied to a full rerun across four real library sizes (the user built three synthetic-but-real-format libraries by duplicating real mod bundles, specifically to test this): the original 72-entry `~mods` folder, and three new libraries at 504, 864, and 2592 entries. Two timed passes per pool size per library; passes agreed within noise once warmup was in place, confirming the fix worked.
+
+**Speedup vs. 1 worker, `Determine` (the actual 6.7 operation: bundle-format check, cheap listing call, `Classify`):**
+
+| Workers | 72 entries | 504 entries | 864 entries | 2592 entries |
+|---|---|---|---|---|
+| 1 | 1.00x | 1.00x | 1.00x | 1.00x |
+| 2 | 1.27x | 1.42x | 1.98x | 1.78x |
+| 4 | **1.76x (peak)** | 2.14x | 2.98x | 3.03x |
+| 8 | 1.36x | **2.36x (peak)** | 3.28x | 4.37x |
+| 16 | 1.14x | 2.32x | **3.40x (peak)** | **4.68x (peak)** |
+| 32 | 0.97x | 1.69x | 2.31x | 3.84x |
+
+**Speedup vs. 1 worker, `ListPak`/`ListIoStoreFiles` alone (no classification):**
+
+| Workers | 72 entries | 504 entries | 864 entries | 2592 entries |
+|---|---|---|---|---|
+| 1 | 1.00x | 1.00x | 1.00x | 1.00x |
+| 2 | 1.26x | 1.69x | 1.63x | 1.88x |
+| 4 | **1.63x (peak)** | **2.24x (peak)** | 2.15x | 3.28x |
+| 8 | 1.41x | 2.06x | 2.32x | 4.55x |
+| 16 | 0.97x | 1.76x | **2.53x (peak)** | **4.77x (peak)** |
+| 32 | 0.73x | 1.28x | 1.86x | 3.64x |
+
+**Speedup vs. 1 worker, `IsIoStoreEncrypted` alone (the cheapest of the three calls):**
+
+| Workers | 72 entries | 504 entries | 864 entries | 2592 entries |
+|---|---|---|---|---|
+| 1 | 1.00x | 1.00x | 1.00x | 1.00x |
+| 2 | 1.07x | 1.68x | 1.54x | 1.61x |
+| 4 | **1.24x (peak)** | **1.95x (peak)** | **1.98x (peak)** | 2.26x |
+| 8 | 1.20x | 1.52x | 1.36x | **2.81x (peak)** |
+| 16 | 0.84x | 1.32x | 1.83x | 1.93x |
+| 32 | 0.76x | 1.05x | 1.14x | 1.84x |
+
+Absolute 1-worker baselines, for scale: `Determine` took 176ms/331ms/555ms/1196ms sequentially at 72/504/864/2592 entries respectively; `discovery.Scan` itself (the plain filesystem walk, no worker involved) took 2ms/15ms/27ms/80ms at the same sizes and is not a bottleneck at any size tested. Category output was identical across every pool size once warmup was applied, confirming pooling changes only timing, not results; the small "per-entry error" counts at each size are expected `ErrCannotDetermineType` results for encrypted IoStore mods, not failures — confirmed by the `IsIoStoreEncrypted` table above showing zero errors for the same entries, since checking whether something is encrypted always succeeds.
+
+**Two findings that reshape the task 6.6 policy:**
+
+1. Pooling genuinely helps even at 72 entries once the cold-cache confound is removed — task 6.6's cheap-operation sweep and task 6.7's first 72-entry pass were both measuring against an unfair pool-1 baseline. It just doesn't matter much there: the gain is real but shaves well under 100ms off an already-imperceptible operation.
+2. The pool size that actually peaks grows with library size — 4 is enough at 72-504 entries, but 864-2592 entries want 8-16 workers to capture the full benefit. 32 workers never wins at any size or operation measured; the ceiling sits somewhere between 16 and 32 at every scale tested.
+
+**Decided policy: entry-count-tiered pool sizing**, replacing the fixed cap of 4:
+
+| Entry count | Pool cap | Basis |
+|---|---|---|
+| < 700 | 4 | Peak observed at 72 and 504 entries across all three operations |
+| 700 – 1,499 | 8 | 864-entry peak was split between 8 and 16 depending on operation; 8 is the safer floor of that range |
+| ≥ 1,500 | 16 | Peak observed at 2592 entries across all three operations; 32 regressed at every size tested |
+
+Implemented as `internal/uassettool.WorkerPoolSizeForLibrary(availableCores, entryCount)` / `DefaultWorkerPoolSizeForLibrary(entryCount)`, layered on the same core-aware halving logic `WorkerPoolSize`/`DefaultWorkerPoolSize` already used for task 6.6's fixed cap of 4 (which those two functions keep doing, unchanged, for callers that don't know their entry count up front). The threshold boundaries (700, 1,500) are interpolated between the four measured sizes, not measured exactly; a wider spread of measured library sizes could refine them further. `internal/modtype` still ships no pooling code of its own — callers with a large library should use `WorkerPoolSizeForLibrary` to size their own worker pool around `Determine`.
+
+This benchmark used a disposable scratch Go harness, temporarily placed inside the Cratebug module tree (Go's `internal/` import visibility rule requires this — a harness outside the module cannot import `internal/discovery`, `internal/uassettool`, or `internal/modtype` regardless of `replace` directives), run once per configuration, deleted immediately after, read-only throughout against the user's real and duplicated-real-format mod libraries with their explicit permission.
 
 ## Sources
 

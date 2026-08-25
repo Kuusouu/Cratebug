@@ -1,7 +1,8 @@
 # Cratebug Active Tasks
 
 **Phase:** 6 - UAssetToolRivals boundary
-**Status:** Active. 6.1, 6.2, 6.3, 6.4, 6.5, and 6.6 complete.
+**Status:** Active. 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, and 6.7 complete. 6.8 added
+and not started.
 
 This file contains only the active phase. Replace it when Phase 6 is complete.
 
@@ -39,6 +40,9 @@ the tool's complete surface.
 * Mod type is determined through a Cratebug-owned layer rather than the
   heavy archive-extraction path, with its own measured concurrency policy
   rather than one assumed from the general archive-operation benchmark.
+* Hero and skin names resolve from the same layer, sourced from a fetched
+  and cached character-ID table, degrading cleanly when that data is
+  unavailable.
 * Production packaging works and includes the worker's licensing and
   third-party notices.
 * Review approves the boundary before archive mutation (Phase 7) begins.
@@ -150,8 +154,10 @@ for the decision to be checked later.
   actions. `docs/decisions/0003-uassettoolrivals-boundary.md`'s benchmark
   found `extract_iostore` + `detect_type` unnecessarily heavy for this, and
   that BentoMod itself avoids that path entirely for its own instant type
-  display, using its own native `.utoc` header parsing and filename
-  heuristics instead of calling into UAssetToolRivals for it.
+  display: it still calls into UAssetToolRivals for a flat internal-path
+  listing (`list_pak` for classic mods, `list_iostore_files` for IoStore),
+  but classifies the result with its own filename and path heuristics
+  instead of the heavy archive-parse actions.
 * This layer may still call the adapter from 6.3 for specific cheap,
   header-only facts it needs (for example `is_iostore_encrypted`), but must
   not depend on the heavy Zen-to-legacy conversion path for routine type
@@ -171,7 +177,30 @@ concurrency curve, and the selected worker count (or the decision not to
 pool at all) is backed by that curve rather than assumed from 6.6's
 archive-operation numbers.
 
-## 6.8 Validate the boundary and complete the review
+## 6.8 Resolve character and skin names from mod paths
+
+* Extend the layer from 6.7 to resolve a mod's hero/character name and,
+  where applicable, its specific skin name, from the same internal asset
+  path listing already gathered for category classification. No additional
+  UAssetToolRivals calls should be needed beyond what 6.7 already performs.
+* Port BentoMod's regex-based matching as a reference (folder-segment
+  character IDs, a filename-based fallback constrained to Marvel Rivals's
+  known character-ID range, and skin-ID matching), adapted to Cratebug's own
+  path conventions rather than copied verbatim.
+* Source character/skin-ID data from the same GitHub-hosted markdown table
+  BentoMod uses, fetched and cached locally rather than bundled, with a
+  clear policy for refreshing it and for operating when it is stale,
+  unreachable, or missing on first run.
+* Keep this resolution decoupled from category classification: a failure or
+  absence of character-ID data must degrade to "no character name," not the
+  loss of an otherwise successful category result from 6.7.
+
+**Verify:** Given representative internal path listings (real and
+disposable-fixture), hero and skin names resolve correctly against a
+fetched character-ID table, and resolution degrades cleanly (no crash, no
+lost category) when that table is stale, unreachable, or missing.
+
+## 6.9 Validate the boundary and complete the review
 
 * Run the canonical repository validation command and the adapter's
   failure-injection tests.
@@ -193,6 +222,8 @@ The review must record:
   policy
 * The mod-type-determination layer's design and its own measured
   concurrency policy
+* The character and skin name resolution layer's design and how it degrades
+  when character-ID data is stale, unreachable, or missing
 * Licensing and third-party notices
 * Commands and tests run
 * Known limitations and deferred findings

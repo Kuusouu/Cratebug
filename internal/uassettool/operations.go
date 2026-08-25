@@ -68,3 +68,32 @@ func IsIoStoreEncrypted(c caller, utocPath string) (bool, error) {
 	}
 	return raw.Encrypted, nil
 }
+
+// Lists the resolved internal asset paths inside the IoStore container at
+// utocPath. aesKey may be empty for an unencrypted container; callers should
+// check IsIoStoreEncrypted first, since Cratebug does not yet manage AES
+// keys for encrypted mods.
+func ListIoStoreFiles(c caller, utocPath, aesKey string) ([]string, error) {
+	if utocPath == "" {
+		return nil, fmt.Errorf("uassettool: list_iostore_files: utoc path is required")
+	}
+
+	params := map[string]any{"file_path": utocPath}
+	if aesKey != "" {
+		params["aes_key"] = aesKey
+	}
+
+	var raw struct {
+		Files []string `json:"files"`
+	}
+	if err := c.Call("list_iostore_files", params, &raw); err != nil {
+		return nil, err
+	}
+
+	for _, path := range raw.Files {
+		if path == "" {
+			return nil, fmt.Errorf("%w: list_iostore_files: entry with an empty path", ErrMalformedResponse)
+		}
+	}
+	return raw.Files, nil
+}

@@ -144,6 +144,103 @@ func TestIsIoStoreEncryptedDecodesResult(t *testing.T) {
 	}
 }
 
+func TestListIoStoreFilesRejectsEmptyPath(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{}
+
+	// Act
+	_, err := ListIoStoreFiles(fake, "", "")
+
+	// Assert
+	if err == nil {
+		t.Fatal("ListIoStoreFiles() error = nil, want an error for an empty path")
+	}
+	if fake.action != "" {
+		t.Errorf("ListIoStoreFiles() called the worker with an empty path, want no call")
+	}
+}
+
+func TestListIoStoreFilesDecodesFiles(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"package_count":1,"container_name":"fixture","files":["/Game/Foo"]}`)}
+
+	// Act
+	files, err := ListIoStoreFiles(fake, "mod.utoc", "")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ListIoStoreFiles() error = %v, want nil", err)
+	}
+	if fake.action != "list_iostore_files" {
+		t.Errorf("action = %q, want list_iostore_files", fake.action)
+	}
+	if fake.params["file_path"] != "mod.utoc" {
+		t.Errorf("params[file_path] = %v, want mod.utoc", fake.params["file_path"])
+	}
+	if !reflect.DeepEqual(files, []string{"/Game/Foo"}) {
+		t.Errorf("files = %#v, want [/Game/Foo]", files)
+	}
+}
+
+func TestListIoStoreFilesOmitsAesKeyWhenEmpty(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"files":[]}`)}
+
+	// Act
+	if _, err := ListIoStoreFiles(fake, "mod.utoc", ""); err != nil {
+		t.Fatalf("ListIoStoreFiles() error = %v, want nil", err)
+	}
+
+	// Assert
+	if _, ok := fake.params["aes_key"]; ok {
+		t.Errorf("params[aes_key] present = %v, want absent when aesKey is empty", fake.params["aes_key"])
+	}
+}
+
+func TestListIoStoreFilesIncludesAesKeyWhenSet(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"files":[]}`)}
+
+	// Act
+	if _, err := ListIoStoreFiles(fake, "mod.utoc", "deadbeef"); err != nil {
+		t.Fatalf("ListIoStoreFiles() error = %v, want nil", err)
+	}
+
+	// Assert
+	if fake.params["aes_key"] != "deadbeef" {
+		t.Errorf("params[aes_key] = %v, want deadbeef", fake.params["aes_key"])
+	}
+}
+
+// An empty-string entry in the file list cannot be a real asset path, so it
+// must be rejected here rather than handed to Cratebug's domain layer.
+func TestListIoStoreFilesRejectsEntryWithEmptyPath(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"files":["/Game/Foo",""]}`)}
+
+	// Act
+	_, err := ListIoStoreFiles(fake, "mod.utoc", "")
+
+	// Assert
+	if !errors.Is(err, ErrMalformedResponse) {
+		t.Fatalf("ListIoStoreFiles() error = %v, want ErrMalformedResponse", err)
+	}
+}
+
+func TestListIoStoreFilesPropagatesCallError(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{err: &ToolError{Action: "list_iostore_files", Message: "UTOC file not found: mod.utoc"}}
+
+	// Act
+	_, err := ListIoStoreFiles(fake, "mod.utoc", "")
+
+	// Assert
+	var toolErr *ToolError
+	if !errors.As(err, &toolErr) {
+		t.Fatalf("ListIoStoreFiles() error = %v, want *ToolError", err)
+	}
+}
+
 // Pinned in docs/decisions/0004-pin-uassettool-worker.md; update both together.
 const pinnedWorkerSourceRevision = "952bd331976c6f28efb36ca320c82c27e2456023"
 
@@ -262,6 +359,30 @@ func TestOperationsAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 		}
 		if encrypted {
 			t.Errorf("IsIoStoreEncrypted() = true, want false: fixture was built without obfuscation")
+		}
+	})
+
+	t.Run("iostore file listing", func(t *testing.T) {
+		// Arrange
+		utocPath := buildIoStoreFixture(t, worker, dir)
+
+		// Act
+		files, err := ListIoStoreFiles(worker, utocPath, "")
+
+		// Assert
+		//
+		// The hybrid fixture built by buildIoStoreFixture has no real
+		// .uasset input, so its IoStore container legitimately has zero Zen
+		// packages: the fixture's loose file lands in the companion PAK
+		// (list_pak's job), not the .utoc/.ucas (list_iostore_files's job).
+		// This still exercises the full Go-to-worker-and-back path for a
+		// real, valid IoStore container; it just cannot assert non-empty
+		// content without a genuine serialized .uasset fixture.
+		if err != nil {
+			t.Fatalf("ListIoStoreFiles() error = %v", err)
+		}
+		if files == nil {
+			t.Errorf("ListIoStoreFiles() = nil, want a non-nil (possibly empty) slice")
 		}
 	})
 }

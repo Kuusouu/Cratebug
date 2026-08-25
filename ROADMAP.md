@@ -175,6 +175,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Crash, packaging, performance, and complexity validation for the selected boundary
 - Evaluate bounded parallel archive inspection and archive-tool actions using representative mod libraries; adopt concurrency only when measurements show it improves responsiveness without weakening cancellation, progress reporting, deterministic results, or filesystem safety
 - A Cratebug-owned, lightweight layer for determining mod type, built instead of routing through UAssetToolRivals's full archive-extraction actions; benchmarked on its own terms for where and how much parallelization actually helps, rather than assuming the general archive-operation findings transfer unchanged
+- Hero and skin name resolution from the same internal path listings, sourced from a fetched and cached character-ID table, as a separate later step built on top of the type-determination layer
 - Version checks, structured errors, logging, and test doubles
 - Representative read-only archive operations from the Cratebug subset
 

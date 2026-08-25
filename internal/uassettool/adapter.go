@@ -55,6 +55,11 @@ func NewAdapter(requests io.Writer, responses io.Reader, logger *log.Logger) *Ad
 // Sends one request and decodes its data payload into result, which may be nil
 // when the caller only needs to know the call succeeded. params becomes the
 // request's fields alongside "action"; it may be nil for actions that take none.
+// Call is not safe for concurrent use by multiple goroutines: it writes one
+// request line and reads back exactly one response line with no
+// request/response ID pairing, so concurrent callers could cross-read each
+// other's responses. A caller that wants concurrency needs one Adapter per
+// goroutine, not one Adapter shared across goroutines.
 func (a *Adapter) Call(action string, params map[string]any, result any) error {
 	request := make(map[string]any, len(params)+1)
 	for key, value := range params {
