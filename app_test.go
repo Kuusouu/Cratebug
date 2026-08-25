@@ -27,7 +27,7 @@ func testMetadataStore(t *testing.T) metadata.Store {
 
 func TestRuntimeStatus(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 
 	// Act
 	got := app.RuntimeStatus()
@@ -47,7 +47,7 @@ func TestSetModEnabledBlocksRunningGame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t), nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestScanLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 
 	// Act
 	library, err := app.ScanLibrary(root)
@@ -105,7 +105,7 @@ func TestSetModEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 			if err := os.Mkdir(filepath.Join(root, "destination"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t))
+			app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t), nil)
 			library, err := app.ScanLibrary(root)
 			if err != nil {
 				t.Fatal(err)
@@ -213,7 +213,7 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 
 func TestSetModRootPersistsAcrossLoads(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 
 	// Act
 	if err := app.SetModRoot(`C:\Mods`); err != nil {
@@ -234,7 +234,7 @@ func TestTagLifecycleThroughApp(t *testing.T) {
 	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -278,7 +278,7 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -317,7 +317,7 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 func TestLoadMetadataRecoversFromACorruptedFile(t *testing.T) {
 	// Arrange
 	path := filepath.Join(t.TempDir(), "metadata.json")
-	app := newApp(staticGameRunningChecker{}, metadata.NewStore(path))
+	app := newApp(staticGameRunningChecker{}, metadata.NewStore(path), nil)
 	// Set it twice: the backup only holds what the primary held before its
 	// most recent write, so a single save leaves no backup to recover from.
 	if err := app.SetModRoot(`C:\Mods`); err != nil {
@@ -347,7 +347,7 @@ func TestLoadMetadataRecoversFromACorruptedFile(t *testing.T) {
 
 func TestAppShutdown(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
 
 	// Act & Assert (shutdown must complete cleanly without panic)
 	app.shutdown(context.Background())
