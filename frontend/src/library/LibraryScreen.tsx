@@ -83,6 +83,7 @@ type ViewModeButtonProps = {
 type SelectedModPanelProps = {
 	entry: discovery.Entry | null;
 	identity?: modtype.Identity | undefined;
+	isClassifying?: boolean | undefined;
 	assignedTags: metadata.Tag[];
 	isMutating: boolean;
 	isMutationLocked: boolean;
@@ -322,6 +323,7 @@ export function LibraryScreen() {
 	const [identitiesByEntryID, setIdentitiesByEntryID] = useState<
 		Record<string, modtype.Identity>
 	>({});
+	const [isClassifying, setIsClassifying] = useState(false);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const classificationRequestIDRef = useRef(0);
@@ -388,6 +390,7 @@ export function LibraryScreen() {
 		if (entries.length === 0) return;
 		classificationRequestIDRef.current += 1;
 		const requestID = classificationRequestIDRef.current;
+		setIsClassifying(true);
 		try {
 			const results = await ClassifyLibrary(root, entries);
 			if (
@@ -399,6 +402,10 @@ export function LibraryScreen() {
 			setIdentitiesByEntryID((prev) => ({ ...prev, ...results }));
 		} catch {
 			// Non-blocking background classification
+		} finally {
+			if (classificationRequestIDRef.current === requestID) {
+				setIsClassifying(false);
+			}
 		}
 	}, []);
 	const updateMutatedEntry = useCallback(
@@ -1363,6 +1370,7 @@ export function LibraryScreen() {
 					<SelectedModPanel
 						entry={selectedEntry}
 						identity={selectedEntry ? identitiesByEntryID[selectedEntry.id] : undefined}
+						isClassifying={isClassifying}
 						assignedTags={assignedTagsForSelection}
 						isMutating={selectedEntry ? mutatingEntryIDs.has(selectedEntry.id) : false}
 						isMutationLocked={isMutationLocked}
@@ -1381,6 +1389,7 @@ export function LibraryScreen() {
 						isMutationLocked={isMutationLocked}
 						tagsByEntryID={entryTags}
 						identitiesByEntryID={identitiesByEntryID}
+						isClassifying={isClassifying}
 						draggedEntryID={draggedItem?.type === "mod" ? draggedItem.entry.id : null}
 						onSetEnabled={setModEnabled}
 						onSelect={(entry) =>
@@ -2109,6 +2118,7 @@ function basename(path: string): string {
 function SelectedModPanel({
 	entry,
 	identity,
+	isClassifying,
 	assignedTags,
 	isMutating,
 	isMutationLocked,
@@ -2142,7 +2152,11 @@ function SelectedModPanel({
 				<h3>{entry.displayName}</h3>
 				<p>
 					{entry.relativeFolder || "Library root"} · {stateLabel}
-					{categoryLabel ? ` · ${categoryLabel}` : ""}
+					{categoryLabel
+						? ` · ${categoryLabel}`
+						: isClassifying
+							? " · Classifying..."
+							: ""}
 					{characterLabel ? ` · ${characterLabel}` : ""}
 					{" · "}Priority {entry.priority.value}
 				</p>

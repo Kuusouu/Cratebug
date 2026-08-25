@@ -26,6 +26,7 @@ type ModCatalogProps = {
 	isMutationLocked: boolean;
 	tagsByEntryID: ReadonlyMap<string, metadata.Tag[]>;
 	identitiesByEntryID?: Record<string, modtype.Identity> | undefined;
+	isClassifying?: boolean | undefined;
 	draggedEntryID: string | null;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
@@ -49,6 +50,7 @@ type ModCardProps = {
 	isMutationLocked: boolean;
 	tags: metadata.Tag[];
 	identity?: modtype.Identity | undefined;
+	isClassifying?: boolean | undefined;
 	isDragging: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	onSelect: ModCatalogProps["onSelect"];
@@ -115,6 +117,7 @@ export function ModCatalog({
 	isMutationLocked,
 	tagsByEntryID,
 	identitiesByEntryID,
+	isClassifying,
 	draggedEntryID,
 	onSetEnabled,
 	onSelect,
@@ -149,6 +152,7 @@ export function ModCatalog({
 					isMutationLocked={isMutationLocked}
 					tags={tagsByEntryID.get(entry.id) ?? []}
 					identity={identitiesByEntryID?.[entry.id]}
+					isClassifying={isClassifying}
 					isDragging={draggedEntryID === entry.id}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
@@ -171,6 +175,7 @@ const ModCard = memo(function ModCard({
 	isMutationLocked,
 	tags,
 	identity,
+	isClassifying,
 	isDragging,
 	onSetEnabled,
 	onSelect,
@@ -204,11 +209,13 @@ const ModCard = memo(function ModCard({
 					{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}
 				</span>
 			)}
-			{categoryLabel && (
+			{categoryLabel ? (
 				<span className={`mod-category-badge category-${categorySlug(categoryLabel)}`}>
 					{categoryLabel}
 				</span>
-			)}
+			) : isClassifying && !identity ? (
+				<span className="mod-category-badge category-skeleton" aria-hidden="true" />
+			) : null}
 			<span>Priority {entry.priority.value}</span>
 		</div>
 	);
