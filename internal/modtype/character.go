@@ -13,7 +13,7 @@ var (
 	// Filename fallback: a 7-digit ID split as a 4-digit character ID (in
 	// Marvel Rivals's known 101x-106x range, to reduce false positives from
 	// arbitrary numbers) plus a 3-digit skin suffix, e.g. "vo_1044001".
-	characterFilenameFallbackPattern = regexp.MustCompile(`[_/](10[1-6]\d)(\d{3})`)
+	characterFilenameFallbackPattern = regexp.MustCompile(`[_/](10[1-6]\d)(\d{3})(?:\D|$)`)
 )
 
 // Resolves a mod's hero and skin display name from its internal asset

@@ -105,10 +105,13 @@ func (c *characteristics) observe(path string) {
 		c.hasText = true
 	}
 
+	stem := filenameLower
+	if dot := strings.LastIndexByte(stem, '.'); dot >= 0 {
+		stem = stem[:dot]
+	}
 	isBlueprintName := strings.HasPrefix(filenameLower, "bp_") ||
-		strings.Contains(filenameLower, "_c.") ||
-		strings.Contains(filenameLower, "bp.") ||
-		strings.HasSuffix(filenameLower, "bp")
+		strings.HasSuffix(stem, "_c") ||
+		strings.HasSuffix(stem, "bp")
 	if (isBlueprintName || strings.Contains(pathLower, "/blueprints/")) && isUasset {
 		c.hasBlueprint = true
 	}

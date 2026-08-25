@@ -20,6 +20,11 @@ const characterTableSourceURL = "https://raw.githubusercontent.com/donutman07/Ma
 // Default cache freshness window before LoadCharacterTable refetches.
 const DefaultCharacterTableMaxAge = 7 * 24 * time.Hour
 
+// Bounds fetchCharacterTable's network round trip so LoadCharacterTable's
+// never-fails guarantee can't be defeated by a hung request when the
+// caller's ctx carries no deadline of its own.
+const characterTableFetchTimeout = 15 * time.Second
+
 // A character/skin ID lookup table for hero-name resolution, sourced from
 // characterTableSourceURL (see LoadCharacterTable). The zero value is a
 // valid, empty table: ResolveCharacter against it simply resolves nothing.
@@ -102,6 +107,9 @@ func writeCharacterTableCache(cachePath string, table CharacterTable) error {
 }
 
 func fetchCharacterTable(ctx context.Context) (CharacterTable, error) {
+	ctx, cancel := context.WithTimeout(ctx, characterTableFetchTimeout)
+	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, characterTableSourceURL, nil)
 	if err != nil {
 		return CharacterTable{}, fmt.Errorf("build character table request: %w", err)
