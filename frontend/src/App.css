@@ -135,6 +135,11 @@ h1 {
 	.wordmark {
 		transition: none;
 	}
+
+	.mod-category-badge.category-skeleton {
+		animation: none;
+		opacity: 0.5;
+	}
 }
 
 .header-controls {
@@ -1163,6 +1168,26 @@ button:disabled {
 	border-color: color-mix(in srgb, var(--muted), transparent 50%);
 	background: color-mix(in srgb, var(--muted), transparent 88%);
 	color: color-mix(in srgb, var(--muted), var(--text) 25%);
+}
+
+.mod-category-badge.category-skeleton {
+	display: inline-block;
+	width: 3.25rem;
+	height: 1.15rem;
+	vertical-align: middle;
+	border-color: transparent;
+	background: color-mix(in srgb, var(--line), transparent 40%);
+	animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+	0%,
+	100% {
+		opacity: 0.35;
+	}
+	50% {
+		opacity: 0.8;
+	}
 }
 
 .mod-card-tags {
