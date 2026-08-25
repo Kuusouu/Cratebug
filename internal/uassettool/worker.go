@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -14,6 +16,16 @@ import (
 )
 
 const (
+	// PinnedSourceRevision is the Git commit hash of the pinned UAssetToolRivals release.
+	// Kept in sync with docs/decisions/0004-pin-uassettool-worker.md and fetch-uassettool.ps1.
+	PinnedSourceRevision = "952bd331976c6f28efb36ca320c82c27e2456023"
+
+	// WorkerExecutableName is the filename of the UAssetTool binary on Windows.
+	WorkerExecutableName = "UAssetTool.exe"
+
+	// EnvWorkerPath is the environment variable override for locating the worker binary.
+	EnvWorkerPath = "CRATEBUG_UASSETTOOL_PATH"
+
 	defaultCallTimeout   = 30 * time.Second
 	defaultShutdownGrace = 5 * time.Second
 	versionCheckTimeout  = 10 * time.Second
@@ -32,6 +44,9 @@ var (
 	execCommandContext = exec.CommandContext
 )
 
+// Reported when the worker executable cannot be found in any of the expected locations.
+var ErrWorkerNotFound = errors.New("uassettool: worker executable not found")
+
 // Reported when the worker executable cannot be started, whether the path is
 // wrong, the file is missing, or the OS refuses to launch it.
 var ErrWorkerLaunchFailed = errors.New("uassettool: failed to launch worker process")
@@ -44,6 +59,79 @@ var ErrWorkerCrashed = errors.New("uassettool: worker process exited unexpectedl
 // worker is killed and reaped before this error is returned, so it never
 // outlives the call it failed to answer.
 var ErrWorkerTimeout = errors.New("uassettool: worker did not respond in time")
+
+// ResolveExecutablePath locates the pinned UAssetTool executable by checking in order:
+//  1. The CRATEBUG_UASSETTOOL_PATH environment variable override.
+//  2. The installed production layout: <executable-dir>/uassettool/UAssetTool.exe.
+//  3. The development layout: build/uassettool/UAssetTool.exe relative to working directory.
+//
+// Returns ErrWorkerNotFound if the executable is not present at any checked location.
+func ResolveExecutablePath() (string, error) {
+	return resolveExecutablePath(
+		os.Getenv(EnvWorkerPath),
+		os.Executable,
+		os.Getwd,
+		func(path string) bool {
+			info, err := os.Stat(path)
+			return err == nil && !info.IsDir()
+		},
+	)
+}
+
+func resolveExecutablePath(
+	envPath string,
+	executablePathFunc func() (string, error),
+	getwdFunc func() (string, error),
+	fileExists func(string) bool,
+) (string, error) {
+	if envPath != "" {
+		cleaned := filepath.Clean(envPath)
+		if fileExists(cleaned) {
+			return cleaned, nil
+		}
+		return "", fmt.Errorf("%w: %s specified %q but file does not exist", ErrWorkerNotFound, EnvWorkerPath, envPath)
+	}
+
+	if executablePathFunc != nil {
+		if exe, err := executablePathFunc(); err == nil && exe != "" {
+			prodPath := filepath.Join(filepath.Dir(exe), "uassettool", WorkerExecutableName)
+			if fileExists(prodPath) {
+				return filepath.Clean(prodPath), nil
+			}
+		}
+	}
+
+	if getwdFunc != nil {
+		if cwd, err := getwdFunc(); err == nil && cwd != "" {
+			devPath := filepath.Join(cwd, "build", "uassettool", WorkerExecutableName)
+			if fileExists(devPath) {
+				return filepath.Clean(devPath), nil
+			}
+		}
+	}
+
+	relDevPath := filepath.Join("build", "uassettool", WorkerExecutableName)
+	if fileExists(relDevPath) {
+		return filepath.Clean(relDevPath), nil
+	}
+
+	return "", fmt.Errorf("%w: checked %s, production layout (<exe>/uassettool/%s), and development layout (build/uassettool/%s)",
+		ErrWorkerNotFound, EnvWorkerPath, WorkerExecutableName, WorkerExecutableName)
+}
+
+// NewPinnedWorker resolves the worker executable path using ResolveExecutablePath,
+// configures it with PinnedSourceRevision, and starts the supervised worker process.
+func NewPinnedWorker(logger *log.Logger) (*Worker, error) {
+	exePath, err := ResolveExecutablePath()
+	if err != nil {
+		return nil, err
+	}
+	return NewWorker(WorkerConfig{
+		ExecutablePath:         exePath,
+		ExpectedSourceRevision: PinnedSourceRevision,
+		Logger:                 logger,
+	})
+}
 
 // Configures how a Worker launches and supervises the pinned UAssetTool.exe process.
 type WorkerConfig struct {

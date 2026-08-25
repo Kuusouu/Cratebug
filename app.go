@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
@@ -238,4 +239,9 @@ func (a *App) UnassignModTag(entryID, tagID string) error {
 		return err
 	}
 	return a.metadataStore.Save(doc)
+}
+
+// shutdown is called by Wails when the application is closing, ensuring
+// any session-held workers or background resources are cleanly closed.
+func (a *App) shutdown(_ context.Context) {
 }
