@@ -42,6 +42,19 @@ func TestResolveCharacterFallsBackToFilenamePattern(t *testing.T) {
 	}
 }
 
+func TestResolveCharacterFilenameFallbackDoesNotMatchLongerDigitRuns(t *testing.T) {
+	// Arrange
+	table := CharacterTable{CharacterNames: map[string]string{"1011": "SomeHero"}}
+
+	// Act
+	name, _ := ResolveCharacter(table, []string{"Audio/vo_101112345_Line.wav"})
+
+	// Assert
+	if name != "" {
+		t.Errorf("ResolveCharacter() name = %q, want \"\" (an 8-digit run should not match as a 4+3 digit character/skin ID)", name)
+	}
+}
+
 func TestResolveCharacterIgnoresFilenameFallbackForMaterialFiles(t *testing.T) {
 	// Arrange
 	table := CharacterTable{CharacterNames: map[string]string{"1044": "SomeHero"}}
