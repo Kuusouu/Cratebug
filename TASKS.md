@@ -1,166 +1,181 @@
 # Cratebug Active Tasks
 
-**Phase:** 5 - Metadata and persistence
-**Status:** Active. Create `docs/reviews/phase-5-review.md` and update this
-header when the phase is approved.
+**Phase:** 6 - UAssetToolRivals boundary
+**Status:** Not started
 
-This file contains only the active phase. Replace it when Phase 5 is complete.
+This file contains only the active phase. Replace it when Phase 6 is complete.
 
 ## Phase objective
 
-Let settings, tags, and mod metadata survive safely across sessions and
-across the controlled operations introduced in Phase 4 (rename, priority
-change, move). Persistence is Go-owned and versioned; React requests loads
-and saves through a typed API and never touches the storage file directly.
+Give Cratebug a reviewed, testable integration for the narrow subset of
+Unreal archive operations it actually needs, behind a typed adapter around a
+pinned, prebuilt UAssetToolRivals worker release tied to a known source
+revision. The default integration direction is a supervised helper process;
+FFI is only pursued if a concrete performance, packaging, or operational
+reason makes it necessary, and that choice is recorded as a written decision
+before implementation goes further.
 
-Phase 4 deliberately deferred general metadata persistence and used only a
-scanner-derived, non-persistent identity (folder + stem + kind) that changes
-whenever a mod is renamed or moved. Phase 5 introduces the stable identity
-that tags and other metadata need to survive those same operations.
+The worker ships as a versioned release artifact from the maintained
+UAssetToolRivals fork. Normal Cratebug development and builds do not require
+the .NET toolchain unless the worker itself is explicitly rebuilt from
+source. Cratebug's domain API stays independent of the tool's own JSON
+contract: the adapter translates worker output into Cratebug's own types, it
+does not re-export the worker's contract.
+
+This phase covers only representative read-only archive operations from the
+Cratebug subset. It does not perform installation, VFX updates, or expose
+the tool's complete surface.
 
 ## Exit criteria
 
-* Same-named mods in different folders can hold separate metadata.
-* Tags survive controlled rename and move.
-* Corrupt or unreadable metadata does not destroy or discard the rest of the
-  library.
-* A failed write preserves the last known-good state.
-* Schema migrations are tested across supported prior versions.
-* Review approves stored data format and recovery behavior.
+* A written decision selects a supervised helper process by default, or
+  documents the concrete reason to pursue FFI instead.
+* Worker release version, source revision, and checksum are pinned and
+  documented.
+* Representative failures (crash, missing worker, version mismatch,
+  malformed output) do not corrupt or crash Cratebug unexpectedly.
+* The review records the bounded-parallelism evaluation, benchmark evidence,
+  selected concurrency policy, and any decision to defer concurrency.
+* Production packaging works and includes the worker's licensing and
+  third-party notices.
+* Review approves the boundary before archive mutation (Phase 7) begins.
 
 ## Out of scope
 
-Phase 5 does not include:
+Phase 6 does not include:
 
-* BentoMod import
-* Cloud sync
-* Perfect reconciliation of metadata after an external (non-Cratebug) rename
-* Batch operations, permanent deletion, archive installation, asset conflict
-  inspection (unchanged from Phase 4's exclusions)
+* Full installation (Phase 7)
+* VFX updating
+* Exposing the complete UAssetToolRivals surface through Cratebug's API
+* Making the UAssetToolRivals JSON contract part of Cratebug's domain API
+* Asset conflict inspection (Phase 8)
+* Adopting concurrency without measured evidence that it helps
 
-## 5.1 Define the persistent metadata storage boundary
+## 6.1 Decide the integration approach
 
-* Choose a storage location and a versioned schema envelope (explicit schema
-  version field) for app settings, tags, and mod metadata.
-* Implement safe writes: write to a temporary file and rename into place, and
-  retain a last-known-good backup that a failed or interrupted write cannot
-  corrupt.
-* Keep all storage access in Go; expose only narrow typed load/save
-  operations to the frontend, matching the mutation boundary's existing
-  pattern of not exposing arbitrary filesystem access.
+* Prototype a supervised helper-process integration against the pinned
+  worker: process lifecycle (start, health check, timeout, kill), structured
+  request/response over its interface, and crash isolation from the Cratebug
+  process.
+* Compare it against FFI only if a concrete performance, packaging, or
+  operational reason surfaces during prototyping; do not build an FFI path
+  speculatively.
+* Record the decision in `docs/decisions/0003-uassettoolrivals-boundary.md`:
+  which approach was selected, why, and what would change the answer.
 
-**Verify:** Disposable fixtures prove a round-trip write/read is exact, and
-that a write interrupted partway (failure injection) leaves the prior valid
-file intact and readable.
+**Verify:** The decision document names the selected approach, the
+alternative considered, and the concrete evidence (not just preference)
+behind the choice.
 
-## 5.2 Implement persistent internal mod identity
+## 6.2 Pin the worker release
 
-* Introduce a mod identity that stays stable across rename, priority change,
-  and move, independent of the scanner's deterministic folder+stem+kind ID
-  used through Phase 4.
-* Reconcile this identity using the `id` / `previousID` values Phase 4's
-  mutation operations already return, so a rename or move re-points existing
-  metadata at the mod's new location instead of orphaning it.
-* Support same-named mods in different folders as distinct identities.
-* Define what makes a persisted identity orphaned (no matching scanned mod)
-  for 5.4 to detect and surface.
+* Select and pin a specific UAssetToolRivals worker release: version, source
+  revision (commit hash), and a checksum verified at Cratebug build or first
+  run.
+* Document how to reproduce the pinned build from the maintained fork, and
+  what changes require re-pinning.
+* Confirm normal Cratebug development and `check.ps1` do not require the
+  .NET toolchain; only an explicit worker rebuild does.
+* Record licensing and third-party notices for the worker and its own
+  dependencies.
 
-**Verify:** Disposable fixtures prove identity and its attached metadata
-survive rename, priority change, and move; same-named mods in separate
-folders keep independent metadata.
+**Verify:** A clean checkout can fetch and verify the pinned worker without
+installing .NET, and the checksum check rejects a tampered or mismatched
+binary.
 
-## 5.3 Implement tags and settings persistence
+## 6.3 Build the narrow typed archive-tool adapter
 
-* Add a tag catalog (create, rename, delete) and per-mod tag assignment keyed
-  to the identity from 5.2, not to the current filename or path.
-* Persist app settings needed across sessions, starting with the selected mod
-  root path, so the library does not require reselecting it every launch.
-* Route all writes through the safe-write path from 5.1.
+* Add a Go package that owns all communication with the worker: version
+  checks, request construction, structured errors, and logging.
+* Expose only the operations this phase needs; do not mirror the worker's
+  full JSON contract into Cratebug's domain types.
+* Provide test doubles so higher-level code and future phases can be tested
+  without a live worker process.
+* Keep the adapter independent of Wails and React, matching the existing
+  scanner and mutation boundaries.
 
-**Verify:** Disposable fixtures and manual testing confirm tags and the
-selected mod root survive an app restart, and that tag assignment follows a
-mod through rename and move rather than resetting.
+**Verify:** Unit tests exercise the adapter against a test double covering
+success, malformed output, and a version mismatch, with no dependency on a
+running worker process.
 
-## 5.4 Handle corrupt and orphaned metadata
+## 6.4 Implement the supervised helper-process integration
 
-* Validate loaded metadata against the versioned schema on load; quarantine
-  (do not silently discard) a corrupt, truncated, or unreadable file and fall
-  back to the last-known-good backup from 5.1 instead of crashing or
-  resetting the library.
-* Detect metadata whose identity no longer matches any scanned mod and
-  surface it as orphaned rather than deleting it, in case the mod reappears
-  (for example, after a folder is reselected).
+* Launch, monitor, and cleanly terminate the worker process from Go,
+  including on Cratebug's own shutdown.
+* Detect and recover from a crashed, hung, or unresponsive worker without
+  crashing Cratebug or leaving an orphaned process.
+* Enforce a version check against the pinned release before trusting worker
+  output.
+* Return specific, actionable errors distinguishing worker-launch failure,
+  timeout, crash, version mismatch, and malformed response.
 
-**Verify:** Disposable fixtures cover a corrupted metadata file, a truncated
-write, an unknown/future schema version, and orphaned entries. None of these
-crash the app, block startup, or discard unrelated valid metadata.
+**Verify:** Failure-injection tests (killed process, hung process, wrong
+version, malformed output) each produce a specific reported error and leave
+no orphaned worker process.
 
-## 5.5 Add schema migration support
+## 6.5 Implement representative read-only archive operations
 
-* Define the migration mechanism from one schema version to the next and
-  apply it automatically on load.
-* Reject an unsupported future schema version safely rather than applying it
-  partially or corrupting it.
+* Implement the small, representative set of read-only archive operations
+  this phase needs (for example, internal asset path listing) through the
+  adapter from 6.3.
+* Validate inputs and outputs at the adapter boundary; do not pass
+  unvalidated worker output further into Cratebug's domain layer.
 
-**Verify:** Fixture files at each supported prior schema version migrate to
-the current version and round-trip correctly; an unsupported future version
-is rejected without modifying the file on disk.
+**Verify:** Disposable fixture archives (classic and IoStore) produce
+expected results through the full path: Go caller to adapter to supervised
+worker and back.
 
-## 5.6 Add tag and settings UI
+## 6.6 Evaluate bounded parallel archive operations
 
-* Add UI for creating tags, assigning and removing tags on a mod, and viewing
-  the persisted mod root on launch instead of requiring reselection.
-* Follow the existing context-menu organize pattern
-  (`frontend/src/library/ContextMenu.tsx`,
-  [0002-organize-action-pattern](docs/decisions/0002-organize-action-pattern.md))
-  for how tag actions are reached, rather than inventing a second pattern.
-* Show corrupt-metadata and recovery states from 5.4 in the UI as actionable,
-  non-crashing feedback.
+* Benchmark sequential versus bounded-parallel archive inspection and
+  archive-tool actions against representative mod libraries.
+* Adopt concurrency only where measurements show it improves responsiveness
+  without weakening cancellation, progress reporting, deterministic results,
+  or filesystem safety; otherwise defer it and record why.
+* Document the selected concurrency policy (or the decision to defer) and
+  the benchmark evidence behind it.
 
-**Verify:** Visually verify tag creation, assignment, removal, persistence
-across an app restart, and corrupt/recovery messaging against a
-user-designated disposable library.
+**Verify:** Benchmark results and the resulting policy are recorded in the
+Phase 6 review with enough detail (library size, timings, concurrency bound)
+for the decision to be checked later.
 
-## 5.7 Validate persistence safety and complete the review
+## 6.7 Validate the boundary and complete the review
 
-* Run the canonical repository validation command and focused disposable
-  persistence tests.
-* Verify before-and-after storage state for successful, failed, corrupt, and
-  migrated cases.
-* Launch the application and exercise tag and settings persistence across a
-  restart against a user-designated disposable library.
-* Capture screenshots of tag creation/assignment, persisted settings on
-  relaunch, and corrupt/recovery states.
-* Confirm no real Marvel Rivals mod files or metadata were used during
-  automated testing.
-* Create `docs/reviews/phase-5-review.md` with validation results, screenshot
-  paths, limitations, deferred findings, and review approval.
+* Run the canonical repository validation command and the adapter's
+  failure-injection tests.
+* Exercise the supervised worker against representative fixture archives and
+  confirm crash, timeout, and version-mismatch handling does not corrupt or
+  crash Cratebug.
+* Confirm production packaging includes the pinned worker and its licensing
+  and third-party notices.
+* Create `docs/reviews/phase-6-review.md` with validation results, benchmark
+  evidence, limitations, deferred findings, and review approval.
 
 The review must record:
 
-* Storage format, schema version, and safe-write/recovery behavior
-* How persistent mod identity is derived and reconciled through rename,
-  priority, and move
-* Tag and settings behavior, including cross-restart persistence
-* Corrupt-data, orphaned-metadata, and migration behavior
+* The integration-approach decision and its rationale
+* Worker release version, source revision, checksum, and packaging behavior
+* Adapter surface and how it stays independent of the worker's own contract
+* Crash, timeout, and version-mismatch handling behavior
+* The parallelism evaluation, benchmark evidence, and selected concurrency
+  policy
+* Licensing and third-party notices
 * Commands and tests run
-* Manual checks and screenshot paths
 * Known limitations and deferred findings
 * Review approval
 
-**Verify:** Review approval grants permission to begin Phase 6.
+**Verify:** Review approval grants permission to begin Phase 7.
 
-## Phase 5 completion report
+## Phase 6 completion report
 
 Report:
 
 * What changed
 * Files changed
 * Validation and results
-* Manual checks and screenshot paths
 * Known limitations
 * Deferred findings
 * Suggested commit message
 
-Proceed through Phase 5 as one bounded implementation pass unless a material
-design decision or explicit review gate is encountered. Stop before Phase 6.
+Proceed through Phase 6 as one bounded implementation pass unless a material
+design decision or explicit review gate is encountered. Stop before Phase 7.
