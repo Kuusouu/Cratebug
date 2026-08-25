@@ -89,7 +89,7 @@ During Phase 7 integration, character table parsing and resolution were refined:
    - Marked with `aria-hidden="true"` to prevent redundant screen reader announcements on initial load.
    - Includes `@media (prefers-reduced-motion: reduce)` support disabling animation and rendering a static 50% opacity badge.
 2. **Selected Mod Actions Panel:**
-   - Displays ` · Classifying...` in place of the category when an entry is selected while classification is pending.
+   - Displays " · Classifying..." in place of the category when an entry is selected while classification is pending.
 3. **Graceful "Unknown" State:**
    - Unresolvable or encrypted mods display `Category: "Unknown"` with muted slate styling (`.category-unknown`), non-alarmingly without error banners or crashes.
    - Hero thumbnail fallback renders the package icon (`<Package />`) cleanly when hero portraits are unavailable.

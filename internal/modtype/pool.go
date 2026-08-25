@@ -39,6 +39,7 @@ type classifyOutcome struct {
 	entryID  string
 	mtime    time.Time
 	identity Identity
+	failed   bool
 }
 
 // WorkerPool manages a fixed-size pool of worker processes executing
@@ -99,21 +100,25 @@ func (p *WorkerPool) workerLoop() {
 		}
 
 		var identity Identity
+		failed := false
 		if w != nil && w.Alive() {
 			id, err := DetermineIdentity(w, job.root, job.entry, job.table)
 			if err != nil {
 				identity = Identity{Category: CategoryUnknown}
+				failed = true
 			} else {
 				identity = id
 			}
 		} else {
 			identity = Identity{Category: CategoryUnknown}
+			failed = true
 		}
 
 		job.result <- classifyOutcome{
 			entryID:  job.entry.ID,
 			mtime:    job.mtime,
 			identity: identity,
+			failed:   failed,
 		}
 	}
 }

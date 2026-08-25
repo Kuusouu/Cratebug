@@ -154,7 +154,7 @@ func isPlayableHero(id, name string) bool {
 	if strings.Contains(name, "(Old)") || strings.Contains(name, "(For Dev)") || strings.Contains(name, "Proxy") {
 		return false
 	}
-	return id >= "1011" && id <= "1066"
+	return id >= "1011" && id <= "1099"
 }
 
 func parseCharacterMarkdown(markdown string) CharacterTable {
