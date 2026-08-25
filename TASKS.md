@@ -36,6 +36,9 @@ the tool's complete surface.
   malformed output) do not corrupt or crash Cratebug unexpectedly.
 * The review records the bounded-parallelism evaluation, benchmark evidence,
   selected concurrency policy, and any decision to defer concurrency.
+* Mod type is determined through a Cratebug-owned layer rather than the
+  heavy archive-extraction path, with its own measured concurrency policy
+  rather than one assumed from the general archive-operation benchmark.
 * Production packaging works and includes the worker's licensing and
   third-party notices.
 * Review approves the boundary before archive mutation (Phase 7) begins.
@@ -139,7 +142,36 @@ worker and back.
 Phase 6 review with enough detail (library size, timings, concurrency bound)
 for the decision to be checked later.
 
-## 6.7 Validate the boundary and complete the review
+## 6.7 Determine mod type through Cratebug's own layer
+
+* Build a lightweight, Cratebug-owned layer for determining a mod's type
+  (for example texture, mesh, blueprint, or a coarser UI-facing category)
+  instead of routing it through UAssetToolRivals's full archive-parse
+  actions. `docs/decisions/0003-uassettoolrivals-boundary.md`'s benchmark
+  found `extract_iostore` + `detect_type` unnecessarily heavy for this, and
+  that BentoMod itself avoids that path entirely for its own instant type
+  display, using its own native `.utoc` header parsing and filename
+  heuristics instead of calling into UAssetToolRivals for it.
+* This layer may still call the adapter from 6.3 for specific cheap,
+  header-only facts it needs (for example `is_iostore_encrypted`), but must
+  not depend on the heavy Zen-to-legacy conversion path for routine type
+  determination.
+* Benchmark this layer on its own terms, the same evidence-before-policy way
+  6.6 benchmarked archive operations generally: sequential versus a bounded
+  worker pool, against a representative real mod library. Do not assume
+  6.6's archive-operation numbers transfer unchanged — a lighter or
+  pure-Go implementation may have a different concurrency profile than
+  either of 6.6's two measured cases, including possibly needing no worker
+  pool at all.
+* Record the resulting policy (worker count, or no pooling) and the
+  benchmark evidence behind it.
+
+**Verify:** Disposable and real-library benchmarks show this layer's actual
+concurrency curve, and the selected worker count (or the decision not to
+pool at all) is backed by that curve rather than assumed from 6.6's
+archive-operation numbers.
+
+## 6.8 Validate the boundary and complete the review
 
 * Run the canonical repository validation command and the adapter's
   failure-injection tests.
@@ -159,6 +191,8 @@ The review must record:
 * Crash, timeout, and version-mismatch handling behavior
 * The parallelism evaluation, benchmark evidence, and selected concurrency
   policy
+* The mod-type-determination layer's design and its own measured
+  concurrency policy
 * Licensing and third-party notices
 * Commands and tests run
 * Known limitations and deferred findings
