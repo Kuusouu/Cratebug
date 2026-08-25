@@ -153,7 +153,11 @@ func verifyWorkerVersion(executablePath, expectedSourceRevision string) error {
 
 // Sends one request to the supervised worker, killing and reaping it if it
 // does not respond within its configured call timeout, and reporting a crash
-// distinctly from a protocol-level failure if it exits mid-call.
+// distinctly from a protocol-level failure if it exits mid-call. Call is not
+// safe for concurrent use by multiple goroutines, for the same reason as
+// Adapter.Call: a caller that wants concurrency needs one Worker per
+// goroutine (a pool of separate worker processes), not one Worker shared
+// across goroutines.
 func (w *Worker) Call(action string, params map[string]any, result any) error {
 	select {
 	case <-w.exited:
