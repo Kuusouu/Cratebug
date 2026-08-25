@@ -49,6 +49,21 @@ jobs:
               shell: pwsh
               run: .\fetch-uassettool.ps1
 
+            - name: Install NSIS
+              shell: pwsh
+              run: |
+                  if (Get-Command choco -ErrorAction SilentlyContinue) {
+                      choco install nsis --no-progress -y
+                  } elseif (Get-Command winget -ErrorAction SilentlyContinue) {
+                      winget install --id NSIS.NSIS --exact --silent --accept-package-agreements --accept-source-agreements
+                  }
+                  if (Test-Path "C:\Program Files (x86)\NSIS") {
+                      "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+                  }
+                  if (Test-Path "C:\Program Files\NSIS") {
+                      "C:\Program Files\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+                  }
+
             - name: Build Windows application and installer
               shell: pwsh
               run: |
