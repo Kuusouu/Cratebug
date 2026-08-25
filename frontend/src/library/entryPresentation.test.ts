@@ -8,7 +8,9 @@ import {
 	categorySlug,
 	entryCategoryLabel,
 	entryCharacterLabel,
+	entryHeroPortraitUrl,
 	entryStateLabel,
+	resolveHeroPortraitUrl,
 } from "./entryPresentation";
 
 describe("entryCategoryLabel", () => {
@@ -157,5 +159,69 @@ describe("capability predicates", () => {
 	it("canTagMod allows any mod kind entry", () => {
 		expect(canTagMod(new discovery.Entry({ kind: "mod" }))).toBe(true);
 		expect(canTagMod(new discovery.Entry({ kind: "orphaned_sidecar" }))).toBe(false);
+	});
+});
+
+describe("resolveHeroPortraitUrl", () => {
+	const fakeMap = {
+		"1011": "/assets/1011.png",
+		"1011100": "/assets/1011100.png",
+		"1058": "/assets/1058.png",
+	};
+
+	it("returns null for undefined or null identity", () => {
+		expect(resolveHeroPortraitUrl(fakeMap, undefined)).toBeNull();
+		expect(resolveHeroPortraitUrl(fakeMap, null)).toBeNull();
+	});
+
+	it("returns null when characterID and skinID are missing or not in map", () => {
+		expect(
+			resolveHeroPortraitUrl(fakeMap, new modtype.Identity({ category: "Mesh" })),
+		).toBeNull();
+		expect(
+			resolveHeroPortraitUrl(
+				fakeMap,
+				new modtype.Identity({ category: "Mesh", characterID: "9999" }),
+			),
+		).toBeNull();
+	});
+
+	it("returns resolved asset URL when characterID matches", () => {
+		const identity = new modtype.Identity({
+			category: "Mesh",
+			characterID: "1011",
+			characterName: "Hulk",
+		});
+		expect(resolveHeroPortraitUrl(fakeMap, identity)).toBe("/assets/1011.png");
+	});
+
+	it("prefers skin-specific portrait when skinID is available", () => {
+		const identity = new modtype.Identity({
+			category: "Mesh",
+			characterID: "1011",
+			characterName: "Hulk",
+			skinID: "1011100",
+			skinName: "Mighty G-Bomb",
+		});
+		expect(resolveHeroPortraitUrl(fakeMap, identity)).toBe("/assets/1011100.png");
+	});
+
+	it("falls back to character avatar when skinID is not in map", () => {
+		const identity = new modtype.Identity({
+			category: "Mesh",
+			characterID: "1011",
+			characterName: "Hulk",
+			skinID: "1011999",
+			skinName: "Unknown Skin",
+		});
+		expect(resolveHeroPortraitUrl(fakeMap, identity)).toBe("/assets/1011.png");
+	});
+});
+
+describe("entryHeroPortraitUrl", () => {
+	it("returns null safely when identity is absent or has no characterID/skinID", () => {
+		expect(entryHeroPortraitUrl(undefined)).toBeNull();
+		expect(entryHeroPortraitUrl(null)).toBeNull();
+		expect(entryHeroPortraitUrl(new modtype.Identity({ category: "Mesh" }))).toBeNull();
 	});
 });

@@ -246,6 +246,9 @@ still be visible immediately after, not blank until the next rescan.
   unpackaged build output and the NSIS installer. Wails supports a custom
   `build/windows/installer/project.nsi` template for adding extra
   installed files; none exists in this repo yet, so this task creates it.
+* Ensure all Git LFS assets in general (hero and skin portrait images, fonts,
+  and binary assets) are properly bundled and resolved into the executable/build
+  and packaging pipeline so production builds and standalone artifacts are self-contained.
 * Do not commit the worker binary — the extracted `UAssetTool.exe` is
   ~73 MB (per `docs/decisions/0004-pin-uassettool-worker.md`; do not
   confuse this with the ~30 MB *zip download* size mentioned there, a

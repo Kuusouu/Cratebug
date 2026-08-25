@@ -25,6 +25,47 @@ export function entryCharacterLabel(identity?: modtype.Identity | null): string 
 	return identity.characterName;
 }
 
+let heroPortraitModules: Record<string, string> = {};
+try {
+	heroPortraitModules = import.meta.glob<string>("../assets/heroes/*.png", {
+		eager: true,
+		import: "default",
+	});
+} catch {
+	// Bun's test runner does not support import.meta.glob
+}
+
+const heroPortraitsByID: Record<string, string> = {};
+for (const [path, url] of Object.entries(heroPortraitModules)) {
+	const match = path.match(/(\d{4,7})\.png$/i);
+	if (match?.[1] && url) {
+		heroPortraitsByID[match[1]] = url;
+	}
+}
+
+// Resolves portrait URL from a map of character/skin ID -> URL,
+// preferring a skin-specific portrait when available and falling back to the hero avatar.
+export function resolveHeroPortraitUrl(
+	portraitsByID: Record<string, string>,
+	identity?: modtype.Identity | null,
+): string | null {
+	if (!identity) {
+		return null;
+	}
+	if (identity.skinID && portraitsByID[identity.skinID]) {
+		return portraitsByID[identity.skinID] ?? null;
+	}
+	if (identity.characterID && portraitsByID[identity.characterID]) {
+		return portraitsByID[identity.characterID] ?? null;
+	}
+	return null;
+}
+
+// Returns the bundled hero or skin portrait image URL if available, or null.
+export function entryHeroPortraitUrl(identity?: modtype.Identity | null): string | null {
+	return resolveHeroPortraitUrl(heroPortraitsByID, identity);
+}
+
 // Keeps state wording consistent wherever a discovered entry is presented.
 export function entryStateLabel(entry: discovery.Entry): string {
 	if (entry.kind === "orphaned_sidecar") return "Orphaned sidecar";
