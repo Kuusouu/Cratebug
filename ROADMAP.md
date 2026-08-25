@@ -199,7 +199,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 - Wire `internal/uassettool` and `internal/modtype` into the application layer (`app.go`), including launching and supervising the worker for the lifetime of a session
 - Expose mod type/category and hero/skin name through the Wails-bound API to the frontend
-- Render category and hero/skin name in the library UI
+- Render category, hero/skin name, and hero portrait thumbnails in the library UI
 - A caching strategy for classification results so repeated scans do not repeatedly re-invoke the worker; BentoMod's mtime-keyed in-memory cache is a reference pattern, not an architectural template
 - Apply the entry-count-tiered concurrency policy from `docs/decisions/0003-uassettoolrivals-boundary.md` (`WorkerPoolSizeForLibrary`) when classifying a full library
 - Progress and loading states for classification, since it runs after the initial fast filesystem scan rather than blocking it

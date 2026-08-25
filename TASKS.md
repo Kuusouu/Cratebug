@@ -213,7 +213,16 @@ equivalent display as a reference, not a template. Rename a mod and
 change its priority in the running app; its category/hero name must
 still be visible immediately after, not blank until the next rescan.
 
-## 7.5 Add progressive loading and a graceful "unknown" presentation
+## 7.5 Hero thumbnail asset pipeline and UI rendering
+
+* Include `characterID` in `modtype.Identity` (and `ResolveCharacter` / `DetermineIdentity`) so the frontend receives the resolved 4-digit Hero ID alongside the hero/skin names.
+* Source/bundle hero portrait assets (in `frontend/src/assets/heroes/<id>.png`) and provide a reproducible script (`scripts/fetch-hero-portraits.ps1` or similar) to document/automate how hero portrait assets are obtained or updated.
+* Render the resolved hero portrait image inside `.mod-thumbnail` on mod cards when `identity.characterID` is available and has a corresponding asset, falling back to the package icon for non-hero or unclassified mods.
+* Keep the hover tooltip working seamlessly on top of the hero image thumbnail.
+
+**Verify:** Mod cards for character mods display their corresponding hero portrait icon in the thumbnail area; non-character mods and unclassified mods cleanly fall back to the package icon.
+
+## 7.6 Add progressive loading and a graceful "unknown" presentation
 
 * Show a lightweight loading indication (for example a skeleton or muted
   placeholder) on each mod's category/hero area between the catalog's
@@ -225,7 +234,7 @@ still be visible immediately after, not blank until the next rescan.
 `Determine`/`DetermineIdentity` cannot resolve) shows that mod as
 "Unknown" without any error state appearing elsewhere in the UI.
 
-## 7.6 Package the pinned worker binary and its notices into production builds
+## 7.7 Package the pinned worker binary and its notices into production builds
 
 * Decide where the installed worker lives relative to `Cratebug.exe` (a
   `uassettool/` subfolder next to the installed executable is the natural
@@ -251,14 +260,14 @@ produces an installer that, once installed, has `UAssetTool.exe` and
 confirmed by inspecting the installed directory, not just the installer's
 file list.
 
-## 7.7 Validate the integration and complete the review
+## 7.8 Validate the integration and complete the review
 
 * Run the canonical repository validation command (`check.ps1`).
 * Launch the app (`mise exec -c "wails dev"`), scan a real or fixture
   library, and confirm categories and hero/skin names render correctly and
   progressively, per `AGENTS.md`'s UI verification steps.
 * Confirm the packaged installer includes the worker and its notices
-  (7.6's Verify).
+  (7.7's Verify).
 * Create `docs/reviews/phase-7-review.md` following the format of
   `docs/reviews/phase-6-review.md`.
 
