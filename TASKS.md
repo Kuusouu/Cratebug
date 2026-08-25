@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 6 - UAssetToolRivals boundary
-**Status:** Active. 6.1, 6.2, 6.3, 6.4, and 6.5 complete.
+**Status:** Active. 6.1, 6.2, 6.3, 6.4, 6.5, and 6.6 complete.
 
 This file contains only the active phase. Replace it when Phase 6 is complete.
 
