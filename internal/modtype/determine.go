@@ -38,45 +38,53 @@ type caller interface {
 // docs/decisions/0003-uassettoolrivals-boundary.md. Each pooled worker needs
 // its own Worker instance, since Worker.Call is not safe for concurrent use.
 func Determine(c caller, root string, entry discovery.Entry) (Category, error) {
+	paths, err := listInternalPaths(c, root, entry)
+	if err != nil {
+		return "", err
+	}
+	return Classify(paths), nil
+}
+
+// Resolves entry's list of internal asset paths: the single listing call
+// Determine and DetermineIdentity both build on, so hero/skin resolution
+// (task 6.8) needs no UAssetToolRivals call beyond what category
+// classification already performs.
+func listInternalPaths(c caller, root string, entry discovery.Entry) ([]string, error) {
 	if entry.Kind != discovery.EntryMod {
-		return "", fmt.Errorf("modtype: entry %q is not a mod", entry.ID)
+		return nil, fmt.Errorf("modtype: entry %q is not a mod", entry.ID)
 	}
 
 	switch entry.BundleFormat {
 	case discovery.BundleFormatClassic:
 		listing, err := uassettool.ListPak(c, absPath(root, entry.PrimaryPath))
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		paths := make([]string, len(listing))
 		for i, file := range listing {
 			paths[i] = file.Path
 		}
-		return Classify(paths), nil
+		return paths, nil
 
 	case discovery.BundleFormatIoStore:
 		if entry.Sidecars.UTOC == "" {
-			return "", fmt.Errorf("%w: %q has no .utoc sidecar to list", ErrCannotDetermineType, entry.ID)
+			return nil, fmt.Errorf("%w: %q has no .utoc sidecar to list", ErrCannotDetermineType, entry.ID)
 		}
 
 		utocPath := absPath(root, entry.Sidecars.UTOC)
 		encrypted, err := uassettool.IsIoStoreEncrypted(c, utocPath)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if encrypted {
-			return "", fmt.Errorf("%w: %q is an encrypted IoStore container", ErrCannotDetermineType, entry.ID)
+			return nil, fmt.Errorf("%w: %q is an encrypted IoStore container", ErrCannotDetermineType, entry.ID)
 		}
 
-		paths, err := uassettool.ListIoStoreFiles(c, utocPath, "")
-		if err != nil {
-			return "", err
-		}
-		return Classify(paths), nil
+		return uassettool.ListIoStoreFiles(c, utocPath, "")
 
 	default:
-		return "", fmt.Errorf("%w: %q has no recognized bundle format", ErrCannotDetermineType, entry.ID)
+		return nil, fmt.Errorf("%w: %q has no recognized bundle format", ErrCannotDetermineType, entry.ID)
 	}
 }
 
