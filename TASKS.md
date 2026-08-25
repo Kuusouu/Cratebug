@@ -44,7 +44,9 @@ the tool's complete surface.
   and cached character-ID table, degrading cleanly when that data is
   unavailable.
 * Production packaging works and includes the worker's licensing and
-  third-party notices.
+  third-party notices — deferred to Phase 7, since nothing in the shipped
+  application invokes the worker until that phase wires it in (see
+  `ROADMAP.md`'s Phase 7 entry and this phase's review, "Known limitations").
 * Review approves the boundary before archive mutation (Phase 8) begins.
 
 ## Out of scope

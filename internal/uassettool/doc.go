@@ -5,6 +5,6 @@
 // Adapter speaks the protocol over an injected io.Writer/io.Reader pair, so
 // it has no opinion on how the worker process is launched or supervised;
 // see docs/decisions/0003-uassettoolrivals-boundary.md for that decision.
-// Process lifecycle (launch, health check, timeout, crash recovery) is
-// built on top of Adapter in a later task.
+// Worker builds process lifecycle (launch, pinned-version health check,
+// call timeout, crash recovery, graceful shutdown) on top of Adapter.
 package uassettool

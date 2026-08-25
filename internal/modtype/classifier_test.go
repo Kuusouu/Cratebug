@@ -131,6 +131,16 @@ func TestClassifyTreatsExtensionlessPathAsUasset(t *testing.T) {
 	}
 }
 
+func TestClassifyTreatsExtensionlessBlueprintPathAsBlueprint(t *testing.T) {
+	// Act
+	got := Classify([]string{"Characters/Hero_C"})
+
+	// Assert
+	if got != CategoryBlueprint {
+		t.Errorf("Classify() = %q, want %q", got, CategoryBlueprint)
+	}
+}
+
 func TestClassifyIsCaseInsensitive(t *testing.T) {
 	// Act
 	got := Classify([]string{"CHARACTERS/SK_HERO.UASSET"})

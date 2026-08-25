@@ -1,7 +1,7 @@
 # Phase 6 Review
 
 **Date:** 2026-08-25
-**Status:** Awaiting review
+**Status:** Approved
 
 ## Outcome
 
@@ -81,7 +81,7 @@ Passed clean: Go formatting, `go vet`, the full Go test suite, and the frontend'
 
 `internal/uassettool` (35 tests) and `internal/modtype` (36 tests) are entirely new this phase. Re-ran for this review specifically, with the pinned worker binary present so integration tests exercised the real process rather than skipping:
 
-```
+```shell
 go test ./internal/uassettool/... -run "TestNewWorkerRejectsVersionMismatch|TestNewWorkerReturnsLaunchFailedForMissingExecutable|TestWorkerCallReturnsCrashedAndLeavesNoOrphan|TestWorkerCallReturnsTimeoutAndKillsHungProcess|TestWorkerCallReturnsMalformedResponse|TestWorkerCloseTerminatesProcessWithoutOrphan" -v
 ```
 — all 6 failure-injection tests pass. Followed by `Get-Process -Name UAssetTool` finding zero running instances.
