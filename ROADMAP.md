@@ -170,7 +170,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Pinned prebuilt UAssetToolRivals worker release tied to a known source revision
 - Narrow typed archive-tool adapter
 - Supervised helper-process prototype as the default integration direction
-- Worker distributed as a versioned release artifact from the maintained UAssetToolRivals fork; normal Cratebug development and builds do not require the .NET toolchain unless the worker is explicitly rebuilt from source
+- Worker distributed as a versioned release artifact pinned directly from upstream UAssetToolRivals (`XzantGaming/UassetToolRivals`), which already publishes an actively maintained, official prebuilt release for this purpose; normal Cratebug development and builds do not require the .NET toolchain unless the worker is explicitly rebuilt from source. Cratebug owning its own fork remains an option if a concrete need to diverge or control the release pipeline ever arises, but is not adopted speculatively.
 - FFI comparison only when a concrete performance, packaging, or operational reason exists
 - Crash, packaging, performance, and complexity validation for the selected boundary
 - Evaluate bounded parallel archive inspection and archive-tool actions using representative mod libraries; adopt concurrency only when measurements show it improves responsiveness without weakening cancellation, progress reporting, deterministic results, or filesystem safety

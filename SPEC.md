@@ -265,7 +265,7 @@ Cratebug must access it through a narrow boundary so that:
 - Tool failure does not leave filesystem operations in an unknown state.
 - The integration mechanism can change without rewriting the frontend or core behavior.
 
-The choice between NativeAOT FFI and a helper process is deferred pending focused review and a small prototype.
+The integration uses a supervised helper process speaking newline-delimited JSON over stdin/stdout, not NativeAOT FFI. This was decided after a focused review and prototype; see `docs/decisions/0003-uassettoolrivals-boundary.md` for the evidence and the concrete reasons FFI was not selected.
 
 Only required operations should be integrated.
 
