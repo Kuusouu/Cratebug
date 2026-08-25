@@ -27,14 +27,14 @@ Cratebug's UAssetToolRivals adapter uses a **supervised helper process** speakin
 
 **Alternative considered:** in-process FFI via the NativeAOT library (`uat_invoke`/`uat_free`), following BentoMod's current architecture. Not selected because it removes process-boundary crash isolation (the strongest factor against it, directly opposing Phase 6's crash-safety exit criterion), has no official prebuilt release to pin against yet, and would introduce Cratebug's first unsafe-pointer/manual-marshaling Go code where the process model needs only `os/exec` and a line-buffered reader. The lower per-call latency FFI offers is real but unneeded at Phase 6's scope.
 
-Because both transports share one JSON contract by upstream's own design, the Go adapter (task 6.3) should still be structured behind a small interface — request in, `UAssetResponse`-shaped result out — so that if a future phase (most plausibly Phase 8's bulk conflict scanning across many mods) produces an actual measured need for lower latency, adding an FFI implementation is a transport swap, not a rewrite of call sites. That measurement, if it ever happens, is what would change this decision.
+Because both transports share one JSON contract by upstream's own design, the Go adapter (task 6.3) should still be structured behind a small interface — request in, `UAssetResponse`-shaped result out — so that if a future phase (most plausibly Phase 9's bulk conflict scanning across many mods) produces an actual measured need for lower latency, adding an FFI implementation is a transport swap, not a rewrite of call sites. That measurement, if it ever happens, is what would change this decision.
 
 ## Consequences
 
 - Task 6.2 pins the officially released self-contained `win-x64` CLI build (currently `v1.5.6`, ~30.3 MB zipped) as the worker artifact, with its version, source revision, and checksum recorded there. No new release pipeline needs to be built for this phase.
 - Task 6.3's adapter package owns process lifecycle (`os/exec`), NDJSON framing, and version verification via a one-shot `--version` call before trusting the long-lived interactive worker.
 - Task 6.4's crash/hang handling can rely on normal process supervision (exit code, timeout, kill, restart) rather than needing to guard against an in-process native fault.
-- The adapter's request/response types should mirror `UAssetRequest`/`UAssetResponse` closely enough that swapping in an FFI implementation later does not require changing call sites, in case Phase 8 or later produces the concrete performance reason this decision did not find.
+- The adapter's request/response types should mirror `UAssetRequest`/`UAssetResponse` closely enough that swapping in an FFI implementation later does not require changing call sites, in case Phase 9 or later produces the concrete performance reason this decision did not find.
 - `uasset_toolkit/README.md` in the BentoMod archive is known to be stale relative to its own code; any future reference to that crate for precedent should re-read `lib.rs` directly rather than trust its README.
 - Task 6.6's concurrency policy is decided below, not deferred: task 6.6 itself capped any worker pool at 4; task 6.7's later, wider benchmark refined this into an entry-count-tiered cap (4/8/16). See "Concurrency policy (task 6.6 evidence)."
 

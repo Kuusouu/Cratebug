@@ -191,7 +191,31 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Licensing and notices are documented.
 - Review approves the boundary before archive mutation begins.
 
-## Phase 7 - Installation and archive safety
+## Phase 7 - UAssetToolRivals UI integration
+
+**Outcome:** Users can see each mod's determined type/category in the library UI, backed by the Cratebug-owned classification layer built in Phase 6.
+
+**Includes:**
+
+- Wire `internal/uassettool` and `internal/modtype` into the application layer (`app.go`), including launching and supervising the worker for the lifetime of a session
+- Expose mod type/category through the Wails-bound API to the frontend
+- Render category (and hero/skin name, once Phase 6's task 6.8 lands) in the library UI
+- A caching strategy for classification results so repeated scans do not repeatedly re-invoke the worker; BentoMod's mtime-keyed in-memory cache is a reference pattern, not an architectural template
+- Apply the entry-count-tiered concurrency policy from `docs/decisions/0003-uassettoolrivals-boundary.md` (`WorkerPoolSizeForLibrary`) when classifying a full library
+- Progress and loading states for classification, since it runs after the initial fast filesystem scan rather than blocking it
+- Graceful, clearly-labeled "unknown" presentation for mods `Determine` cannot classify (encrypted IoStore containers, incomplete bundles)
+
+**Excludes:** Installation, asset conflict inspection, VFX updating, and exposing any UAssetToolRivals surface beyond what Phase 6 already scoped.
+
+**Exit criteria:**
+
+- Mod type/category renders correctly for representative real and disposable-fixture libraries.
+- Classification does not block the initial library render; the catalog appears immediately and categories populate progressively.
+- Encrypted or otherwise undeterminable mods show a clear "unknown" state, never an error or a crash.
+- Caching avoids redundant worker calls for mods unchanged since the last classification.
+- Review approves the UI presentation and responsiveness against a large real library.
+
+## Phase 8 - Installation and archive safety
 
 **Outcome:** Cratebug can safely install supported local mod archives.
 
@@ -216,7 +240,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Representative classic and IoStore fixtures work.
 - Review covers success and major failure paths.
 
-## Phase 8 - Asset conflict inspection
+## Phase 9 - Asset conflict inspection
 
 **Outcome:** Users can inspect overlapping internal Unreal asset paths.
 
@@ -240,7 +264,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Large scans remain responsive.
 - Review approves terminology and presentation.
 
-## Phase 9 - BentoMod migration
+## Phase 10 - BentoMod migration
 
 **Outcome:** Users can optionally import selected BentoMod state without modifying BentoMod.
 
@@ -261,7 +285,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Repeated imports do not duplicate data unpredictably.
 - Review uses disposable copies of representative real state.
 
-## Phase 10 - Release hardening
+## Phase 11 - Release hardening
 
 **Outcome:** Cratebug is ready for its first public release.
 
