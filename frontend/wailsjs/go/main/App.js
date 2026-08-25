@@ -6,6 +6,10 @@ export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
+export function ClassificationType() {
+  return window['go']['main']['App']['ClassificationType']();
+}
+
 export function ClassifyLibrary(arg1, arg2) {
   return window['go']['main']['App']['ClassifyLibrary'](arg1, arg2);
 }

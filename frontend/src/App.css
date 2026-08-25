@@ -916,6 +916,11 @@ button:disabled {
 	outline-offset: 1px;
 }
 
+.mod-card:hover,
+.list-mod-row:hover {
+	z-index: 10;
+}
+
 .mod-card[draggable="true"],
 .list-mod-row[draggable="true"] {
 	cursor: grab;
@@ -963,15 +968,60 @@ button:disabled {
 }
 
 .mod-thumbnail {
+	position: relative;
+	z-index: 2;
 	display: grid;
 	width: 2.75rem;
 	height: 2.75rem;
 	flex: 0 0 auto;
 	place-items: center;
+	padding: 0;
 	border: 1px solid var(--line);
 	border-radius: 0.55rem;
 	background: color-mix(in srgb, var(--panel), var(--muted) 8%);
 	color: var(--muted);
+	font: inherit;
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		background 0.15s ease,
+		color 0.15s ease;
+}
+
+.mod-thumbnail:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--accent), transparent 30%);
+	background: color-mix(in srgb, var(--panel), var(--accent) 15%);
+	color: var(--text);
+	filter: none;
+}
+
+.mod-thumbnail-tooltip {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	padding: 0.25rem 0.55rem;
+	border-radius: 0.35rem;
+	background: var(--panel, #15171b);
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 40%);
+	color: var(--text);
+	font-size: 0.72rem;
+	font-weight: 600;
+	white-space: nowrap;
+	pointer-events: none;
+	opacity: 0;
+	visibility: hidden;
+	transition:
+		opacity 0.15s ease,
+		transform 0.15s ease;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+	z-index: 100;
+}
+
+.mod-thumbnail:hover .mod-thumbnail-tooltip,
+.mod-thumbnail:focus-visible .mod-thumbnail-tooltip {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(2px);
 }
 
 .mod-thumbnail svg {
@@ -1033,6 +1083,78 @@ button:disabled {
 	border-color: color-mix(in srgb, #5b8dae, transparent 50%);
 	background: color-mix(in srgb, #5b8dae, transparent 88%);
 	color: color-mix(in srgb, #5b8dae, var(--text) 25%);
+}
+
+.mod-category-badge {
+	border-color: color-mix(in srgb, var(--accent), transparent 60%);
+	background: color-mix(in srgb, var(--accent), transparent 92%);
+	color: var(--text);
+}
+
+.mod-category-badge.category-mesh {
+	border-color: color-mix(in srgb, #06b6d4, transparent 60%);
+	background: color-mix(in srgb, #06b6d4, transparent 88%);
+	color: color-mix(in srgb, #06b6d4, var(--text) 25%);
+}
+
+.mod-category-badge.category-static-mesh {
+	border-color: color-mix(in srgb, #38bdf8, transparent 60%);
+	background: color-mix(in srgb, #38bdf8, transparent 88%);
+	color: color-mix(in srgb, #38bdf8, var(--text) 25%);
+}
+
+.mod-category-badge.category-vfx {
+	border-color: color-mix(in srgb, #f97316, transparent 60%);
+	background: color-mix(in srgb, #f97316, transparent 88%);
+	color: color-mix(in srgb, #f97316, var(--text) 25%);
+}
+
+.mod-category-badge.category-audio {
+	border-color: color-mix(in srgb, #22c55e, transparent 60%);
+	background: color-mix(in srgb, #22c55e, transparent 88%);
+	color: color-mix(in srgb, #22c55e, var(--text) 25%);
+}
+
+.mod-category-badge.category-ui {
+	border-color: color-mix(in srgb, #ec4899, transparent 60%);
+	background: color-mix(in srgb, #ec4899, transparent 88%);
+	color: color-mix(in srgb, #ec4899, var(--text) 25%);
+}
+
+.mod-category-badge.category-texture {
+	border-color: color-mix(in srgb, #eab308, transparent 60%);
+	background: color-mix(in srgb, #eab308, transparent 88%);
+	color: color-mix(in srgb, #eab308, var(--text) 25%);
+}
+
+.mod-category-badge.category-movies {
+	border-color: color-mix(in srgb, #f43f5e, transparent 60%);
+	background: color-mix(in srgb, #f43f5e, transparent 88%);
+	color: color-mix(in srgb, #f43f5e, var(--text) 25%);
+}
+
+.mod-category-badge.category-animation {
+	border-color: color-mix(in srgb, #a855f7, transparent 60%);
+	background: color-mix(in srgb, #a855f7, transparent 88%);
+	color: color-mix(in srgb, #a855f7, var(--text) 25%);
+}
+
+.mod-category-badge.category-blueprint {
+	border-color: color-mix(in srgb, #6366f1, transparent 60%);
+	background: color-mix(in srgb, #6366f1, transparent 88%);
+	color: color-mix(in srgb, #6366f1, var(--text) 25%);
+}
+
+.mod-category-badge.category-text {
+	border-color: color-mix(in srgb, #f59e0b, transparent 60%);
+	background: color-mix(in srgb, #f59e0b, transparent 88%);
+	color: color-mix(in srgb, #f59e0b, var(--text) 25%);
+}
+
+.mod-category-badge.category-unknown {
+	border-color: color-mix(in srgb, var(--muted), transparent 50%);
+	background: color-mix(in srgb, var(--muted), transparent 88%);
+	color: color-mix(in srgb, var(--muted), var(--text) 25%);
 }
 
 .mod-card-tags {

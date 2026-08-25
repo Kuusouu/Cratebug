@@ -263,6 +263,27 @@ export namespace metadata {
 
 }
 
+export namespace modtype {
+	
+	export class Identity {
+	    category: string;
+	    characterName: string;
+	    skinName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Identity(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.category = source["category"];
+	        this.characterName = source["characterName"];
+	        this.skinName = source["skinName"];
+	    }
+	}
+
+}
+
 export namespace mutation {
 	
 	export class Result {
@@ -293,26 +314,4 @@ export namespace mutation {
 	}
 
 }
-
-export namespace modtype {
-	
-	export class Identity {
-	    category: string;
-	    characterName: string;
-	    skinName: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Identity(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.category = source["category"];
-	        this.characterName = source["characterName"];
-	        this.skinName = source["skinName"];
-	    }
-	}
-
-}
-
 
