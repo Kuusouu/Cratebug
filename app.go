@@ -6,6 +6,7 @@ import (
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
+	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
 )
 
@@ -13,6 +14,7 @@ import (
 type App struct {
 	mutationExecutor mutation.Executor
 	metadataStore    metadata.Store
+	classifier       *modtype.SessionClassifier
 }
 
 // Creates the application binding.
@@ -21,15 +23,20 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve metadata storage location: %w", err)
 	}
-	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path)), nil
+	classifier := modtype.NewSessionClassifier(modtype.DefaultWorkerLauncher(nil))
+	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier), nil
 }
 
-// Lets tests inject a deterministic game-running detector and a disposable
-// metadata store without exposing either to Wails.
-func newApp(gameRunningChecker mutation.GameRunningChecker, metadataStore metadata.Store) *App {
+// Lets tests inject a deterministic game-running detector, a disposable
+// metadata store, and a custom classifier without exposing either to Wails.
+func newApp(gameRunningChecker mutation.GameRunningChecker, metadataStore metadata.Store, classifier *modtype.SessionClassifier) *App {
+	if classifier == nil {
+		classifier = modtype.NewSessionClassifier(nil)
+	}
 	return &App{
 		mutationExecutor: mutation.NewExecutor(gameRunningChecker),
 		metadataStore:    metadataStore,
+		classifier:       classifier,
 	}
 }
 
@@ -244,4 +251,7 @@ func (a *App) UnassignModTag(entryID, tagID string) error {
 // shutdown is called by Wails when the application is closing, ensuring
 // any session-held workers or background resources are cleanly closed.
 func (a *App) shutdown(_ context.Context) {
+	if a.classifier != nil {
+		_ = a.classifier.Close()
+	}
 }
