@@ -198,12 +198,13 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 **Includes:**
 
 - Wire `internal/uassettool` and `internal/modtype` into the application layer (`app.go`), including launching and supervising the worker for the lifetime of a session
-- Expose mod type/category through the Wails-bound API to the frontend
-- Render category (and hero/skin name, once Phase 6's task 6.8 lands) in the library UI
+- Expose mod type/category and hero/skin name through the Wails-bound API to the frontend
+- Render category and hero/skin name in the library UI
 - A caching strategy for classification results so repeated scans do not repeatedly re-invoke the worker; BentoMod's mtime-keyed in-memory cache is a reference pattern, not an architectural template
 - Apply the entry-count-tiered concurrency policy from `docs/decisions/0003-uassettoolrivals-boundary.md` (`WorkerPoolSizeForLibrary`) when classifying a full library
 - Progress and loading states for classification, since it runs after the initial fast filesystem scan rather than blocking it
-- Graceful, clearly-labeled "unknown" presentation for mods `Determine` cannot classify (encrypted IoStore containers, incomplete bundles)
+- Graceful, clearly-labeled "unknown" presentation for mods `Determine`/`DetermineIdentity` cannot classify (encrypted IoStore containers, incomplete bundles)
+- Package the pinned worker binary and its third-party notices into the production build and installer, deferred from Phase 6 since nothing invoked the worker until this phase wires it in
 
 **Excludes:** Installation, asset conflict inspection, VFX updating, and exposing any UAssetToolRivals surface beyond what Phase 6 already scoped.
 
@@ -213,6 +214,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Classification does not block the initial library render; the catalog appears immediately and categories populate progressively.
 - Encrypted or otherwise undeterminable mods show a clear "unknown" state, never an error or a crash.
 - Caching avoids redundant worker calls for mods unchanged since the last classification.
+- Production packaging and the installer include the pinned worker binary and its third-party notices.
 - Review approves the UI presentation and responsiveness against a large real library.
 
 ## Phase 8 - Installation and archive safety
