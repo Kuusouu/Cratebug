@@ -9,6 +9,7 @@ import (
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
+	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
 )
 
@@ -25,9 +26,21 @@ func testMetadataStore(t *testing.T) metadata.Store {
 	return metadata.NewStore(filepath.Join(t.TempDir(), "metadata.json"))
 }
 
+func testApp(t *testing.T, gameRunning bool) *App {
+	t.Helper()
+	emptyTable := modtype.CharacterTable{}
+	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, testMetadataStore(t), nil, &emptyTable)
+}
+
+func testAppWithStore(t *testing.T, gameRunning bool, store metadata.Store) *App {
+	t.Helper()
+	emptyTable := modtype.CharacterTable{}
+	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, store, nil, &emptyTable)
+}
+
 func TestRuntimeStatus(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 
 	// Act
 	got := app.RuntimeStatus()
@@ -47,7 +60,7 @@ func TestSetModEnabledBlocksRunningGame(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t), nil)
+	app := testApp(t, true)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +86,7 @@ func TestScanLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 
 	// Act
 	library, err := app.ScanLibrary(root)
@@ -105,7 +118,7 @@ func TestSetModEnabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +204,7 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 			if err := os.Mkdir(filepath.Join(root, "destination"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			app := newApp(staticGameRunningChecker{gameRunning: true}, testMetadataStore(t), nil)
+			app := testApp(t, true)
 			library, err := app.ScanLibrary(root)
 			if err != nil {
 				t.Fatal(err)
@@ -213,7 +226,7 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 
 func TestSetModRootPersistsAcrossLoads(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 
 	// Act
 	if err := app.SetModRoot(`C:\Mods`); err != nil {
@@ -234,7 +247,7 @@ func TestTagLifecycleThroughApp(t *testing.T) {
 	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -278,7 +291,7 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -317,7 +330,7 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 func TestLoadMetadataRecoversFromACorruptedFile(t *testing.T) {
 	// Arrange
 	path := filepath.Join(t.TempDir(), "metadata.json")
-	app := newApp(staticGameRunningChecker{}, metadata.NewStore(path), nil)
+	app := testAppWithStore(t, false, metadata.NewStore(path))
 	// Set it twice: the backup only holds what the primary held before its
 	// most recent write, so a single save leaves no backup to recover from.
 	if err := app.SetModRoot(`C:\Mods`); err != nil {
@@ -347,8 +360,41 @@ func TestLoadMetadataRecoversFromACorruptedFile(t *testing.T) {
 
 func TestAppShutdown(t *testing.T) {
 	// Arrange
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil)
+	app := testApp(t, false)
 
 	// Act & Assert (shutdown must complete cleanly without panic)
 	app.shutdown(context.Background())
+}
+
+func TestClassifyLibrary(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	primaryPath := filepath.Join(root, "Example_9999999_P.pak")
+	if err := os.WriteFile(primaryPath, []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	table := modtype.CharacterTable{
+		CharacterNames: map[string]string{"1044": "Blade"},
+	}
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table)
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	results, err := app.ClassifyLibrary(root, library.Entries)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ClassifyLibrary() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("results len = %d, want 1", len(results))
+	}
+	// Without a live worker running in this unit test, it degrades to CategoryUnknown gracefully
+	if results[library.Entries[0].ID].Category != modtype.CategoryUnknown {
+		t.Errorf("Category = %q, want CategoryUnknown", results[library.Entries[0].ID].Category)
+	}
 }
