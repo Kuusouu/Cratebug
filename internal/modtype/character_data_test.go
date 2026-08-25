@@ -39,19 +39,35 @@ func TestParseCharacterMarkdownExtractsCharactersAndSkins(t *testing.T) {
 	}
 }
 
-// Rows with a non-numeric ID (unreleased characters marked "????") and
-// malformed rows with missing cells must not produce a bogus table entry
-// or a panic.
+// Rows with a non-numeric ID (unreleased characters marked "????"), non-playable
+// test IDs (such as 9999), and stale "(Old)" collision rows must not produce bogus entries.
 func TestParseCharacterMarkdownSkipsUnreleasedAndMalformedRows(t *testing.T) {
+	markdown := `# Marvel Rivals Character IDs
+
+|  ID  | NAME | SKIN IDs | SKIN NAMES
+| :--: | :--: | :--: | :--: |
+| 1062 | Devil Dinosaur | 1062100 | TROPICAL BEAST |
+| 1063 | Cyclops | 1063100 | SHADOWED NEMESIS |
+| ???? | Upcoming Characters | | |
+| 9999 | Hero Zero | | |
+| 1062 | Beast (Old) | | |
+| 1063 | Nightcrawler (Old) | | |
+`
 	// Act
-	table := parseCharacterMarkdown(sampleCharacterMarkdown)
+	table := parseCharacterMarkdown(markdown)
 
 	// Assert
 	if _, ok := table.CharacterNames["????"]; ok {
 		t.Errorf("CharacterNames contains the literal placeholder %q, want it skipped", "????")
 	}
-	if table.CharacterNames["9999"] != "Hero Zero" {
-		t.Errorf("CharacterNames[9999] = %q, want Hero Zero", table.CharacterNames["9999"])
+	if _, ok := table.CharacterNames["9999"]; ok {
+		t.Errorf("CharacterNames contains non-playable test ID 9999, want it skipped")
+	}
+	if table.CharacterNames["1062"] != "Devil Dinosaur" {
+		t.Errorf("CharacterNames[1062] = %q, want Devil Dinosaur (not overwritten by Beast (Old))", table.CharacterNames["1062"])
+	}
+	if table.CharacterNames["1063"] != "Cyclops" {
+		t.Errorf("CharacterNames[1063] = %q, want Cyclops (not overwritten by Nightcrawler (Old))", table.CharacterNames["1063"])
 	}
 }
 

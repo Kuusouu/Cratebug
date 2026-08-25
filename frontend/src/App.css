@@ -1029,6 +1029,14 @@ button:disabled {
 	height: 1.3rem;
 }
 
+.mod-thumbnail-hero {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	border-radius: calc(0.55rem - 1px);
+	display: block;
+}
+
 .mod-card-heading h3 {
 	display: -webkit-box;
 	overflow: hidden;
