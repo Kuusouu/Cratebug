@@ -32,6 +32,7 @@ coverage.out
 # Wails generated output and packaging assets
 /build/bin/
 /build/uassettool/
+/build/windows/installer/wails_tools.nsh
 
 # Frontend dependencies and build output
 /node_modules/

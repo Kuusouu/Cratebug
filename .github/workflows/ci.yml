@@ -45,10 +45,17 @@ jobs:
               shell: pwsh
               run: .\check.ps1
 
-            - name: Build Windows application
+            - name: Fetch pinned worker
+              shell: pwsh
+              run: .\fetch-uassettool.ps1
+
+            - name: Build Windows application and installer
               shell: pwsh
               run: |
-                  mise exec -c "go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -platform windows/amd64 -nopackage -nocolour"
+                  mise exec -c "go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -platform windows/amd64 -nsis -installscope user -nocolour"
                   if (-not (Test-Path "build/bin/Cratebug.exe")) {
                       throw "Wails did not produce build/bin/Cratebug.exe"
+                  }
+                  if (-not (Test-Path "build/bin/Cratebug-amd64-installer.exe")) {
+                      throw "Wails did not produce build/bin/Cratebug-amd64-installer.exe"
                   }
