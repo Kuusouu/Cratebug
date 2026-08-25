@@ -10,6 +10,7 @@ Desktop.ini
 *.dylib
 *.test
 *.out
+*.syso
 
 # Editors and IDEs
 .idea/
@@ -29,7 +30,8 @@ Desktop.ini
 coverage.out
 
 # Wails generated output and packaging assets
-/build/
+/build/bin/
+/build/uassettool/
 
 # Frontend dependencies and build output
 /node_modules/
