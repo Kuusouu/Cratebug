@@ -39,7 +39,7 @@ What stays as a persistent, always-visible control:
 The context menu is built as a small reusable component
 (`frontend/src/library/ContextMenu.tsx`) rather than one-off menus per
 surface, so later phases can extend it (recoverable deletion in 4.5.5, tags
-in Phase 5, conflict inspection in Phase 8) without inventing a second
+in Phase 5, conflict inspection in Phase 9) without inventing a second
 pattern.
 
 Keyboard access did not need custom key handling. Attaching the

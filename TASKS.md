@@ -45,17 +45,18 @@ the tool's complete surface.
   unavailable.
 * Production packaging works and includes the worker's licensing and
   third-party notices.
-* Review approves the boundary before archive mutation (Phase 7) begins.
+* Review approves the boundary before archive mutation (Phase 8) begins.
 
 ## Out of scope
 
 Phase 6 does not include:
 
-* Full installation (Phase 7)
+* Full installation (Phase 8)
 * VFX updating
 * Exposing the complete UAssetToolRivals surface through Cratebug's API
 * Making the UAssetToolRivals JSON contract part of Cratebug's domain API
-* Asset conflict inspection (Phase 8)
+* Asset conflict inspection (Phase 9)
+* Wiring mod type/category into the UI (Phase 7, immediately next)
 * Adopting concurrency without measured evidence that it helps
 
 ## 6.1 Decide the integration approach
