@@ -1,4 +1,29 @@
-import type { discovery } from "../../wailsjs/go/models";
+import type { discovery, modtype } from "../../wailsjs/go/models";
+
+// Returns the category name when classified, or empty when not yet available.
+export function entryCategoryLabel(identity?: modtype.Identity | null): string {
+	if (!identity?.category) {
+		return "";
+	}
+	return identity.category;
+}
+
+// Converts category name to CSS-friendly class name slug.
+export function categorySlug(category?: string | null): string {
+	if (!category) return "";
+	return category.toLowerCase().replace(/\s+/g, "-");
+}
+
+// Formats hero and optional skin name into a human-readable label.
+export function entryCharacterLabel(identity?: modtype.Identity | null): string {
+	if (!identity?.characterName) {
+		return "";
+	}
+	if (identity.skinName) {
+		return `${identity.characterName} (${identity.skinName})`;
+	}
+	return identity.characterName;
+}
 
 // Keeps state wording consistent wherever a discovered entry is presented.
 export function entryStateLabel(entry: discovery.Entry): string {
