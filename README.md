@@ -28,7 +28,7 @@ See:
 
 Development currently targets 64-bit Windows 10 version 1909 or newer and Windows 11. Install:
 
-- Git
+- Git and [Git LFS](https://git-lfs.com/)
 - [`mise`](https://mise.jdx.dev/installing-mise.html)
 - Microsoft WebView2 Runtime
 - NSIS 3 when building the installer
@@ -44,11 +44,13 @@ Restart the terminal after installing system tools so their updated paths are av
 
 ## Setup
 
-Clone the repository:
+Initialize Git LFS and clone the repository:
 
 ```powershell
+git lfs install
 git clone https://github.com/Kuusouu/Cratebug.git
 Set-Location Cratebug
+git lfs pull
 ```
 
 Install the pinned Go and Bun versions through `mise`:

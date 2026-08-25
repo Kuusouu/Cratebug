@@ -8,6 +8,7 @@ import {
 	categorySlug,
 	entryCategoryLabel,
 	entryCharacterLabel,
+	entryHeroPortraitUrl,
 } from "./entryPresentation";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
@@ -193,6 +194,7 @@ const ModCard = memo(function ModCard({
 	const disabled = entry.state === "disabled";
 	const categoryLabel = entryCategoryLabel(identity);
 	const characterLabel = entryCharacterLabel(identity);
+	const heroPortraitUrl = entryHeroPortraitUrl(identity);
 	const isOrphaned = entry.kind === "orphaned_sidecar";
 	const facts = (
 		<div className="mod-facts">
@@ -221,7 +223,11 @@ const ModCard = memo(function ModCard({
 					characterLabel ? `Hero: ${characterLabel}` : `Select ${entry.displayName}`
 				}
 			>
-				<Package aria-hidden="true" />
+				{heroPortraitUrl ? (
+					<img src={heroPortraitUrl} alt="" className="mod-thumbnail-hero" />
+				) : (
+					<Package aria-hidden="true" />
+				)}
 				{characterLabel && (
 					<span className="mod-thumbnail-tooltip" role="tooltip">
 						{characterLabel}

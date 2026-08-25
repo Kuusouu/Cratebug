@@ -16,14 +16,14 @@ var (
 	characterFilenameFallbackPattern = regexp.MustCompile(`[_/](10[1-6]\d)(\d{3})(?:\D|$)`)
 )
 
-// Resolves a mod's hero and skin display name from its internal asset
+// Resolves a mod's hero ID, hero name, skin ID, and skin display name from its internal asset
 // paths, adapted from BentoMod's own regex-based matching
 // (bentomod/src/utils.rs:12-28,83-110,223-263) to Cratebug's forward-slash
 // path convention. Returns empty strings, not an error, when nothing
 // resolves, when the resolved character ID is not in table, or when more
 // than one character is found across the mod's paths — an ambiguous mod
 // has no single hero name to report.
-func ResolveCharacter(table CharacterTable, paths []string) (characterName, skinName string) {
+func ResolveCharacter(table CharacterTable, paths []string) (characterID, characterName, skinID, skinName string) {
 	characterIDs := make(map[string]struct{})
 	skinIDs := make(map[string]struct{})
 
@@ -48,24 +48,29 @@ func ResolveCharacter(table CharacterTable, paths []string) (characterName, skin
 	}
 
 	if len(characterIDs) != 1 {
-		return "", ""
+		return "", "", "", ""
 	}
-	var characterID string
+	var resolvedID string
 	for id := range characterIDs {
-		characterID = id
+		resolvedID = id
 	}
 
-	characterName = table.CharacterNames[characterID]
+	characterName = table.CharacterNames[resolvedID]
 	if characterName == "" {
-		return "", ""
+		return "", "", "", ""
 	}
 
-	for skinID := range skinIDs {
-		if skin, ok := table.Skins[skinID]; ok && skin.CharacterID == characterID {
-			return characterName, skin.SkinName
+	var matchingSkins []string
+	for skinIDKey := range skinIDs {
+		if skin, ok := table.Skins[skinIDKey]; ok && skin.CharacterID == resolvedID {
+			matchingSkins = append(matchingSkins, skinIDKey)
 		}
 	}
-	return characterName, ""
+	if len(matchingSkins) == 1 {
+		singleSkinID := matchingSkins[0]
+		return resolvedID, characterName, singleSkinID, table.Skins[singleSkinID].SkinName
+	}
+	return resolvedID, characterName, "", ""
 }
 
 func isMaterialFile(path string) bool {

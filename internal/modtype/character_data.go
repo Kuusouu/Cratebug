@@ -147,6 +147,16 @@ var (
 // Malformed rows (missing cells, non-numeric IDs such as unreleased
 // characters marked "????") are skipped rather than treated as errors,
 // since this is a best-effort community data source, not a contract.
+func isPlayableHero(id, name string) bool {
+	if !characterRowIDPattern.MatchString(id) {
+		return false
+	}
+	if strings.Contains(name, "(Old)") || strings.Contains(name, "(For Dev)") || strings.Contains(name, "Proxy") {
+		return false
+	}
+	return id >= "1011" && id <= "1066"
+}
+
 func parseCharacterMarkdown(markdown string) CharacterTable {
 	table := CharacterTable{
 		CharacterNames: make(map[string]string),
@@ -161,9 +171,15 @@ func parseCharacterMarkdown(markdown string) CharacterTable {
 		}
 
 		if id := cells[0]; id != "" {
-			if characterRowIDPattern.MatchString(id) {
+			name := ""
+			if len(cells) > 1 {
+				name = cells[1]
+			}
+			if isPlayableHero(id, name) {
+				if _, exists := table.CharacterNames[id]; !exists {
+					table.CharacterNames[id] = name
+				}
 				currentCharacterID = id
-				table.CharacterNames[currentCharacterID] = cells[1]
 			} else {
 				currentCharacterID = ""
 			}
@@ -175,7 +191,9 @@ func parseCharacterMarkdown(markdown string) CharacterTable {
 
 		skinID, skinName := cells[2], cells[3]
 		if skinIDPattern.MatchString(skinID) && skinName != "" {
-			table.Skins[skinID] = SkinReference{CharacterID: currentCharacterID, SkinName: skinName}
+			if _, exists := table.Skins[skinID]; !exists {
+				table.Skins[skinID] = SkinReference{CharacterID: currentCharacterID, SkinName: skinName}
+			}
 		}
 	}
 	return table

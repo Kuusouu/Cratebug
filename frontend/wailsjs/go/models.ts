@@ -267,7 +267,9 @@ export namespace modtype {
 	
 	export class Identity {
 	    category: string;
+	    characterID: string;
 	    characterName: string;
+	    skinID: string;
 	    skinName: string;
 	
 	    static createFrom(source: any = {}) {
@@ -277,7 +279,9 @@ export namespace modtype {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.category = source["category"];
+	        this.characterID = source["characterID"];
 	        this.characterName = source["characterName"];
+	        this.skinID = source["skinID"];
 	        this.skinName = source["skinName"];
 	    }
 	}

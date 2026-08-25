@@ -22,8 +22,8 @@ func TestDetermineIdentityCombinesCategoryAndCharacter(t *testing.T) {
 	if identity.Category != CategoryMesh {
 		t.Errorf("identity.Category = %q, want %q", identity.Category, CategoryMesh)
 	}
-	if identity.CharacterName != "Hulk" || identity.SkinName != "Mighty G-Bomb" {
-		t.Errorf("identity = %+v, want CharacterName=Hulk, SkinName=Mighty G-Bomb", identity)
+	if identity.CharacterID != "1011" || identity.CharacterName != "Hulk" || identity.SkinID != "1011100" || identity.SkinName != "Mighty G-Bomb" {
+		t.Errorf("identity = %+v, want CharacterID=1011, CharacterName=Hulk, SkinID=1011100, SkinName=Mighty G-Bomb", identity)
 	}
 }
 
@@ -46,8 +46,8 @@ func TestDetermineIdentityDegradesToNoCharacterNameWithoutLosingCategory(t *test
 	if identity.Category != CategoryMesh {
 		t.Errorf("identity.Category = %q, want %q even with no character table", identity.Category, CategoryMesh)
 	}
-	if identity.CharacterName != "" || identity.SkinName != "" {
-		t.Errorf("identity = %+v, want empty CharacterName/SkinName", identity)
+	if identity.CharacterID != "" || identity.CharacterName != "" || identity.SkinID != "" || identity.SkinName != "" {
+		t.Errorf("identity = %+v, want empty CharacterID/CharacterName/SkinID/SkinName", identity)
 	}
 }
 
