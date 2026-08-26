@@ -1180,6 +1180,20 @@ button:disabled {
 	color: color-mix(in srgb, var(--muted), var(--text) 25%);
 }
 
+.mod-conflict-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	border-color: color-mix(in srgb, var(--bad), transparent 40%);
+	background: color-mix(in srgb, var(--bad), transparent 85%);
+	color: color-mix(in srgb, var(--bad), var(--text) 15%);
+}
+
+.mod-conflict-badge svg {
+	width: 0.85rem;
+	height: 0.85rem;
+}
+
 .mod-category-badge.category-skeleton {
 	display: inline-block;
 	width: 3.25rem;

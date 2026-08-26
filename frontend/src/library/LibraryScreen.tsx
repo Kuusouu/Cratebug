@@ -6,6 +6,7 @@ import {
 	PanelsTopLeft,
 	PackagePlus,
 	Settings as SettingsIcon,
+	ShieldAlert,
 	TriangleAlert,
 	X,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
 	CreateTag,
 	DeleteMod,
 	DeleteTag,
+	DetectConflicts,
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
@@ -41,7 +43,13 @@ import {
 	SetTheme,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
-import { discovery, type metadata, type modtype, type mutation } from "../../wailsjs/go/models";
+import {
+	type conflict,
+	discovery,
+	type metadata,
+	type modtype,
+	type mutation,
+} from "../../wailsjs/go/models";
 import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
@@ -324,6 +332,8 @@ export function LibraryScreen() {
 		Record<string, modtype.Identity>
 	>({});
 	const [isClassifying, setIsClassifying] = useState(false);
+	const [conflictResult, setConflictResult] = useState<conflict.Result | null>(null);
+	const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const [installDialogFiles, setInstallDialogFiles] = useState<string[] | null>(null);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
@@ -349,6 +359,15 @@ export function LibraryScreen() {
 		[tagCatalog, assignedTagIDsForSelection],
 	);
 	const entryTags = useMemo(() => tagsByEntryID(metadataDocument), [metadataDocument]);
+	const conflictedEntryIDs = useMemo(
+		() =>
+			new Set(
+				conflictResult?.groups.flatMap((group) =>
+					group.participants.map((participant) => participant.entryID),
+				) ?? [],
+			),
+		[conflictResult],
+	);
 
 	const displayedEntries = useMemo(() => {
 		const normalizedSearch = search.trim().toLocaleLowerCase();
@@ -491,6 +510,35 @@ export function LibraryScreen() {
 			}
 		}
 	}, []);
+	// User-initiated only: never runs automatically after a scan, so it never
+	// surprises someone mid-organize the way a background check would.
+	const checkConflicts = useCallback(async () => {
+		if (!libraryRoot || !library) return;
+
+		setIsCheckingConflicts(true);
+		try {
+			const result = await DetectConflicts(libraryRoot, library.entries);
+			setConflictResult(result);
+			if (result.groups.length === 0) {
+				showMutationFeedback("success", "No asset conflicts found.");
+			} else {
+				const conflicting = result.groups.filter(
+					(group) => group.relationship === "same_priority",
+				).length;
+				showMutationFeedback(
+					"warning",
+					`Found ${result.groups.length} overlapping mod group${result.groups.length === 1 ? "" : "s"}` +
+						(conflicting > 0
+							? `, ${conflicting} needing a priority change to resolve.`
+							: ", all resolved by existing priority order."),
+				);
+			}
+		} catch (error) {
+			showMutationFeedback("error", `Could not check for conflicts: ${errorMessage(error)}`);
+		} finally {
+			setIsCheckingConflicts(false);
+		}
+	}, [libraryRoot, library, showMutationFeedback]);
 	const updateMutatedEntry = useCallback(
 		(
 			result: mutation.Result,
@@ -1172,6 +1220,7 @@ export function LibraryScreen() {
 			setActiveFolderDialog(null);
 			setContextMenu(null);
 			setIdentitiesByEntryID({});
+			setConflictResult(null);
 			setLibraryState("initial");
 			return;
 		}
@@ -1186,6 +1235,7 @@ export function LibraryScreen() {
 
 			setLibrary(result);
 			setIdentitiesByEntryID({});
+			setConflictResult(null);
 			classify(root, result.entries);
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
@@ -1331,6 +1381,16 @@ export function LibraryScreen() {
 						title="Install mod from archive or pak file"
 					>
 						<PackagePlus aria-hidden="true" />
+					</button>
+					<button
+						type="button"
+						className="icon-button"
+						onClick={() => void checkConflicts()}
+						disabled={!libraryRoot || libraryState === "loading" || isCheckingConflicts}
+						aria-label="Check for conflicts"
+						title="Scan enabled mods for overlapping asset paths"
+					>
+						<ShieldAlert aria-hidden="true" />
 					</button>
 					<button
 						type="button"
@@ -1483,6 +1543,7 @@ export function LibraryScreen() {
 						tagsByEntryID={entryTags}
 						identitiesByEntryID={identitiesByEntryID}
 						isClassifying={isClassifying}
+						conflictedEntryIDs={conflictedEntryIDs}
 						draggedEntryID={draggedItem?.type === "mod" ? draggedItem.entry.id : null}
 						onSetEnabled={setModEnabled}
 						onSelect={(entry) =>
