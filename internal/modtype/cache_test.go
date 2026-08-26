@@ -10,10 +10,13 @@ func TestCachePutAndGet(t *testing.T) {
 	// Arrange
 	cache := NewCache()
 	mtime := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
-	want := Identity{
-		Category:      CategoryMesh,
-		CharacterName: "Luna Snow",
-		SkinName:      "Default",
+	want := CachedClassification{
+		Identity: Identity{
+			Category:      CategoryMesh,
+			CharacterName: "Luna Snow",
+			SkinName:      "Default",
+		},
+		Paths: []string{"Marvel/Content/Marvel/Characters/1044/SK_Luna.uasset"},
 	}
 
 	// Act
@@ -24,8 +27,11 @@ func TestCachePutAndGet(t *testing.T) {
 	if !ok {
 		t.Fatal("Get() returned false, want true")
 	}
-	if got != want {
-		t.Errorf("Get() = %#v, want %#v", got, want)
+	if got.Identity != want.Identity {
+		t.Errorf("Get().Identity = %#v, want %#v", got.Identity, want.Identity)
+	}
+	if len(got.Paths) != 1 || got.Paths[0] != want.Paths[0] {
+		t.Errorf("Get().Paths = %v, want %v", got.Paths, want.Paths)
 	}
 	if cache.Len() != 1 {
 		t.Errorf("Len() = %d, want 1", cache.Len())
@@ -36,7 +42,7 @@ func TestCacheMissOnEntryID(t *testing.T) {
 	// Arrange
 	cache := NewCache()
 	mtime := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
-	cache.Put("mod-1", mtime, Identity{Category: CategoryMesh})
+	cache.Put("mod-1", mtime, CachedClassification{Identity: Identity{Category: CategoryMesh}})
 
 	// Act
 	_, ok := cache.Get("mod-2", mtime)
@@ -52,7 +58,7 @@ func TestCacheMissOnMTimeChange(t *testing.T) {
 	cache := NewCache()
 	oldTime := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
 	newTime := oldTime.Add(time.Hour)
-	cache.Put("mod-1", oldTime, Identity{Category: CategoryMesh})
+	cache.Put("mod-1", oldTime, CachedClassification{Identity: Identity{Category: CategoryMesh}})
 
 	// Act
 	_, ok := cache.Get("mod-1", newTime)
@@ -74,7 +80,7 @@ func TestCacheConcurrentAccess(t *testing.T) {
 		wg.Add(2)
 		go func(id int) {
 			defer wg.Done()
-			cache.Put("mod-1", mtime, Identity{Category: CategoryTexture})
+			cache.Put("mod-1", mtime, CachedClassification{Identity: Identity{Category: CategoryTexture}})
 		}(i)
 		go func(id int) {
 			defer wg.Done()

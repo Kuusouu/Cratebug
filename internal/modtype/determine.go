@@ -38,7 +38,7 @@ type caller interface {
 // docs/decisions/0003-uassettoolrivals-boundary.md. Each pooled worker needs
 // its own Worker instance, since Worker.Call is not safe for concurrent use.
 func Determine(c caller, root string, entry discovery.Entry) (Category, error) {
-	paths, err := listInternalPaths(c, root, entry)
+	paths, err := ListInternalPaths(c, root, entry)
 	if err != nil {
 		return "", err
 	}
@@ -48,8 +48,11 @@ func Determine(c caller, root string, entry discovery.Entry) (Category, error) {
 // Resolves entry's list of internal asset paths: the single listing call
 // Determine and DetermineIdentity both build on, so hero/skin resolution
 // (task 6.8) needs no UAssetToolRivals call beyond what category
-// classification already performs.
-func listInternalPaths(c caller, root string, entry discovery.Entry) ([]string, error) {
+// classification already performs. Exported so a caller with a mod not yet
+// classified this session (for example asset conflict detection, task 9.1)
+// can resolve its paths directly instead of duplicating the per-format
+// listing logic below.
+func ListInternalPaths(c caller, root string, entry discovery.Entry) ([]string, error) {
 	if entry.Kind != discovery.EntryMod {
 		return nil, fmt.Errorf("modtype: entry %q is not a mod", entry.ID)
 	}

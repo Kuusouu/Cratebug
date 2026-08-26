@@ -13,7 +13,7 @@ func TestDetermineIdentityCombinesCategoryAndCharacter(t *testing.T) {
 	entry := classicEntry("Mods/Example.pak")
 
 	// Act
-	identity, err := DetermineIdentity(fake, "C:/root", entry, hulkTable())
+	identity, paths, err := DetermineIdentity(fake, "C:/root", entry, hulkTable())
 
 	// Assert
 	if err != nil {
@@ -24,6 +24,10 @@ func TestDetermineIdentityCombinesCategoryAndCharacter(t *testing.T) {
 	}
 	if identity.CharacterID != "1011" || identity.CharacterName != "Hulk" || identity.SkinID != "1011100" || identity.SkinName != "Mighty G-Bomb" {
 		t.Errorf("identity = %+v, want CharacterID=1011, CharacterName=Hulk, SkinID=1011100, SkinName=Mighty G-Bomb", identity)
+	}
+	wantPaths := []string{"Marvel/Content/Marvel/Characters/1011/1011100/Meshes/SK_Hulk.uasset"}
+	if len(paths) != 1 || paths[0] != wantPaths[0] {
+		t.Errorf("paths = %v, want %v", paths, wantPaths)
 	}
 }
 
@@ -37,7 +41,7 @@ func TestDetermineIdentityDegradesToNoCharacterNameWithoutLosingCategory(t *test
 	entry := classicEntry("Mods/Example.pak")
 
 	// Act
-	identity, err := DetermineIdentity(fake, "C:/root", entry, CharacterTable{})
+	identity, _, err := DetermineIdentity(fake, "C:/root", entry, CharacterTable{})
 
 	// Assert
 	if err != nil {
@@ -57,7 +61,7 @@ func TestDetermineIdentityPropagatesUnderlyingCallError(t *testing.T) {
 	entry := classicEntry("Mods/Example.pak")
 
 	// Act
-	_, err := DetermineIdentity(fake, "C:/root", entry, CharacterTable{})
+	_, _, err := DetermineIdentity(fake, "C:/root", entry, CharacterTable{})
 
 	// Assert
 	if err == nil {

@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
@@ -397,6 +399,105 @@ func TestClassifyLibrary(t *testing.T) {
 	// Without a live worker running in this unit test, it degrades to CategoryUnknown gracefully
 	if results[library.Entries[0].ID].Category != modtype.CategoryUnknown {
 		t.Errorf("Category = %q, want CategoryUnknown", results[library.Entries[0].ID].Category)
+	}
+}
+
+// A minimal modtype.PoolWorker double that answers list_pak with a canned
+// response, so tests can exercise real classification (and therefore real
+// path retention) without a live UAssetTool worker process.
+type fakeConflictWorker struct {
+	response string
+	calls    int
+}
+
+func (w *fakeConflictWorker) Call(action string, _ map[string]any, result any) error {
+	w.calls++
+	if action != "list_pak" {
+		return nil
+	}
+	return json.Unmarshal([]byte(w.response), result)
+}
+
+func (w *fakeConflictWorker) Alive() bool  { return true }
+func (w *fakeConflictWorker) Close() error { return nil }
+
+func writePakFixture(t *testing.T, root, name string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, name), []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDetectConflictsFindsSamePriorityGroupAndReusesCache(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writePakFixture(t, root, "ModA_9999999_P.pak")
+	writePakFixture(t, root, "ModB_9999999_P.pak")
+
+	worker := &fakeConflictWorker{response: `{"files":[{"path":"Marvel/Content/Characters/1044/SK_Blade.uasset"}]}`}
+	classifier := modtype.NewSessionClassifier(func() (modtype.PoolWorker, error) { return worker, nil })
+	defer classifier.Close()
+
+	table := modtype.CharacterTable{}
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), classifier, &table, nil)
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	result, err := app.DetectConflicts(root, library.Entries)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("DetectConflicts() error = %v", err)
+	}
+	if len(result.Groups) != 1 {
+		t.Fatalf("Groups = %+v, want exactly one group", result.Groups)
+	}
+	if result.Groups[0].Relationship != conflict.SamePriority {
+		t.Errorf("Relationship = %q, want %q (both mods share the same trailing-nine priority)", result.Groups[0].Relationship, conflict.SamePriority)
+	}
+	if len(result.Unavailable) != 0 {
+		t.Errorf("Unavailable = %v, want none", result.Unavailable)
+	}
+	callsAfterFirstScan := worker.calls
+
+	// Act - second scan of the same unchanged library must not re-list either mod's contents
+	if _, err := app.DetectConflicts(root, library.Entries); err != nil {
+		t.Fatalf("second DetectConflicts() error = %v", err)
+	}
+
+	// Assert
+	if worker.calls != callsAfterFirstScan {
+		t.Errorf("worker.calls after second scan = %d, want %d (unchanged mods should hit the classification cache)", worker.calls, callsAfterFirstScan)
+	}
+}
+
+func TestDetectConflictsReportsUnavailableWithoutALiveWorker(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writePakFixture(t, root, "ModA_9999999_P.pak")
+
+	table := modtype.CharacterTable{}
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table, nil)
+	library, err := app.ScanLibrary(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	result, err := app.DetectConflicts(root, library.Entries)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("DetectConflicts() error = %v", err)
+	}
+	if len(result.Groups) != 0 {
+		t.Errorf("Groups = %+v, want none", result.Groups)
+	}
+	if len(result.Unavailable) != 1 || result.Unavailable[0] != library.Entries[0].ID {
+		t.Errorf("Unavailable = %v, want [%s]", result.Unavailable, library.Entries[0].ID)
 	}
 }
 

@@ -39,6 +39,7 @@ type classifyOutcome struct {
 	entryID  string
 	mtime    time.Time
 	identity Identity
+	paths    []string
 	failed   bool
 }
 
@@ -100,14 +101,16 @@ func (p *WorkerPool) workerLoop() {
 		}
 
 		var identity Identity
+		var paths []string
 		failed := false
 		if w != nil && w.Alive() {
-			id, err := DetermineIdentity(w, job.root, job.entry, job.table)
+			id, resolvedPaths, err := DetermineIdentity(w, job.root, job.entry, job.table)
 			if err != nil {
 				identity = Identity{Category: CategoryUnknown}
 				failed = true
 			} else {
 				identity = id
+				paths = resolvedPaths
 			}
 		} else {
 			identity = Identity{Category: CategoryUnknown}
@@ -118,6 +121,7 @@ func (p *WorkerPool) workerLoop() {
 			entryID:  job.entry.ID,
 			mtime:    job.mtime,
 			identity: identity,
+			paths:    paths,
 			failed:   failed,
 		}
 	}

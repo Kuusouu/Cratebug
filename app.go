@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
@@ -84,6 +85,36 @@ func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
 func (a *App) ClassifyLibrary(modRoot string, entries []discovery.Entry) (map[string]modtype.Identity, error) {
 	table := a.getCharacterTable()
 	return a.classifier.Classify(modRoot, entries, table)
+}
+
+// ConflictType anchors conflict.Result so Wails emits its TypeScript model into models.ts.
+func (a *App) ConflictType() conflict.Result {
+	return conflict.Result{}
+}
+
+// DetectConflicts scans entries for enabled mods that share internal Unreal
+// asset paths. It classifies entries first (a no-op for anything already
+// classified this session, since internal/modtype's SessionClassifier keyed
+// on Classify's own mtime-based cache also skips the corresponding
+// UAssetToolRivals call), then reuses each enabled mod's retained path
+// listing from that same cache rather than resolving it a second time.
+func (a *App) DetectConflicts(modRoot string, entries []discovery.Entry) (conflict.Result, error) {
+	table := a.getCharacterTable()
+	if _, err := a.classifier.Classify(modRoot, entries, table); err != nil {
+		return conflict.Result{}, err
+	}
+
+	paths := make(map[string][]string, len(entries))
+	for _, entry := range entries {
+		if entry.State != discovery.StateEnabled {
+			continue
+		}
+		if resolved, ok := a.classifier.PathsForEntry(modRoot, entry); ok {
+			paths[entry.ID] = resolved
+		}
+	}
+
+	return conflict.Detect(entries, paths), nil
 }
 
 func (a *App) getCharacterTable() modtype.CharacterTable {
