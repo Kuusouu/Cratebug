@@ -43,12 +43,7 @@ export function useDialogFocusTrap<T extends HTMLElement>(onClose: () => void) {
 
 		const activeContainer: HTMLElement = container;
 
-		// Blocks wheel input from reaching the page/library behind the dialog. Confirmed
-		// necessary in the actual native WebView2 window: a headless-Chromium check against
-		// the dev server showed body/html with no overflow at that window's exact size, but
-		// the real window's dimensions/DPI do produce scrollable overflow, and
-		// `overscroll-behavior: contain` (App.css) alone does not stop it there. Applies to
-		// every dialog using this hook, not just the one it was added for.
+		// Blocks wheel input from reaching the page/library behind the dialog
 		function handleWheel(event: WheelEvent) {
 			const target = event.target as HTMLElement | null;
 			if (!target || !activeContainer.contains(target)) {
