@@ -4,6 +4,7 @@ import {
 	Grid2X2,
 	List,
 	PanelsTopLeft,
+	PackagePlus,
 	Settings as SettingsIcon,
 	TriangleAlert,
 	X,
@@ -31,6 +32,7 @@ import {
 	RenameMod,
 	RenameTag,
 	ScanLibrary,
+	SelectFilesForInstall,
 	SetAccentColor,
 	SetDefaultViewMode,
 	SetModEnabled,
@@ -53,6 +55,8 @@ import {
 	hasMissingSidecar,
 } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
+import { InstallPreviewDialog } from "./InstallPreviewDialog";
+import { formatWailsError as errorMessage } from "./installPresentation";
 import {
 	type DraggedItem,
 	isValidDropTarget,
@@ -159,11 +163,6 @@ const maximumFileNameUTF16CodeUnits = 255;
 const minimumTrailingNines = 7;
 // SPEC.md requires a short deliberate delay before destructive confirmation.
 const deleteConfirmDelaySeconds = 3;
-
-// Converts unknown Wails failures into displayable scan errors.
-function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
 
 // Build subtree lookups once per scan so folder navigation does not repeatedly scan the library.
 // Starts from the scanner's complete folder list, not just folders containing mods, so an empty
@@ -325,6 +324,7 @@ export function LibraryScreen() {
 	>({});
 	const [isClassifying, setIsClassifying] = useState(false);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
+	const [installDialogFiles, setInstallDialogFiles] = useState<string[] | null>(null);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const classificationRequestIDRef = useRef(0);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
@@ -386,6 +386,16 @@ export function LibraryScreen() {
 		nextMutationFeedbackIDRef.current += 1;
 		setMutationFeedback({ id: nextMutationFeedbackIDRef.current, kind, message });
 	}, []);
+	const startInstallFiles = useCallback(async () => {
+		try {
+			const files = await SelectFilesForInstall();
+			if (files && files.length > 0) {
+				setInstallDialogFiles(files);
+			}
+		} catch (error) {
+			showMutationFeedback("error", `Could not open file selector: ${errorMessage(error)}`);
+		}
+	}, [showMutationFeedback]);
 	const classify = useCallback(async (root: string, entries: discovery.Entry[]) => {
 		classificationRequestIDRef.current += 1;
 		const requestID = classificationRequestIDRef.current;
@@ -1245,6 +1255,16 @@ export function LibraryScreen() {
 					<button
 						type="button"
 						className="icon-button"
+						onClick={() => void startInstallFiles()}
+						disabled={!libraryRoot || libraryState === "loading"}
+						aria-label="Install mod"
+						title="Install mod from archive or pak file"
+					>
+						<PackagePlus aria-hidden="true" />
+					</button>
+					<button
+						type="button"
+						className="icon-button"
 						onClick={() => setSettingsOpen(true)}
 						aria-label="Settings"
 						title="Settings"
@@ -1475,6 +1495,34 @@ export function LibraryScreen() {
 					onClose={() => setSettingsOpen(false)}
 					onSelectTheme={selectTheme}
 					onSelectAccentColor={selectAccentColor}
+				/>
+			)}
+			{installDialogFiles && libraryRoot && (
+				<InstallPreviewDialog
+					modRoot={libraryRoot}
+					sourceFiles={installDialogFiles}
+					defaultFolder={selectedFolder === "all" ? "" : selectedFolder}
+					folders={libraryIndex.folders}
+					libraryEntries={library.entries}
+					onDone={(result) => {
+						setInstallDialogFiles(null);
+						setLibrary(result.reconciledLibrary);
+						setLibraryState(
+							result.reconciledLibrary.entries.length === 0 ? "empty" : "populated",
+						);
+						classify(libraryRoot, result.reconciledLibrary.entries);
+						showMutationFeedback(
+							"success",
+							result.installedEntryIDs.length === 1
+								? "Installed 1 mod."
+								: `Installed ${result.installedEntryIDs.length} mods.`,
+						);
+						const firstInstalledID = result.installedEntryIDs[0];
+						if (firstInstalledID) {
+							setSelectedEntryID(firstInstalledID);
+						}
+					}}
+					onCancel={() => setInstallDialogFiles(null)}
 				/>
 			)}
 		</main>

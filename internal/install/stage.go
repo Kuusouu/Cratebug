@@ -30,6 +30,10 @@ const (
 
 	// Standard Marvel Rivals patch suffix stripped from display names for clean preview.
 	stagingPatchSuffix = "_P"
+
+	// Reported when a companion sidecar or primary fails to copy during staging, so the
+	// resulting bundle is not installed as if it were complete.
+	issueCompanionCopyFailed discovery.IssueCode = "companion-copy-failed"
 )
 
 // Progress reports the current status of a staging or installation operation.
@@ -45,12 +49,14 @@ type Progress struct {
 type StagedMod struct {
 	ID                  string                 `json:"id"`
 	RelativePrimaryPath string                 `json:"relativePrimaryPath"`
+	SourcePath          string                 `json:"sourcePath"`
 	Sidecars            discovery.Sidecars     `json:"sidecars"`
 	BundleFormat        discovery.BundleFormat `json:"bundleFormat"`
 	DisplayName         string                 `json:"displayName"`
 	Stem                string                 `json:"stem"`
 	TotalSizeBytes      int64                  `json:"totalSizeBytes"`
 	AllFiles            []string               `json:"allFiles"`
+	Issues              []discovery.Issue      `json:"issues,omitempty"`
 }
 
 // StagedSession holds the temporary workspace where mod files are unpacked and inspected.
@@ -171,6 +177,11 @@ func (s *StagedSession) StageFiles(ctx context.Context, onProgress func(Progress
 		return fmt.Errorf("no files provided for staging")
 	}
 
+	// Records companion files that failed to copy during auto-discovery, keyed by the
+	// lowercased stem of the loose file that triggered discovery. discoverStagedMods uses
+	// this to flag bundles that look complete on disk only because a copy silently failed.
+	companionCopyFailures := make(map[string][]string)
+
 	for i, srcPath := range s.SourceFiles {
 		select {
 		case <-ctx.Done():
@@ -210,6 +221,36 @@ func (s *StagedSession) StageFiles(ctx context.Context, onProgress func(Progress
 			if err := copyRegularFile(srcPath, destFile); err != nil {
 				return fmt.Errorf("copy %q to staging: %w", fileName, err)
 			}
+
+			// Automatically discover and pull in matching companion sidecars (.utoc, .ucas)
+			// or primary (.pak) from the same source directory so selecting only the .pak
+			// completes the full IoStore bundle.
+			srcDir := filepath.Dir(srcPath)
+			stem := extractFileStem(fileName)
+			if dirEntries, err := os.ReadDir(srcDir); err == nil {
+				for _, entry := range dirEntries {
+					if entry.IsDir() {
+						continue
+					}
+					entryName := entry.Name()
+					if strings.EqualFold(entryName, fileName) {
+						continue
+					}
+					if strings.EqualFold(extractFileStem(entryName), stem) {
+						if hasBundleExtension(entryName) {
+							companionSrc := filepath.Join(srcDir, entryName)
+							companionDst := filepath.Join(looseDir, entryName)
+							if err := copyRegularFile(companionSrc, companionDst); err != nil {
+								// Remove any partial write so a truncated copy doesn't
+								// masquerade as a genuinely present sidecar.
+								_ = os.Remove(companionDst)
+								key := strings.ToLower(stem)
+								companionCopyFailures[key] = append(companionCopyFailures[key], entryName)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -223,7 +264,7 @@ func (s *StagedSession) StageFiles(ctx context.Context, onProgress func(Progress
 		})
 	}
 
-	mods, err := discoverStagedMods(s.Dir)
+	mods, err := discoverStagedMods(s.Dir, s.SourceFiles, companionCopyFailures)
 	if err != nil {
 		return fmt.Errorf("discover staged mods: %w", err)
 	}
@@ -236,8 +277,9 @@ func (s *StagedSession) StageFiles(ctx context.Context, onProgress func(Progress
 	return nil
 }
 
-// Scans the staging workspace and builds StagedMod representations.
-func discoverStagedMods(stagingRoot string) ([]StagedMod, error) {
+// Scans the staging workspace and builds StagedMod representations. companionCopyFailures
+// flags bundles whose companion files failed to copy during staging, keyed by lowercased stem.
+func discoverStagedMods(stagingRoot string, sourceFiles []string, companionCopyFailures map[string][]string) ([]StagedMod, error) {
 	lib, err := discovery.Scan(stagingRoot)
 	if err != nil {
 		return nil, fmt.Errorf("scan staging directory: %w", err)
@@ -278,16 +320,26 @@ func discoverStagedMods(stagingRoot string) ([]StagedMod, error) {
 		primaryBase := filepath.Base(entry.PrimaryPath)
 		stem := extractFileStem(primaryBase)
 
+		issues := append([]discovery.Issue{}, entry.Issues...)
+		for _, failedFile := range companionCopyFailures[strings.ToLower(stem)] {
+			issues = append(issues, discovery.Issue{
+				Code:    issueCompanionCopyFailed,
+				Message: fmt.Sprintf("%s failed to copy during staging; the bundle may be incomplete", failedFile),
+			})
+		}
+
 		modID := fmt.Sprintf("staged-mod-%d", i)
 		mods = append(mods, StagedMod{
 			ID:                  modID,
 			RelativePrimaryPath: entry.PrimaryPath,
+			SourcePath:          determineSourcePath(entry.PrimaryPath, sourceFiles),
 			Sidecars:            entry.Sidecars,
 			BundleFormat:        entry.BundleFormat,
 			DisplayName:         cleanInstallDisplayName(entry.DisplayName),
 			Stem:                stem,
 			TotalSizeBytes:      totalBytes,
 			AllFiles:            allFiles,
+			Issues:              issues,
 		})
 	}
 
@@ -296,6 +348,94 @@ func discoverStagedMods(stagingRoot string) ([]StagedMod, error) {
 	})
 
 	return mods, nil
+}
+
+// Identifies which selected source input produced a staged path, so origin-formatting
+// helpers don't each re-derive the same loose-file/archive-item resolution.
+type stagedOrigin struct {
+	fromArchive bool // true for an "item_N/..." path staged out of an archive
+
+	// Set when fromArchive is false (a directly-selected "loose/..." file).
+	looseSourcePath string // best-guess absolute path of the selected or companion source file
+	looseFileName   string // staged file's base name
+
+	// Set when fromArchive is true.
+	archiveSourcePath string
+	archiveInnerPath  string
+	multiSource       bool // true when more than one source file was selected
+}
+
+// Resolves which sourceFiles entry a staged primaryPath came from, if any.
+func resolveStagedOrigin(primaryPath string, sourceFiles []string) (stagedOrigin, bool) {
+	cleanRel := filepath.ToSlash(primaryPath)
+
+	if strings.HasPrefix(cleanRel, "loose/") {
+		fileName := strings.TrimPrefix(cleanRel, "loose/")
+		for _, src := range sourceFiles {
+			if strings.EqualFold(filepath.Base(src), fileName) {
+				return stagedOrigin{looseSourcePath: src, looseFileName: fileName}, true
+			}
+			companion := filepath.Join(filepath.Dir(src), fileName)
+			if _, err := os.Stat(companion); err == nil {
+				return stagedOrigin{looseSourcePath: companion, looseFileName: fileName}, true
+			}
+		}
+		return stagedOrigin{looseFileName: fileName}, false
+	}
+
+	if strings.HasPrefix(cleanRel, "item_") {
+		parts := strings.SplitN(cleanRel, "/", 2)
+		if len(parts) == 2 {
+			var index int
+			if _, err := fmt.Sscanf(parts[0], "item_%d", &index); err == nil && index >= 0 && index < len(sourceFiles) {
+				return stagedOrigin{
+					fromArchive:       true,
+					archiveSourcePath: sourceFiles[index],
+					archiveInnerPath:  parts[1],
+					multiSource:       len(sourceFiles) > 1,
+				}, true
+			}
+		}
+	}
+
+	return stagedOrigin{}, false
+}
+
+// Determines the readable origin path for a staged mod candidate.
+func determineSourcePath(primaryPath string, sourceFiles []string) string {
+	origin, ok := resolveStagedOrigin(primaryPath, sourceFiles)
+	if !ok {
+		if origin.looseFileName != "" {
+			return origin.looseFileName
+		}
+		return primaryPath
+	}
+	if origin.fromArchive {
+		return fmt.Sprintf("%s > %s", origin.archiveSourcePath, origin.archiveInnerPath)
+	}
+	return origin.looseSourcePath
+}
+
+// Determines the concise readable display path for a file in the preview UI.
+func determineDisplayPath(primaryPath string, sourceFiles []string) string {
+	origin, ok := resolveStagedOrigin(primaryPath, sourceFiles)
+	if !ok {
+		if origin.looseFileName != "" {
+			return origin.looseFileName
+		}
+		return primaryPath
+	}
+	if origin.fromArchive {
+		if origin.multiSource {
+			return fmt.Sprintf("%s > %s", filepath.Base(origin.archiveSourcePath), origin.archiveInnerPath)
+		}
+		return origin.archiveInnerPath
+	}
+	parent := filepath.Base(filepath.Dir(origin.looseSourcePath))
+	if parent != "" && parent != "." && parent != "/" && parent != "\\" {
+		return filepath.ToSlash(filepath.Join(parent, origin.looseFileName))
+	}
+	return origin.looseFileName
 }
 
 // Extracts the filename stem excluding extension and disabled suffixes.
