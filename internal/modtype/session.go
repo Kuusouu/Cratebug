@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
@@ -50,9 +51,8 @@ func (s *SessionClassifier) Classify(root string, entries []discovery.Entry, tab
 			continue
 		}
 
-		primaryAbsPath := filepath.Join(root, filepath.FromSlash(entry.PrimaryPath))
-		info, err := os.Stat(primaryAbsPath)
-		if err != nil {
+		mtime, ok := primaryMTime(root, entry)
+		if !ok {
 			// If stat fails (e.g. file missing), dispatch as uncacheable miss so it degrades to Unknown
 			missJobs = append(missJobs, classifyJob{
 				root:  root,
@@ -62,9 +62,8 @@ func (s *SessionClassifier) Classify(root string, entries []discovery.Entry, tab
 			continue
 		}
 
-		mtime := info.ModTime()
 		if cached, ok := s.cache.Get(entry.ID, mtime); ok {
-			results[entry.ID] = cached
+			results[entry.ID] = cached.Identity
 			continue
 		}
 
@@ -98,7 +97,7 @@ func (s *SessionClassifier) Classify(root string, entries []discovery.Entry, tab
 		outcome := <-outcomeChan
 		results[outcome.entryID] = outcome.identity
 		if !outcome.mtime.IsZero() && !outcome.failed {
-			s.cache.Put(outcome.entryID, outcome.mtime, outcome.identity)
+			s.cache.Put(outcome.entryID, outcome.mtime, CachedClassification{Identity: outcome.identity, Paths: outcome.paths})
 		}
 	}
 
@@ -108,6 +107,44 @@ func (s *SessionClassifier) Classify(root string, entries []discovery.Entry, tab
 // Cache returns the session classifier's in-memory cache.
 func (s *SessionClassifier) Cache() *Cache {
 	return s.cache
+}
+
+// Paths returns the internal asset path listing retained for entryID the
+// last time it was classified at modTime, if any. ok is false when the
+// entry has never been classified this session, or was last classified at a
+// different modTime — callers should fall back to ListInternalPaths in that
+// case rather than treating a miss as an empty listing.
+func (s *SessionClassifier) Paths(entryID string, modTime time.Time) ([]string, bool) {
+	cached, ok := s.cache.Get(entryID, modTime)
+	if !ok {
+		return nil, false
+	}
+	return cached.Paths, true
+}
+
+// PathsForEntry resolves entry's primary file mtime against root and looks
+// up its retained path listing, the same way Classify itself resolves a
+// cache hit. ok is false for a non-mod entry, a missing primary file, or an
+// entry not yet classified since its primary file's current mtime — callers
+// should treat that as "not yet available", not "no content".
+func (s *SessionClassifier) PathsForEntry(root string, entry discovery.Entry) ([]string, bool) {
+	if entry.Kind != discovery.EntryMod || entry.PrimaryPath == "" {
+		return nil, false
+	}
+	mtime, ok := primaryMTime(root, entry)
+	if !ok {
+		return nil, false
+	}
+	return s.Paths(entry.ID, mtime)
+}
+
+// Resolves entry's primary file's current modification time against root.
+func primaryMTime(root string, entry discovery.Entry) (time.Time, bool) {
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(entry.PrimaryPath)))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return info.ModTime(), true
 }
 
 // Close gracefully closes the session worker pool, terminating all active child processes.

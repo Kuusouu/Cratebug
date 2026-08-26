@@ -3,6 +3,7 @@
 import {install} from '../models';
 import {modtype} from '../models';
 import {discovery} from '../models';
+import {conflict} from '../models';
 import {mutation} from '../models';
 import {metadata} from '../models';
 import {main} from '../models';
@@ -17,6 +18,8 @@ export function ClassificationType():Promise<modtype.Identity>;
 
 export function ClassifyLibrary(arg1:string,arg2:Array<discovery.Entry>):Promise<Record<string, modtype.Identity>>;
 
+export function ConflictType():Promise<conflict.Result>;
+
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
 export function CreateTag(arg1:string):Promise<metadata.Tag>;
@@ -24,6 +27,8 @@ export function CreateTag(arg1:string):Promise<metadata.Tag>;
 export function DeleteMod(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
 
 export function DeleteTag(arg1:string):Promise<void>;
+
+export function DetectConflicts(arg1:string,arg2:Array<discovery.Entry>):Promise<conflict.Result>;
 
 export function LoadMetadata():Promise<main.MetadataState>;
 

@@ -24,10 +24,15 @@ type Identity struct {
 // cause an error: CharacterID, CharacterName, SkinID, and SkinName are simply empty, so a
 // character-data problem never costs the caller an otherwise successful
 // category result.
-func DetermineIdentity(c caller, root string, entry discovery.Entry, table CharacterTable) (Identity, error) {
-	paths, err := listInternalPaths(c, root, entry)
+//
+// The returned paths are entry's full internal asset path listing, the same
+// one used to derive Identity. SessionClassifier retains it in its cache
+// alongside Identity so a later asset conflict scan (Phase 9) can reuse it
+// instead of listing the same mod's contents a second time.
+func DetermineIdentity(c caller, root string, entry discovery.Entry, table CharacterTable) (Identity, []string, error) {
+	paths, err := ListInternalPaths(c, root, entry)
 	if err != nil {
-		return Identity{}, err
+		return Identity{}, nil, err
 	}
 
 	characterID, characterName, skinID, skinName := ResolveCharacter(table, paths)
@@ -37,5 +42,5 @@ func DetermineIdentity(c caller, root string, entry discovery.Entry, table Chara
 		CharacterName: characterName,
 		SkinID:        skinID,
 		SkinName:      skinName,
-	}, nil
+	}, paths, nil
 }
