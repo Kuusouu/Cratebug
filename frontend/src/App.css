@@ -1907,6 +1907,39 @@ button:disabled {
 	animation: spin 1s linear infinite;
 }
 
+.drop-overlay {
+	display: grid;
+	position: fixed;
+	z-index: 40;
+	inset: 0;
+	place-items: center;
+	padding: 2rem;
+	background: color-mix(in srgb, var(--page), transparent 25%);
+	backdrop-filter: blur(0.35rem);
+	-webkit-backdrop-filter: blur(0.35rem);
+	pointer-events: none;
+}
+
+.drop-overlay-card {
+	display: grid;
+	justify-items: center;
+	gap: 0.85rem;
+	padding: 3rem 4rem;
+	border: 0.15rem dashed color-mix(in srgb, var(--accent), transparent 30%);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--panel-raised), var(--page) 8%);
+	color: var(--text);
+	font-size: 1.05rem;
+	font-weight: 650;
+	text-align: center;
+}
+
+.drop-overlay-card svg {
+	width: 2.5rem;
+	height: 2.5rem;
+	color: var(--accent);
+}
+
 @keyframes spin {
 	from {
 		transform: rotate(0deg);

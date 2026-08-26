@@ -42,6 +42,7 @@ import {
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import { discovery, type metadata, type modtype, type mutation } from "../../wailsjs/go/models";
+import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
@@ -325,6 +326,8 @@ export function LibraryScreen() {
 	const [isClassifying, setIsClassifying] = useState(false);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const [installDialogFiles, setInstallDialogFiles] = useState<string[] | null>(null);
+	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
+	const externalDragDepthRef = useRef(0);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const classificationRequestIDRef = useRef(0);
 	const mutatingEntryIDsRef = useRef(new Set<string>());
@@ -396,6 +399,73 @@ export function LibraryScreen() {
 			showMutationFeedback("error", `Could not open file selector: ${errorMessage(error)}`);
 		}
 	}, [showMutationFeedback]);
+	const handleDroppedFiles = useCallback(
+		(_x: number, _y: number, paths: string[]) => {
+			if (paths.length === 0) return;
+			if (!libraryRoot) {
+				showMutationFeedback("error", "Set a mod library folder before installing.");
+				return;
+			}
+			setInstallDialogFiles(paths);
+		},
+		[libraryRoot, showMutationFeedback],
+	);
+
+	// Wails resolves real filesystem paths for dropped files outside the DOM's
+	// dataTransfer, which never exposes host paths for security reasons.
+	useEffect(() => {
+		OnFileDrop(handleDroppedFiles, false);
+		return () => OnFileDropOff();
+	}, [handleDroppedFiles]);
+
+	// Tracks external OS file drags separately from the app's own internal drag-to-organize
+	// system (which carries "text/plain" data, not "Files") to show a drop-target overlay.
+	// dragenter/dragleave bubble from every element the drag crosses, so a depth counter
+	// avoids the overlay flickering as the pointer moves between nested elements.
+	useEffect(() => {
+		function isExternalFileDrag(event: DragEvent) {
+			return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+		}
+
+		function handleDragEnter(event: DragEvent) {
+			if (!isExternalFileDrag(event)) return;
+			event.preventDefault();
+			externalDragDepthRef.current += 1;
+			setIsDraggingExternalFiles(true);
+		}
+
+		function handleDragOver(event: DragEvent) {
+			if (!isExternalFileDrag(event)) return;
+			event.preventDefault();
+		}
+
+		function handleDragLeave(event: DragEvent) {
+			if (!isExternalFileDrag(event)) return;
+			externalDragDepthRef.current = Math.max(0, externalDragDepthRef.current - 1);
+			if (externalDragDepthRef.current === 0) {
+				setIsDraggingExternalFiles(false);
+			}
+		}
+
+		function handleDrop(event: DragEvent) {
+			if (!isExternalFileDrag(event)) return;
+			event.preventDefault();
+			externalDragDepthRef.current = 0;
+			setIsDraggingExternalFiles(false);
+		}
+
+		window.addEventListener("dragenter", handleDragEnter);
+		window.addEventListener("dragover", handleDragOver);
+		window.addEventListener("dragleave", handleDragLeave);
+		window.addEventListener("drop", handleDrop);
+		return () => {
+			window.removeEventListener("dragenter", handleDragEnter);
+			window.removeEventListener("dragover", handleDragOver);
+			window.removeEventListener("dragleave", handleDragLeave);
+			window.removeEventListener("drop", handleDrop);
+		};
+	}, []);
+
 	const classify = useCallback(async (root: string, entries: discovery.Entry[]) => {
 		classificationRequestIDRef.current += 1;
 		const requestID = classificationRequestIDRef.current;
@@ -1525,6 +1595,18 @@ export function LibraryScreen() {
 					onCancel={() => setInstallDialogFiles(null)}
 				/>
 			)}
+			{isDraggingExternalFiles &&
+				!activeDialog &&
+				!activeFolderDialog &&
+				!settingsOpen &&
+				!installDialogFiles && (
+					<div className="drop-overlay" aria-hidden="true">
+						<div className="drop-overlay-card">
+							<PackagePlus aria-hidden="true" />
+							<p>Drop mod files or archives to install</p>
+						</div>
+					</div>
+				)}
 		</main>
 	);
 }
