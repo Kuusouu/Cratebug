@@ -34,6 +34,7 @@ func main() {
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,
 		},
+		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,
 	})
 	if err != nil {

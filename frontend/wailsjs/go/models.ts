@@ -135,6 +135,155 @@ export namespace discovery {
 
 }
 
+export namespace install {
+	
+	export class ApplyItem {
+	    id: string;
+	    modName: string;
+	    destinationFolder: string;
+	    overwrite: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.modName = source["modName"];
+	        this.destinationFolder = source["destinationFolder"];
+	        this.overwrite = source["overwrite"];
+	    }
+	}
+	export class ApplyResult {
+	    installedEntryIDs: string[];
+	    reconciledLibrary: discovery.Library;
+	
+	    static createFrom(source: any = {}) {
+	        return new ApplyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installedEntryIDs = source["installedEntryIDs"];
+	        this.reconciledLibrary = this.convertValues(source["reconciledLibrary"], discovery.Library);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CollisionInfo {
+	    hasCollision: boolean;
+	    existingModID?: string;
+	    collidingFiles?: string[];
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CollisionInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasCollision = source["hasCollision"];
+	        this.existingModID = source["existingModID"];
+	        this.collidingFiles = source["collidingFiles"];
+	        this.description = source["description"];
+	    }
+	}
+	export class PreviewItem {
+	    id: string;
+	    modName: string;
+	    originalStem: string;
+	    bundleFormat: string;
+	    files: string[];
+	    totalSizeBytes: number;
+	    destinationFolder: string;
+	    collision: CollisionInfo;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreviewItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.modName = source["modName"];
+	        this.originalStem = source["originalStem"];
+	        this.bundleFormat = source["bundleFormat"];
+	        this.files = source["files"];
+	        this.totalSizeBytes = source["totalSizeBytes"];
+	        this.destinationFolder = source["destinationFolder"];
+	        this.collision = this.convertValues(source["collision"], CollisionInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PreviewResult {
+	    sessionId: string;
+	    items: PreviewItem[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PreviewResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.items = this.convertValues(source["items"], PreviewItem);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace main {
 	
 	export class MetadataState {
