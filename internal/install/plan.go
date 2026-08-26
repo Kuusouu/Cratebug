@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/modtype"
 )
 
 // CollisionInfo records conflict details when a staged mod collides with an existing library entry.
@@ -22,11 +23,14 @@ type PreviewItem struct {
 	ID                string                 `json:"id"`
 	ModName           string                 `json:"modName"`
 	OriginalStem      string                 `json:"originalStem"`
+	SourcePath        string                 `json:"sourcePath"`
 	BundleFormat      discovery.BundleFormat `json:"bundleFormat"`
 	Files             []string               `json:"files"`
 	TotalSizeBytes    int64                  `json:"totalSizeBytes"`
 	DestinationFolder string                 `json:"destinationFolder"`
 	Collision         CollisionInfo          `json:"collision"`
+	Identity          modtype.Identity       `json:"identity"`
+	Issues            []discovery.Issue      `json:"issues,omitempty"`
 }
 
 // PreviewResult contains all discovered mods in a staging session with collision checks.
@@ -36,7 +40,8 @@ type PreviewResult struct {
 }
 
 // BuildPreview constructs the installation preview and detects collisions against modRoot.
-func BuildPreview(modRoot string, session *StagedSession, defaultFolder string) (PreviewResult, error) {
+// identities may be nil when no classification is available.
+func BuildPreview(modRoot string, session *StagedSession, defaultFolder string, identities map[string]modtype.Identity) (PreviewResult, error) {
 	if session == nil {
 		return PreviewResult{}, fmt.Errorf("staging session is nil")
 	}
@@ -60,9 +65,9 @@ func BuildPreview(modRoot string, session *StagedSession, defaultFolder string) 
 
 	var previewItems []PreviewItem
 	for _, mod := range session.Mods {
-		var fileNames []string
+		var displayFilePaths []string
 		for _, f := range mod.AllFiles {
-			fileNames = append(fileNames, filepath.Base(f))
+			displayFilePaths = append(displayFilePaths, determineDisplayPath(f, session.SourceFiles))
 		}
 
 		collision := checkModCollision(modRoot, normDefaultFolder, mod, library)
@@ -71,11 +76,14 @@ func BuildPreview(modRoot string, session *StagedSession, defaultFolder string) 
 			ID:                mod.ID,
 			ModName:           mod.DisplayName,
 			OriginalStem:      mod.Stem,
+			SourcePath:        mod.SourcePath,
 			BundleFormat:      mod.BundleFormat,
-			Files:             fileNames,
+			Files:             displayFilePaths,
 			TotalSizeBytes:    mod.TotalSizeBytes,
 			DestinationFolder: normDefaultFolder,
 			Collision:         collision,
+			Identity:          identities[mod.ID],
+			Issues:            mod.Issues,
 		})
 	}
 

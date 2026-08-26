@@ -3,6 +3,7 @@ module github.com/Kuusouu/Cratebug
 go 1.26.5
 
 require (
+	github.com/mholt/archives v0.1.5
 	github.com/wailsapp/wails/v2 v2.13.0
 	golang.org/x/sys v0.44.0
 )
@@ -32,7 +33,6 @@ require (
 	github.com/leaanthony/u v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mholt/archives v0.1.5 // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect
 	github.com/minio/minlz v1.0.1 // indirect
 	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
