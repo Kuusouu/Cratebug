@@ -22,6 +22,10 @@ export function ClassifyLibrary(arg1, arg2) {
   return window['go']['main']['App']['ClassifyLibrary'](arg1, arg2);
 }
 
+export function ConflictType() {
+  return window['go']['main']['App']['ConflictType']();
+}
+
 export function CreateFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
 }
@@ -36,6 +40,10 @@ export function DeleteMod(arg1, arg2, arg3) {
 
 export function DeleteTag(arg1) {
   return window['go']['main']['App']['DeleteTag'](arg1);
+}
+
+export function DetectConflicts(arg1, arg2) {
+  return window['go']['main']['App']['DetectConflicts'](arg1, arg2);
 }
 
 export function LoadMetadata() {

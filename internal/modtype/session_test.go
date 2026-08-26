@@ -286,6 +286,9 @@ func TestSessionClassifierDoesNotCacheFailedOutcomes(t *testing.T) {
 	if _, ok := classifier.Cache().Get("mod-1", fi.ModTime()); ok {
 		t.Error("classifier cached a failed outcome; expected cache miss")
 	}
+	if _, ok := classifier.Paths("mod-1", fi.ModTime()); ok {
+		t.Error("classifier retained paths for a failed outcome; expected miss")
+	}
 
 	// Act 2: Worker heals (transient failure resolved) -> second scan succeeds and populates cache
 	shouldFail = false
@@ -299,8 +302,12 @@ func TestSessionClassifierDoesNotCacheFailedOutcomes(t *testing.T) {
 	}
 
 	// Now cache should have it
-	if cached, ok := classifier.Cache().Get("mod-1", fi.ModTime()); !ok || cached.CharacterName != "Blade" {
+	if cached, ok := classifier.Cache().Get("mod-1", fi.ModTime()); !ok || cached.Identity.CharacterName != "Blade" {
 		t.Errorf("cache get = (%#v, %v), want Blade and hit", cached, ok)
+	}
+	wantPaths := []string{"Marvel/Content/Characters/1044/SK_Blade.uasset"}
+	if paths, ok := classifier.Paths("mod-1", fi.ModTime()); !ok || len(paths) != 1 || paths[0] != wantPaths[0] {
+		t.Errorf("Paths() = (%v, %v), want (%v, true)", paths, ok, wantPaths)
 	}
 }
 
