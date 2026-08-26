@@ -6,19 +6,24 @@ import (
 	"sync"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // Exposes the small backend surface used by the frontend.
 type App struct {
-	mutationExecutor mutation.Executor
-	metadataStore    metadata.Store
-	classifier       *modtype.SessionClassifier
-	tableMu          sync.Mutex
-	characterTable   modtype.CharacterTable
-	tableLoaded      bool
+	ctx                   context.Context
+	gameRunningChecker    mutation.GameRunningChecker
+	mutationExecutor      mutation.Executor
+	metadataStore         metadata.Store
+	classifier            *modtype.SessionClassifier
+	installSessionManager *install.SessionManager
+	tableMu               sync.Mutex
+	characterTable        modtype.CharacterTable
+	tableLoaded           bool
 }
 
 // Creates the application binding.
@@ -28,24 +33,30 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("resolve metadata storage location: %w", err)
 	}
 	classifier := modtype.NewSessionClassifier(modtype.DefaultWorkerLauncher(nil))
-	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier, nil), nil
+	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier, nil, nil), nil
 }
 
 // Lets tests inject a deterministic game-running detector, a disposable
-// metadata store, a custom classifier, and an optional character table without exposing either to Wails.
+// metadata store, a custom classifier, an optional character table, and an install session manager.
 func newApp(
 	gameRunningChecker mutation.GameRunningChecker,
 	metadataStore metadata.Store,
 	classifier *modtype.SessionClassifier,
 	characterTable *modtype.CharacterTable,
+	installSessionManager *install.SessionManager,
 ) *App {
 	if classifier == nil {
 		classifier = modtype.NewSessionClassifier(nil)
 	}
+	if installSessionManager == nil {
+		installSessionManager = install.NewSessionManager()
+	}
 	app := &App{
-		mutationExecutor: mutation.NewExecutor(gameRunningChecker),
-		metadataStore:    metadataStore,
-		classifier:       classifier,
+		gameRunningChecker:    gameRunningChecker,
+		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
+		metadataStore:         metadataStore,
+		classifier:            classifier,
+		installSessionManager: installSessionManager,
 	}
 	if characterTable != nil {
 		app.characterTable = *characterTable
@@ -288,10 +299,104 @@ func (a *App) UnassignModTag(entryID, tagID string) error {
 	return a.metadataStore.Save(doc)
 }
 
+// startup is called by Wails when the application is launched, saving the runtime context.
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+}
+
+// SelectFilesForInstall opens a native multiple-file dialog to select mod archives or direct bundles.
+func (a *App) SelectFilesForInstall() ([]string, error) {
+	if a.ctx == nil {
+		return nil, fmt.Errorf("application runtime context is not available")
+	}
+
+	paths, err := wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select Mods to Install",
+		Filters: []wailsRuntime.FileFilter{
+			{
+				DisplayName: "Supported Mod Archives & Files (*.zip, *.7z, *.rar, *.pak, *.utoc, *.ucas)",
+				Pattern:     "*.zip;*.7z;*.rar;*.tar;*.tar.gz;*.tgz;*.pak;*.utoc;*.ucas",
+			},
+			{
+				DisplayName: "All Files (*.*)",
+				Pattern:     "*.*",
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("open file dialog: %w", err)
+	}
+
+	return paths, nil
+}
+
+// PrepareInstall creates a staging session, unpacks the selected files, discovers mods,
+// and returns the preview information with collision checks.
+func (a *App) PrepareInstall(modRoot string, filePaths []string, defaultFolder string) (install.PreviewResult, error) {
+	if len(filePaths) == 0 {
+		return install.PreviewResult{}, fmt.Errorf("no files selected")
+	}
+
+	session, err := a.installSessionManager.CreateSession(filePaths)
+	if err != nil {
+		return install.PreviewResult{}, fmt.Errorf("create staging session: %w", err)
+	}
+
+	onProgress := func(p install.Progress) {
+		if a.ctx != nil {
+			wailsRuntime.EventsEmit(a.ctx, "install:progress", p)
+		}
+	}
+
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if err := session.StageFiles(ctx, onProgress); err != nil {
+		_ = a.installSessionManager.RemoveSession(session.ID)
+		return install.PreviewResult{}, err
+	}
+
+	preview, err := install.BuildPreview(modRoot, session, defaultFolder)
+	if err != nil {
+		_ = a.installSessionManager.RemoveSession(session.ID)
+		return install.PreviewResult{}, err
+	}
+
+	return preview, nil
+}
+
+// ApplyInstall applies the approved installation items and cleans up the staging session.
+func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.ApplyItem) (install.ApplyResult, error) {
+	session := a.installSessionManager.GetSession(sessionID)
+	if session == nil {
+		return install.ApplyResult{}, fmt.Errorf("install staging session %q not found or expired", sessionID)
+	}
+	defer func() {
+		_ = a.installSessionManager.RemoveSession(sessionID)
+	}()
+
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	return install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
+}
+
+// CancelInstall cleans up staging data when the user cancels the installation preview.
+func (a *App) CancelInstall(sessionID string) error {
+	return a.installSessionManager.RemoveSession(sessionID)
+}
+
 // shutdown is called by Wails when the application is closing, ensuring
 // any session-held workers or background resources are cleanly closed.
 func (a *App) shutdown(_ context.Context) {
 	if a.classifier != nil {
 		_ = a.classifier.Close()
+	}
+	if a.installSessionManager != nil {
+		_ = a.installSessionManager.CleanupAll()
 	}
 }
