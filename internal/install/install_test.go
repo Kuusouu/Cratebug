@@ -825,3 +825,65 @@ func TestDetermineFinalStem_NoDuplicateSuffix(t *testing.T) {
 		t.Errorf("expected 'Hero New_P' without duplicate _P, got %q", stem)
 	}
 }
+
+func TestStageFiles_IncompleteMultiVolumeRarFailsCleanly(t *testing.T) {
+	// Arrange: a real rar archive (see testdata/README.md), the first volume of
+	// a two-volume set. Cratebug reads a selected archive through a single
+	// os.File reader (ExtractArchive), never multi-volume-aware sibling lookup,
+	// so this is what a user selecting only the first part of a multi-volume
+	// rar actually produces - not a rar containing zero mod files.
+	rarPath := filepath.Join("testdata", "test.part01.rar")
+	if _, err := os.Stat(rarPath); err != nil {
+		t.Skipf("rar fixture unavailable: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{rarPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Act
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: fails cleanly instead of silently succeeding with a truncated
+	// extraction or leaving partial state behind.
+	if err == nil {
+		t.Fatalf("expected StageFiles to reject an incomplete multi-volume rar, got nil error; mods=%+v", session.Mods)
+	}
+	if !strings.Contains(err.Error(), "multi-volume") {
+		t.Errorf("expected a multi-volume-related error, got: %v", err)
+	}
+	if _, statErr := os.Stat(session.Dir); statErr != nil {
+		t.Errorf("expected staging dir to still exist for caller cleanup after a failed stage, stat err=%v", statErr)
+	}
+}
+
+func TestStageFiles_GenuinelyEmptyRarRejectedCleanly(t *testing.T) {
+	// Arrange: a real, valid, single-volume rar archive with zero entries
+	// (see testdata/README.md).
+	rarPath := filepath.Join("testdata", "empty.rar")
+	if _, err := os.Stat(rarPath); err != nil {
+		t.Skipf("rar fixture unavailable: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{rarPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Act
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: the archive decodes without error, same rejection as any other
+	// archive with no mod files - not a crash, hang, or silent empty install.
+	if err == nil {
+		t.Fatalf("expected StageFiles to reject an empty rar, got nil error; mods=%+v", session.Mods)
+	}
+	if !strings.Contains(err.Error(), "no valid Marvel Rivals mod files") {
+		t.Errorf("expected the standard no-mod-files rejection, got: %v", err)
+	}
+}
