@@ -1,4 +1,4 @@
-import { Package, X } from "lucide-react";
+import { Package, ShieldAlert, X } from "lucide-react";
 import { type DragEvent, memo, type MouseEvent } from "react";
 import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
 import {
@@ -27,6 +27,7 @@ type ModCatalogProps = {
 	tagsByEntryID: ReadonlyMap<string, metadata.Tag[]>;
 	identitiesByEntryID?: Record<string, modtype.Identity> | undefined;
 	isClassifying?: boolean | undefined;
+	conflictedEntryIDs?: ReadonlySet<string> | undefined;
 	draggedEntryID: string | null;
 	onSetEnabled: (entry: discovery.Entry) => void;
 	onSelect: (entry: discovery.Entry) => void;
@@ -51,6 +52,7 @@ type ModCardProps = {
 	tags: metadata.Tag[];
 	identity?: modtype.Identity | undefined;
 	isClassifying?: boolean | undefined;
+	hasConflict: boolean;
 	isDragging: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
 	onSelect: ModCatalogProps["onSelect"];
@@ -118,6 +120,7 @@ export function ModCatalog({
 	tagsByEntryID,
 	identitiesByEntryID,
 	isClassifying,
+	conflictedEntryIDs,
 	draggedEntryID,
 	onSetEnabled,
 	onSelect,
@@ -153,6 +156,7 @@ export function ModCatalog({
 					tags={tagsByEntryID.get(entry.id) ?? []}
 					identity={identitiesByEntryID?.[entry.id]}
 					isClassifying={isClassifying}
+					hasConflict={conflictedEntryIDs?.has(entry.id) ?? false}
 					isDragging={draggedEntryID === entry.id}
 					onSetEnabled={onSetEnabled}
 					onSelect={onSelect}
@@ -176,6 +180,7 @@ const ModCard = memo(function ModCard({
 	tags,
 	identity,
 	isClassifying,
+	hasConflict,
 	isDragging,
 	onSetEnabled,
 	onSelect,
@@ -217,6 +222,12 @@ const ModCard = memo(function ModCard({
 				<span className="mod-category-badge category-skeleton" aria-hidden="true" />
 			) : null}
 			<span>Priority {entry.priority.value}</span>
+			{hasConflict && (
+				<span className="mod-conflict-badge">
+					<ShieldAlert aria-hidden="true" />
+					Conflict
+				</span>
+			)}
 		</div>
 	);
 	const heading = (
