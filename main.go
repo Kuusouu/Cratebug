@@ -28,6 +28,12 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 12, G: 16, B: 24, A: 1},
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop: true,
+			// Prevents the WebView from navigating to a dropped file if our own
+			// frontend handler ever fails to intercept the drop.
+			DisableWebViewDrop: true,
+		},
 		Bind: []interface{}{
 			app,
 		},
