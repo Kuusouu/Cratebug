@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
@@ -29,13 +30,13 @@ func testMetadataStore(t *testing.T) metadata.Store {
 func testApp(t *testing.T, gameRunning bool) *App {
 	t.Helper()
 	emptyTable := modtype.CharacterTable{}
-	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, testMetadataStore(t), nil, &emptyTable)
+	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, testMetadataStore(t), nil, &emptyTable, nil)
 }
 
 func testAppWithStore(t *testing.T, gameRunning bool, store metadata.Store) *App {
 	t.Helper()
 	emptyTable := modtype.CharacterTable{}
-	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, store, nil, &emptyTable)
+	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, store, nil, &emptyTable, nil)
 }
 
 func TestRuntimeStatus(t *testing.T) {
@@ -377,7 +378,7 @@ func TestClassifyLibrary(t *testing.T) {
 	table := modtype.CharacterTable{
 		CharacterNames: map[string]string{"1044": "Blade"},
 	}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table)
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table, nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -396,5 +397,94 @@ func TestClassifyLibrary(t *testing.T) {
 	// Without a live worker running in this unit test, it degrades to CategoryUnknown gracefully
 	if results[library.Entries[0].ID].Category != modtype.CategoryUnknown {
 		t.Errorf("Category = %q, want CategoryUnknown", results[library.Entries[0].ID].Category)
+	}
+}
+
+func TestAppInstallLifecycle(t *testing.T) {
+	// Arrange
+	modRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	sourcePak := filepath.Join(sourceDir, "Punisher_P.pak")
+	if err := os.WriteFile(sourcePak, []byte("punisher"), 0o600); err != nil {
+		t.Fatalf("write source pak: %v", err)
+	}
+
+	app := testApp(t, false)
+
+	// Act - Prepare
+	preview, err := app.PrepareInstall(modRoot, []string{sourcePak}, "Characters/Punisher")
+	if err != nil {
+		t.Fatalf("PrepareInstall failed: %v", err)
+	}
+
+	// Assert - Prepare
+	if len(preview.Items) != 1 {
+		t.Fatalf("expected 1 item in preview, got %d", len(preview.Items))
+	}
+	if preview.Items[0].ModName != "Punisher" {
+		t.Errorf("expected ModName Punisher, got %q", preview.Items[0].ModName)
+	}
+
+	// Act - Apply
+	applyItems := []install.ApplyItem{
+		{
+			ID:                preview.Items[0].ID,
+			ModName:           "Punisher",
+			DestinationFolder: "Characters/Punisher",
+			Overwrite:         false,
+		},
+	}
+	result, err := app.ApplyInstall(modRoot, preview.SessionID, applyItems)
+
+	// Assert - Apply
+	if err != nil {
+		t.Fatalf("ApplyInstall failed: %v", err)
+	}
+	if len(result.InstalledEntryIDs) != 1 {
+		t.Errorf("expected 1 installed entry ID, got %d", len(result.InstalledEntryIDs))
+	}
+
+	destPak := filepath.Join(modRoot, "Characters", "Punisher", "Punisher_P.pak")
+	if _, err := os.Stat(destPak); err != nil {
+		t.Fatalf("expected installed file missing: %s", destPak)
+	}
+}
+
+func TestAppInstallCancel(t *testing.T) {
+	// Arrange
+	modRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	sourcePak := filepath.Join(sourceDir, "Groot_P.pak")
+	if err := os.WriteFile(sourcePak, []byte("groot"), 0o600); err != nil {
+		t.Fatalf("write source pak: %v", err)
+	}
+
+	app := testApp(t, false)
+
+	preview, err := app.PrepareInstall(modRoot, []string{sourcePak}, "")
+	if err != nil {
+		t.Fatalf("PrepareInstall failed: %v", err)
+	}
+
+	// Act - Cancel
+	err = app.CancelInstall(preview.SessionID)
+
+	// Assert - Cancel
+	if err != nil {
+		t.Fatalf("CancelInstall failed: %v", err)
+	}
+
+	// Attempting to apply after cancel should fail because session is removed
+	applyItems := []install.ApplyItem{
+		{
+			ID:                preview.Items[0].ID,
+			ModName:           "Groot",
+			DestinationFolder: "",
+			Overwrite:         false,
+		},
+	}
+	_, err = app.ApplyInstall(modRoot, preview.SessionID, applyItems)
+	if err == nil {
+		t.Fatalf("expected ApplyInstall to fail after CancelInstall, but it succeeded")
 	}
 }

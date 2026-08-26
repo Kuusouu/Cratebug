@@ -461,7 +461,7 @@ func validateFileStem(stem string) error {
 	if strings.ContainsAny(stem, `<>:"/\|?*`) {
 		return fmt.Errorf("name contains a Windows-reserved character")
 	}
-	if isReservedDeviceName(stem) {
+	if IsReservedDeviceName(stem) {
 		return fmt.Errorf("name is reserved by Windows for a device")
 	}
 	for _, character := range stem {
@@ -473,7 +473,7 @@ func validateFileStem(stem string) error {
 }
 
 // Windows reserves device names even when they are followed by an extension.
-func isReservedDeviceName(stem string) bool {
+func IsReservedDeviceName(stem string) bool {
 	baseName := strings.TrimRight(stem, " .")
 	if extension := strings.IndexRune(baseName, '.'); extension >= 0 {
 		baseName = strings.TrimRight(baseName[:extension], " ")
