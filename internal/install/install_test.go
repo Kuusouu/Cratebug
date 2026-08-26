@@ -233,6 +233,265 @@ func TestStageFiles_MixedArchivesAndDirectFiles(t *testing.T) {
 	}
 }
 
+func TestStageFiles_AutoDiscoversCompanionSidecars(t *testing.T) {
+	// Arrange: A folder on disk containing a full IoStore bundle (.pak, .utoc, .ucas)
+	tempDir := t.TempDir()
+	modDir := filepath.Join(tempDir, "LooseMod")
+	if err := os.MkdirAll(modDir, testDirPermissions); err != nil {
+		t.Fatalf("create mod dir: %v", err)
+	}
+
+	pakPath := filepath.Join(modDir, "Lagoona_9999999_P.pak")
+	utocPath := filepath.Join(modDir, "Lagoona_9999999_P.utoc")
+	ucasPath := filepath.Join(modDir, "Lagoona_9999999_P.ucas")
+
+	if err := os.WriteFile(pakPath, []byte("pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write pak: %v", err)
+	}
+	if err := os.WriteFile(utocPath, []byte("utoc-data"), testFilePermissions); err != nil {
+		t.Fatalf("write utoc: %v", err)
+	}
+	if err := os.WriteFile(ucasPath, []byte("ucas-data"), testFilePermissions); err != nil {
+		t.Fatalf("write ucas: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{pakPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Act: User selects ONLY the .pak file for staging
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: It should automatically detect and stage the .utoc and .ucas companions
+	if err != nil {
+		t.Fatalf("StageFiles failed: %v", err)
+	}
+	if len(session.Mods) != 1 {
+		t.Fatalf("expected 1 mod discovered, got %d", len(session.Mods))
+	}
+
+	mod := session.Mods[0]
+	if mod.BundleFormat != discovery.BundleFormatIoStore {
+		t.Errorf("expected BundleFormatIoStore, got %v", mod.BundleFormat)
+	}
+	if mod.Sidecars.UTOC == "" || mod.Sidecars.UCAS == "" {
+		t.Errorf("expected both UTOC and UCAS sidecars populated, got %+v", mod.Sidecars)
+	}
+	if len(mod.AllFiles) != 3 {
+		t.Errorf("expected 3 files in bundle, got %d: %v", len(mod.AllFiles), mod.AllFiles)
+	}
+}
+
+func TestStageFiles_CompanionDiscovery_CaseInsensitiveMatch(t *testing.T) {
+	// Arrange: sidecars use uppercase and mixed-case extensions
+	tempDir := t.TempDir()
+	modDir := filepath.Join(tempDir, "LooseMod")
+	if err := os.MkdirAll(modDir, testDirPermissions); err != nil {
+		t.Fatalf("create mod dir: %v", err)
+	}
+
+	pakPath := filepath.Join(modDir, "Lagoona_9999999_P.pak")
+	if err := os.WriteFile(pakPath, []byte("pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write pak: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Lagoona_9999999_P.UTOC"), []byte("utoc-data"), testFilePermissions); err != nil {
+		t.Fatalf("write utoc: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Lagoona_9999999_P.Ucas"), []byte("ucas-data"), testFilePermissions); err != nil {
+		t.Fatalf("write ucas: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{pakPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Act
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: uppercase/mixed-case sidecar extensions are still matched
+	if err != nil {
+		t.Fatalf("StageFiles failed: %v", err)
+	}
+	if len(session.Mods) != 1 {
+		t.Fatalf("expected 1 mod discovered, got %d", len(session.Mods))
+	}
+	mod := session.Mods[0]
+	if mod.BundleFormat != discovery.BundleFormatIoStore {
+		t.Errorf("expected BundleFormatIoStore, got %v", mod.BundleFormat)
+	}
+	if len(mod.AllFiles) != 3 {
+		t.Errorf("expected 3 files in bundle, got %d: %v", len(mod.AllFiles), mod.AllFiles)
+	}
+}
+
+func TestStageFiles_CompanionDiscovery_ExcludesDifferentStem(t *testing.T) {
+	// Arrange: an unrelated mod's primary sits in the same source directory
+	tempDir := t.TempDir()
+	modDir := filepath.Join(tempDir, "LooseMod")
+	if err := os.MkdirAll(modDir, testDirPermissions); err != nil {
+		t.Fatalf("create mod dir: %v", err)
+	}
+
+	pakPath := filepath.Join(modDir, "Foo_P.pak")
+	if err := os.WriteFile(pakPath, []byte("pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write pak: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Foo_P.utoc"), []byte("utoc-data"), testFilePermissions); err != nil {
+		t.Fatalf("write utoc: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Foo_P.ucas"), []byte("ucas-data"), testFilePermissions); err != nil {
+		t.Fatalf("write ucas: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Bar_P.pak"), []byte("unrelated-pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write unrelated pak: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{pakPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Act: User selects ONLY Foo_P.pak
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: the unrelated Bar_P.pak is not pulled in as a companion
+	if err != nil {
+		t.Fatalf("StageFiles failed: %v", err)
+	}
+	if len(session.Mods) != 1 {
+		t.Fatalf("expected 1 mod discovered, got %d: %+v", len(session.Mods), session.Mods)
+	}
+	if len(session.Mods[0].AllFiles) != 3 {
+		t.Errorf("expected 3 files (pak+utoc+ucas), got %d: %v", len(session.Mods[0].AllFiles), session.Mods[0].AllFiles)
+	}
+}
+
+func TestStageFiles_CompanionDiscovery_PicksUpDisabledSuffixVariant(t *testing.T) {
+	// Arrange: an enabled primary sits alongside a disabled-suffix variant of itself
+	tempDir := t.TempDir()
+	modDir := filepath.Join(tempDir, "LooseMod")
+	if err := os.MkdirAll(modDir, testDirPermissions); err != nil {
+		t.Fatalf("create mod dir: %v", err)
+	}
+
+	pakPath := filepath.Join(modDir, "Foo_9999999_P.pak")
+	if err := os.WriteFile(pakPath, []byte("pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write pak: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Foo_9999999_P.pak_disabled"), []byte("disabled-pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write disabled variant: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{pakPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Act
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: both variants staged, so discovery reports them as ambiguous primaries -
+	// proof the .pak_disabled companion was actually copied, not just the .pak itself.
+	if err != nil {
+		t.Fatalf("StageFiles failed: %v", err)
+	}
+	if len(session.Mods) != 2 {
+		t.Fatalf("expected 2 mods (enabled + disabled variant), got %d: %+v", len(session.Mods), session.Mods)
+	}
+	for _, mod := range session.Mods {
+		found := false
+		for _, issue := range mod.Issues {
+			if issue.Code == discovery.IssueAmbiguousPrimary {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("expected mod %q to report an ambiguous-primary issue, got %+v", mod.DisplayName, mod.Issues)
+		}
+	}
+}
+
+func TestStageFiles_CompanionCopyFailure_SurfacesIssueInsteadOfSilentClassic(t *testing.T) {
+	// Arrange: a .pak whose intended .utoc/.ucas companions cannot be copied
+	tempDir := t.TempDir()
+	modDir := filepath.Join(tempDir, "LooseMod")
+	if err := os.MkdirAll(modDir, testDirPermissions); err != nil {
+		t.Fatalf("create mod dir: %v", err)
+	}
+
+	pakPath := filepath.Join(modDir, "Foo_P.pak")
+	if err := os.WriteFile(pakPath, []byte("pak-data"), testFilePermissions); err != nil {
+		t.Fatalf("write pak: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Foo_P.utoc"), []byte("utoc-data"), testFilePermissions); err != nil {
+		t.Fatalf("write utoc: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(modDir, "Foo_P.ucas"), []byte("ucas-data"), testFilePermissions); err != nil {
+		t.Fatalf("write ucas: %v", err)
+	}
+
+	sm := NewSessionManager()
+	session, err := sm.CreateSession([]string{pakPath})
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	defer session.Cleanup()
+
+	// Obstruct both sidecar destinations with directories so copyRegularFile fails for
+	// each companion, simulating a locked-file/permission-denied failure portably.
+	looseDir := filepath.Join(session.Dir, "loose")
+	if err := os.MkdirAll(filepath.Join(looseDir, "Foo_P.utoc"), testDirPermissions); err != nil {
+		t.Fatalf("obstruct utoc destination: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(looseDir, "Foo_P.ucas"), testDirPermissions); err != nil {
+		t.Fatalf("obstruct ucas destination: %v", err)
+	}
+
+	// Act
+	err = session.StageFiles(context.Background(), nil)
+
+	// Assert: staging still succeeds best-effort, but the mod is flagged rather than
+	// silently reported as a plain Classic bundle.
+	if err != nil {
+		t.Fatalf("StageFiles failed: %v", err)
+	}
+	if len(session.Mods) != 1 {
+		t.Fatalf("expected 1 mod discovered, got %d", len(session.Mods))
+	}
+
+	mod := session.Mods[0]
+	if mod.BundleFormat != discovery.BundleFormatClassic {
+		t.Errorf("expected BundleFormatClassic since neither sidecar landed, got %v", mod.BundleFormat)
+	}
+	if len(mod.Issues) != 2 {
+		t.Fatalf("expected 2 companion-copy-failed issues, got %d: %+v", len(mod.Issues), mod.Issues)
+	}
+	for _, issue := range mod.Issues {
+		if issue.Code != issueCompanionCopyFailed {
+			t.Errorf("expected issue code %q, got %q", issueCompanionCopyFailed, issue.Code)
+		}
+	}
+
+	// The failure must also reach the preview the user actually sees.
+	preview, err := BuildPreview(tempDir, session, "", nil)
+	if err != nil {
+		t.Fatalf("BuildPreview failed: %v", err)
+	}
+	if len(preview.Items) != 1 || len(preview.Items[0].Issues) != 2 {
+		t.Fatalf("expected the copy-failure issues to reach the preview item, got %+v", preview.Items)
+	}
+}
+
 func TestBuildPreview_CollisionDetection(t *testing.T) {
 	// Arrange
 	modRoot := t.TempDir()
@@ -262,7 +521,7 @@ func TestBuildPreview_CollisionDetection(t *testing.T) {
 	}
 
 	// Act - Collision case
-	previewWithCollision, err := BuildPreview(modRoot, session, "Characters/Hulk")
+	previewWithCollision, err := BuildPreview(modRoot, session, "Characters/Hulk", nil)
 	if err != nil {
 		t.Fatalf("BuildPreview failed: %v", err)
 	}
@@ -276,7 +535,7 @@ func TestBuildPreview_CollisionDetection(t *testing.T) {
 	}
 
 	// Act - No collision case (different folder)
-	previewNoCollision, err := BuildPreview(modRoot, session, "Characters/Thor")
+	previewNoCollision, err := BuildPreview(modRoot, session, "Characters/Thor", nil)
 	if err != nil {
 		t.Fatalf("BuildPreview failed: %v", err)
 	}
@@ -502,7 +761,7 @@ func TestBuildPreview_EscapingDestinationFolder(t *testing.T) {
 	}
 
 	// Act
-	_, err = BuildPreview(tempDir, session, "../outside")
+	_, err = BuildPreview(tempDir, session, "../outside", nil)
 
 	// Assert
 	if err == nil {

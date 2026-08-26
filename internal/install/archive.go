@@ -44,14 +44,24 @@ const (
 	defaultArchiveFilePermissions fs.FileMode = 0644
 )
 
-// Reports whether a file path has an archive extension and is not a raw Unreal bundle.
-func IsArchiveFile(filePath string) bool {
-	lower := strings.ToLower(filePath)
+// Reports whether a file name carries one of the recognized Unreal bundle extensions
+// (primary .pak, its disabled-suffix variants, or a .utoc/.ucas sidecar).
+func hasBundleExtension(fileName string) bool {
+	lower := strings.ToLower(fileName)
 	for _, bundleExt := range bundleExtensions {
 		if strings.HasSuffix(lower, bundleExt) {
-			return false
+			return true
 		}
 	}
+	return false
+}
+
+// Reports whether a file path has an archive extension and is not a raw Unreal bundle.
+func IsArchiveFile(filePath string) bool {
+	if hasBundleExtension(filePath) {
+		return false
+	}
+	lower := strings.ToLower(filePath)
 	for _, archExt := range archiveExtensions {
 		if strings.HasSuffix(lower, archExt) {
 			return true

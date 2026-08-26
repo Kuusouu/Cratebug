@@ -209,11 +209,14 @@ export namespace install {
 	    id: string;
 	    modName: string;
 	    originalStem: string;
+	    sourcePath: string;
 	    bundleFormat: string;
 	    files: string[];
 	    totalSizeBytes: number;
 	    destinationFolder: string;
 	    collision: CollisionInfo;
+	    identity: modtype.Identity;
+	    issues?: discovery.Issue[];
 	
 	    static createFrom(source: any = {}) {
 	        return new PreviewItem(source);
@@ -224,11 +227,14 @@ export namespace install {
 	        this.id = source["id"];
 	        this.modName = source["modName"];
 	        this.originalStem = source["originalStem"];
+	        this.sourcePath = source["sourcePath"];
 	        this.bundleFormat = source["bundleFormat"];
 	        this.files = source["files"];
 	        this.totalSizeBytes = source["totalSizeBytes"];
 	        this.destinationFolder = source["destinationFolder"];
 	        this.collision = this.convertValues(source["collision"], CollisionInfo);
+	        this.identity = this.convertValues(source["identity"], modtype.Identity);
+	        this.issues = this.convertValues(source["issues"], discovery.Issue);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

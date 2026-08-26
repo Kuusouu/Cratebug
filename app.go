@@ -358,7 +358,22 @@ func (a *App) PrepareInstall(modRoot string, filePaths []string, defaultFolder s
 		return install.PreviewResult{}, err
 	}
 
-	preview, err := install.BuildPreview(modRoot, session, defaultFolder)
+	var entries []discovery.Entry
+	for _, mod := range session.Mods {
+		entries = append(entries, discovery.Entry{
+			ID:           mod.ID,
+			Kind:         discovery.EntryMod,
+			DisplayName:  mod.DisplayName,
+			PrimaryPath:  mod.RelativePrimaryPath,
+			BundleFormat: mod.BundleFormat,
+			Sidecars:     mod.Sidecars,
+		})
+	}
+	// Classification only enriches the preview with hero/category labels; a failure here
+	// must not block installation, so the error is intentionally not propagated.
+	identities, _ := a.classifier.Classify(session.Dir, entries, a.getCharacterTable())
+
+	preview, err := install.BuildPreview(modRoot, session, defaultFolder, identities)
 	if err != nil {
 		_ = a.installSessionManager.RemoveSession(session.ID)
 		return install.PreviewResult{}, err
