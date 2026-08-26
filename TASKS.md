@@ -69,7 +69,7 @@ Phase 8 does not include:
 * Launch the app and perform installations using various fixtures (zip, rar, bare `.pak`, multiple files).
 * Verify that drag-and-drop triggers the flow.
 * Confirm path traversal protections and cancellation cleanly aborts.
-* Reference BentoMod in `C:\Users\mew\archive\BentoMod` to see how they handle installations for ideas, but do not treat it as the final truth.
+* Reference BentoMod in `$HOME/archive/BentoMod` to see how they handle installations for ideas, but do not treat it as the final truth.
 * Create `docs/reviews/phase-8-review.md` covering all new workflows.
 
 **Verify:** Review approval grants permission to begin Phase 9.
