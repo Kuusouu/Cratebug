@@ -1,19 +1,41 @@
+<div align="center">
+
+<img src="frontend/src/assets/logo.png" alt="Cratebug" width="120" />
+
 # Cratebug
+
+</div>
 
 Cratebug is an open-source, Windows-first mod manager for Marvel Rivals.
 
-The project is a fresh implementation built with Go, Wails, React, and TypeScript. It aims to preserve useful workflows and compatibility with existing mod libraries while making filesystem operations safe, predictable, and recoverable.
+The project is a fresh implementation built with Go, Wails, React, and TypeScript, built to be what BentoMod was meant to be: a better implementation of [Repak-X](https://github.com/XzantGaming/Repak-X). It aims to preserve useful workflows and compatibility with existing mod libraries while making filesystem operations safe, predictable, and recoverable.
 
 ## Project status
 
-Cratebug has completed its Phase 0 repository and toolchain foundation, Phase
-1 read-only discovery scanner, and Phase 2 read-only library UI. The
-application can scan a selected mod root, report empty and inaccessible
-directories, browse the discovered folder hierarchy, search locally, and switch
-between compact, large, and list catalog views.
+Cratebug is under active development and not yet ready for general use. See
+[ROADMAP.md](ROADMAP.md) for full phase detail. This table tracks feature
+status at a glance.
 
-Phase 3 will add the first safe filesystem mutations: enabling and disabling
-discovered mods while preserving sidecars and enforcing backend safety checks.
+[implemented]: https://img.shields.io/badge/Implemented-3ddc97?style=flat-square
+[next]: https://img.shields.io/badge/Next-8ab6e0?style=flat-square
+[deferred]: https://img.shields.io/badge/Deferred-9e9e9e?style=flat-square
+
+| Feature | Status |
+| --- | --- |
+| Read-only mod discovery and library browsing | ![Implemented][implemented] |
+| Safe mod enable/disable | ![Implemented][implemented] |
+| Rename, priority, folder organization, recoverable deletion | ![Implemented][implemented] |
+| Metadata and settings persistence, tags | ![Implemented][implemented] |
+| Mod type/hero/skin classification via UAssetToolRivals | ![Implemented][implemented] |
+| Archive installation (zip/7z/tar/rar, drag-and-drop) | ![Implemented][implemented] |
+| Asset conflict detection and inspection | ![Implemented][implemented] |
+| Automatic app updates, remote mod downloads | ![Next][next] |
+| Release hardening (signing, upgrades, accessibility) | ![Next][next] |
+| BentoMod/Repak-X state import | ![Deferred][deferred] |
+| Batch operations, filesystem watching, full backup/restore | ![Deferred][deferred] |
+| Browser intake, game launching, crash monitoring | ![Deferred][deferred] |
+| Character data updates, recompression, VFX updating | ![Deferred][deferred] |
+| Virtual collections, permanent deletion, external-rename reconciliation | ![Deferred][deferred] |
 
 See:
 

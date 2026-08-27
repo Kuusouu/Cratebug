@@ -266,26 +266,27 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Large scans remain responsive.
 - Review approves terminology and presentation.
 
-## Phase 10 - BentoMod migration
+## Phase 10 - Automatic updates and remote mod downloads
 
-**Outcome:** Users can optionally import selected BentoMod state without modifying BentoMod.
+**Outcome:** Users who already have Cratebug installed keep receiving new releases without manually reinstalling, and can install a mod directly from a URL instead of only a local file.
 
 **Includes:**
 
-- Read-only state detection and parsing
-- Import preview and confirmation
-- Selected game path, tags, tag catalog, and approved appearance preferences
-- Ambiguity reporting and repeatable behavior
+- Update check against published GitHub releases
+- User-visible update notification with manual-trigger download and apply
+- Applying an update through the existing NSIS installer flow
+- Downloading a mod archive from a user-provided URL into the existing Phase 8 staged-install pipeline
+- Treating a remote download as untrusted input, the same as a local archive
 
-**Excludes:** Mod-file mutation, automatic import, unsafe bypass settings, launcher state, updater state, and crash-monitor state.
+**Excludes:** Silent or forced background updates, browser-extension or deep-link intake, and cross-platform packaging.
 
 **Exit criteria:**
 
-- BentoMod files remain unchanged.
-- Malformed state fails safely.
-- Ambiguous filename-based tags are surfaced.
-- Repeated imports do not duplicate data unpredictably.
-- Review uses disposable copies of representative real state.
+- An older installed build detects and offers a newer published release.
+- Applying an update succeeds without losing user settings or metadata.
+- A URL-sourced download goes through the same staging, validation, and preview as a local archive install.
+- Update and download failures report clearly and never leave a partially-applied install.
+- Review approves the update and remote-download flows.
 
 ## Phase 11 - Release hardening
 
@@ -313,6 +314,6 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 ## Deferred post-release work
 
-Potential later work includes batch operations, filesystem watching, full backup and restore, automatic updates, remote downloads, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
+Potential later work includes BentoMod/Repak-X state migration, batch operations, filesystem watching, full backup and restore, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
 
 These require separate specification and roadmap decisions.
