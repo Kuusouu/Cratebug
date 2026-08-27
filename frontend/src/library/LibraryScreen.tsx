@@ -1,8 +1,10 @@
 import {
+	ChevronRight,
 	CircleAlert,
 	CircleCheckBig,
 	Grid2X2,
 	List,
+	Package,
 	PanelsTopLeft,
 	PackagePlus,
 	Settings as SettingsIcon,
@@ -44,7 +46,7 @@ import {
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import {
-	type conflict,
+	conflict,
 	discovery,
 	type metadata,
 	type modtype,
@@ -58,6 +60,7 @@ import {
 	canDeleteMod,
 	canOrganizeMod,
 	canTagMod,
+	characterHeroPortraitUrl,
 	entryCategoryLabel,
 	entryCharacterLabel,
 	entryStateLabel,
@@ -155,6 +158,15 @@ type MutationFeedback = {
 type MutationToastProps = {
 	feedback: MutationFeedback;
 	onDismiss: () => void;
+};
+
+type ConflictDetailsDialogProps = {
+	result: conflict.Result;
+	entries: readonly discovery.Entry[];
+	identitiesByEntryID: Record<string, modtype.Identity>;
+	isMutationLocked: boolean;
+	onClose: () => void;
+	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
 };
 
 const viewModeIcons = {
@@ -334,6 +346,7 @@ export function LibraryScreen() {
 	const [isClassifying, setIsClassifying] = useState(false);
 	const [conflictResult, setConflictResult] = useState<conflict.Result | null>(null);
 	const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
+	const [conflictDetailsOpen, setConflictDetailsOpen] = useState(false);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const [installDialogFiles, setInstallDialogFiles] = useState<string[] | null>(null);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
@@ -362,8 +375,8 @@ export function LibraryScreen() {
 	const conflictedEntryIDs = useMemo(
 		() =>
 			new Set(
-				conflictResult?.groups.flatMap((group) =>
-					group.participants.map((participant) => participant.entryID),
+				conflictResult?.groups?.flatMap((group) =>
+					(group.participants ?? []).map((participant) => participant.entryID),
 				) ?? [],
 			),
 		[conflictResult],
@@ -519,19 +532,10 @@ export function LibraryScreen() {
 		try {
 			const result = await DetectConflicts(libraryRoot, library.entries);
 			setConflictResult(result);
-			if (result.groups.length === 0) {
+			if ((result?.groups?.length ?? 0) === 0) {
 				showMutationFeedback("success", "No asset conflicts found.");
 			} else {
-				const conflicting = result.groups.filter(
-					(group) => group.relationship === "same_priority",
-				).length;
-				showMutationFeedback(
-					"warning",
-					`Found ${result.groups.length} overlapping mod group${result.groups.length === 1 ? "" : "s"}` +
-						(conflicting > 0
-							? `, ${conflicting} needing a priority change to resolve.`
-							: ", all resolved by existing priority order."),
-				);
+				setConflictDetailsOpen(true);
 			}
 		} catch (error) {
 			showMutationFeedback("error", `Could not check for conflicts: ${errorMessage(error)}`);
@@ -572,6 +576,47 @@ export function LibraryScreen() {
 					return next;
 				});
 			}
+			setConflictResult((currentConflictResult) => {
+				if (!currentConflictResult) return currentConflictResult;
+				let hasAnyChange = false;
+				const updatedGroups = currentConflictResult.groups.map((group) => {
+					let groupChanged = false;
+					const updatedParticipants = group.participants.map((p) => {
+						if (
+							(result.previousID && p.entryID === result.previousID) ||
+							p.entryID === result.id
+						) {
+							groupChanged = true;
+							hasAnyChange = true;
+							return new conflict.Participant({
+								...p,
+								entryID: result.id,
+								displayName: changes.displayName ?? p.displayName,
+								priority: changes.priority ?? p.priority,
+							});
+						}
+						return p;
+					});
+					if (!groupChanged) return group;
+
+					const firstPriority = updatedParticipants[0]?.priority;
+					const isSamePriority = updatedParticipants.every(
+						(p) =>
+							p.priority.kind === firstPriority?.kind &&
+							p.priority.value === firstPriority?.value,
+					);
+					return new conflict.Group({
+						...group,
+						participants: updatedParticipants,
+						relationship: isSamePriority ? "same_priority" : "cross_priority",
+					});
+				});
+				if (!hasAnyChange) return currentConflictResult;
+				return new conflict.Result({
+					...currentConflictResult,
+					groups: updatedGroups,
+				});
+			});
 			setSelectedEntryID(result.id);
 		},
 		[],
@@ -1385,10 +1430,24 @@ export function LibraryScreen() {
 					<button
 						type="button"
 						className="icon-button"
-						onClick={() => void checkConflicts()}
+						onClick={() => {
+							if ((conflictResult?.groups?.length ?? 0) > 0) {
+								setConflictDetailsOpen(true);
+							} else {
+								void checkConflicts();
+							}
+						}}
 						disabled={!libraryRoot || libraryState === "loading" || isCheckingConflicts}
-						aria-label="Check for conflicts"
-						title="Scan enabled mods for overlapping asset paths"
+						aria-label={
+							(conflictResult?.groups?.length ?? 0) > 0
+								? "View conflict details"
+								: "Check for conflicts"
+						}
+						title={
+							(conflictResult?.groups?.length ?? 0) > 0
+								? "View conflict details"
+								: "Scan enabled mods for overlapping asset paths"
+						}
 					>
 						<ShieldAlert aria-hidden="true" />
 					</button>
@@ -1628,6 +1687,16 @@ export function LibraryScreen() {
 					onSelectAccentColor={selectAccentColor}
 				/>
 			)}
+			{conflictDetailsOpen && conflictResult && library && (
+				<ConflictDetailsDialog
+					result={conflictResult}
+					entries={library.entries}
+					identitiesByEntryID={identitiesByEntryID}
+					isMutationLocked={isMutationLocked}
+					onClose={() => setConflictDetailsOpen(false)}
+					onSetPriority={setModPriority}
+				/>
+			)}
 			{installDialogFiles && libraryRoot && (
 				<InstallPreviewDialog
 					modRoot={libraryRoot}
@@ -1660,6 +1729,7 @@ export function LibraryScreen() {
 				!activeDialog &&
 				!activeFolderDialog &&
 				!settingsOpen &&
+				!conflictDetailsOpen &&
 				!installDialogFiles && (
 					<div className="drop-overlay" aria-hidden="true">
 						<div className="drop-overlay-card">
@@ -2410,5 +2480,325 @@ function ViewModeButton({ active, mode, onSelect }: ViewModeButtonProps) {
 			<span className="visually-hidden">{label} view</span>
 			<Icon aria-hidden="true" />
 		</button>
+	);
+}
+
+// Groups each conflict.Group by the character identity shared among its participants.
+// When all participants resolve to the same characterID, the group is filed under that
+// character. Mixed-character groups fall back to a "Multiple characters" bucket so no
+// group is silently lost.
+type CharacterBucket = {
+	characterID: string;
+	characterName: string;
+	groups: conflict.Group[];
+};
+
+function groupByCharacter(
+	groups: conflict.Group[],
+	identitiesByEntryID: Record<string, modtype.Identity>,
+): CharacterBucket[] {
+	const buckets = new Map<string, CharacterBucket>();
+
+	for (const group of groups ?? []) {
+		const characterIDs = (group.participants ?? [])
+			.map((p) => identitiesByEntryID[p.entryID]?.characterID ?? "")
+			.filter(Boolean);
+
+		const uniqueCharacters = [...new Set(characterIDs)];
+		const bucketKey =
+			uniqueCharacters.length === 1 && uniqueCharacters[0]
+				? uniqueCharacters[0]
+				: "__mixed__";
+
+		const firstCharacterID = uniqueCharacters[0] ?? "";
+		const repParticipantID =
+			(group.participants ?? []).find(
+				(p) => identitiesByEntryID[p.entryID]?.characterID === firstCharacterID,
+			)?.entryID ?? "";
+		const characterName =
+			bucketKey === "__mixed__"
+				? "Multiple characters"
+				: identitiesByEntryID[repParticipantID]?.characterName ||
+					firstCharacterID ||
+					"Unknown";
+
+		if (!buckets.has(bucketKey)) {
+			buckets.set(bucketKey, { characterID: bucketKey, characterName, groups: [] });
+		}
+		buckets.get(bucketKey)?.groups.push(group);
+	}
+
+	return [...buckets.values()].sort((a, b) => {
+		if (a.characterID === "__mixed__") return 1;
+		if (b.characterID === "__mixed__") return -1;
+		return a.characterName.localeCompare(b.characterName);
+	});
+}
+
+// Presents conflict scan results grouped by resolved character, with hero thumbnails,
+// relationship labels, overlapping path counts, and per-participant priority switchers
+// so users can adjust load order without leaving the view.
+function ConflictDetailsDialog({
+	result,
+	entries,
+	identitiesByEntryID,
+	isMutationLocked,
+	onClose,
+	onSetPriority,
+}: ConflictDetailsDialogProps) {
+	const handleEscape = useCallback(() => onClose(), [onClose]);
+	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
+
+	const entriesByID = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
+	const groups = result.groups ?? [];
+	const unavailable = result.unavailable ?? [];
+
+	const characterBuckets = useMemo(
+		() => groupByCharacter(groups, identitiesByEntryID),
+		[groups, identitiesByEntryID],
+	);
+
+	const samePriorityCount = groups.filter((g) => g.relationship === "same_priority").length;
+	const crossPriorityCount = groups.length - samePriorityCount;
+
+	return (
+		<div className="mutation-dialog-backdrop">
+			<section
+				ref={dialogRef}
+				className="mutation-dialog conflict-details-dialog"
+				aria-labelledby="conflict-dialog-title"
+				aria-modal="true"
+				role="dialog"
+			>
+				<div className="conflict-dialog-header">
+					<div>
+						<p className="eyebrow">Conflict report</p>
+						<h2 id="conflict-dialog-title">Asset conflicts</h2>
+						<p className="mutation-dialog-subtitle conflict-summary-pills">
+							{samePriorityCount > 0 && (
+								<span className="conflict-summary-pill same-priority">
+									{samePriorityCount} duplicate priority
+								</span>
+							)}
+							{crossPriorityCount > 0 && (
+								<span className="conflict-summary-pill cross-priority">
+									{crossPriorityCount} cross-priority
+								</span>
+							)}
+							{unavailable.length > 0 && (
+								<span className="conflict-summary-pill unavailable">
+									{unavailable.length} unavailable
+								</span>
+							)}
+						</p>
+					</div>
+					<button
+						type="button"
+						className="icon-button conflict-dialog-close"
+						onClick={onClose}
+						aria-label="Close conflict details"
+					>
+						<X aria-hidden="true" />
+					</button>
+				</div>
+
+				{unavailable.length > 0 && (
+					<p className="conflict-unavailable-notice" role="note">
+						{unavailable.length === 1
+							? "1 enabled mod could not be scanned (encrypted or unreadable) and is excluded from these results."
+							: `${unavailable.length} enabled mods could not be scanned (encrypted or unreadable) and are excluded from these results.`}
+					</p>
+				)}
+
+				<div className="conflict-groups-list">
+					{characterBuckets.map((bucket) => (
+						<section key={bucket.characterID} className="conflict-character-section">
+							<ConflictCharacterHeading
+								characterID={bucket.characterID}
+								characterName={bucket.characterName}
+							/>
+							{bucket.groups.map((group) => (
+								<ConflictGroupCard
+									key={(group.participants ?? []).map((p) => p.entryID).join(",")}
+									group={group}
+									entriesByID={entriesByID}
+									isMutationLocked={isMutationLocked}
+									onSetPriority={onSetPriority}
+								/>
+							))}
+						</section>
+					))}
+				</div>
+
+				<div className="mutation-dialog-actions">
+					<button type="button" className="quiet-button" onClick={onClose}>
+						Close
+					</button>
+				</div>
+			</section>
+		</div>
+	);
+}
+
+type ConflictCharacterHeadingProps = {
+	characterID: string;
+	characterName: string;
+};
+
+// Renders a character section heading with default hero avatar when available.
+function ConflictCharacterHeading({ characterID, characterName }: ConflictCharacterHeadingProps) {
+	const portraitUrl = characterHeroPortraitUrl(characterID);
+
+	return (
+		<div className="conflict-character-heading">
+			<div className="conflict-character-thumbnail">
+				{portraitUrl ? (
+					<img src={portraitUrl} alt="" className="mod-thumbnail-hero" />
+				) : (
+					<Package aria-hidden="true" />
+				)}
+			</div>
+			<h3>{characterName}</h3>
+		</div>
+	);
+}
+
+type ConflictGroupCardProps = {
+	group: conflict.Group;
+	entriesByID: ReadonlyMap<string, discovery.Entry>;
+	isMutationLocked: boolean;
+	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
+};
+
+// One conflict group: relationship label, total overlapping path count, and each
+// participant with its priority switcher and the specific paths it contributes.
+function ConflictGroupCard({
+	group,
+	entriesByID,
+	isMutationLocked,
+	onSetPriority,
+}: ConflictGroupCardProps) {
+	const isSamePriority = group.relationship === "same_priority";
+	return (
+		<div
+			className={`conflict-group-card${isSamePriority ? " same-priority" : " cross-priority"}`}
+		>
+			<div className="conflict-group-meta">
+				<span
+					className={`conflict-relationship-badge${isSamePriority ? " same-priority" : " cross-priority"}`}
+				>
+					{isSamePriority ? "Duplicate priority" : "Cross-priority"}
+				</span>
+				<span className="conflict-path-count">
+					{group.pathCount} overlapping {group.pathCount === 1 ? "path" : "paths"}
+				</span>
+			</div>
+			<ul className="conflict-participants">
+				{(group.participants ?? []).map((participant) => {
+					const entry = entriesByID.get(participant.entryID) ?? null;
+					return (
+						<ConflictParticipantRow
+							key={participant.entryID}
+							participant={participant}
+							entry={entry}
+							isMutationLocked={isMutationLocked}
+							onSetPriority={onSetPriority}
+						/>
+					);
+				})}
+			</ul>
+		</div>
+	);
+}
+
+type ConflictParticipantRowProps = {
+	participant: conflict.Participant;
+	entry: discovery.Entry | null;
+	isMutationLocked: boolean;
+	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
+};
+
+// One participant within a conflict group: mod name, priority value with +/- buttons
+// to adjust load order in place, and the specific overlapping paths it contributes.
+function ConflictParticipantRow({
+	participant,
+	entry,
+	isMutationLocked,
+	onSetPriority,
+}: ConflictParticipantRowProps) {
+	const [isBusy, setIsBusy] = useState(false);
+	const [pathsExpanded, setPathsExpanded] = useState(false);
+	const canAdjust = entry !== null && canOrganizeMod(entry) && !isMutationLocked && !isBusy;
+	const maxPriority = entry ? maximumPriorityFor(entry) : 0;
+	const currentPriority = entry?.priority?.value ?? participant.priority.value;
+	const overlappingPaths = participant.overlappingPaths ?? [];
+
+	async function adjustPriority(delta: number) {
+		if (!entry || !canAdjust) return;
+		const next = Math.max(0, Math.min(maxPriority, currentPriority + delta));
+		if (next === currentPriority) return;
+		setIsBusy(true);
+		try {
+			await onSetPriority(entry, next);
+		} finally {
+			setIsBusy(false);
+		}
+	}
+
+	return (
+		<li className="conflict-participant">
+			<div className="conflict-participant-header">
+				<span className="conflict-participant-name">{participant.displayName}</span>
+				<div className="conflict-priority-control">
+					<button
+						type="button"
+						className="conflict-priority-step"
+						aria-label={`Decrease priority of ${participant.displayName}`}
+						disabled={!canAdjust || currentPriority <= 0}
+						onClick={() => void adjustPriority(-1)}
+					>
+						−
+					</button>
+					<span className="conflict-priority-value" aria-hidden="true">
+						{currentPriority}
+					</span>
+					<button
+						type="button"
+						className="conflict-priority-step"
+						aria-label={`Increase priority of ${participant.displayName}`}
+						disabled={!canAdjust || currentPriority >= maxPriority}
+						onClick={() => void adjustPriority(1)}
+					>
+						+
+					</button>
+				</div>
+			</div>
+			{overlappingPaths.length > 0 && (
+				<>
+					<button
+						type="button"
+						className="conflict-paths-toggle"
+						aria-expanded={pathsExpanded}
+						onClick={() => setPathsExpanded((expanded) => !expanded)}
+					>
+						<ChevronRight
+							aria-hidden="true"
+							className={`chevron-icon${pathsExpanded ? " expanded" : ""}`}
+						/>
+						{overlappingPaths.length} overlapping{" "}
+						{overlappingPaths.length === 1 ? "file" : "files"}
+					</button>
+					{pathsExpanded && (
+						<ul className="conflict-paths">
+							{overlappingPaths.map((path) => (
+								<li key={path} className="conflict-path" title={path}>
+									{path.split("/").pop() ?? path}
+								</li>
+							))}
+						</ul>
+					)}
+				</>
+			)}
+		</li>
 	);
 }

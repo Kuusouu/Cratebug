@@ -66,6 +66,14 @@ export function entryHeroPortraitUrl(identity?: modtype.Identity | null): string
 	return resolveHeroPortraitUrl(heroPortraitsByID, identity);
 }
 
+// Returns the bundled base hero avatar URL for a characterID, ignoring skin-specific portraits.
+export function characterHeroPortraitUrl(characterID?: string | null): string | null {
+	if (!characterID) {
+		return null;
+	}
+	return heroPortraitsByID[characterID] ?? null;
+}
+
 // Keeps state wording consistent wherever a discovered entry is presented.
 export function entryStateLabel(entry: discovery.Entry): string {
 	if (entry.kind === "orphaned_sidecar") return "Orphaned sidecar";

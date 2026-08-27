@@ -72,7 +72,7 @@ func Detect(entries []discovery.Entry, paths map[string][]string) Result {
 	}
 
 	pathIndex := make(map[string][]string) // internal asset path -> entry IDs that contain it
-	var unavailable []string
+	unavailable := make([]string, 0)
 	for id := range enabled {
 		list, ok := paths[id]
 		if !ok {
@@ -163,7 +163,7 @@ func buildGroup(memberIDs []string, enabled map[string]discovery.Entry, paths ma
 	for i, id := range memberIDs {
 		entry := enabled[id]
 
-		var overlapping []string
+		overlapping := make([]string, 0)
 		for _, p := range paths[id] {
 			if len(pathIndex[p]) >= 2 {
 				overlapping = append(overlapping, p)
