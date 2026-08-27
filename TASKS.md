@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 9 - Asset conflict inspection
-**Status:** In progress.
+**Status:** Complete. Approved.
 
 This file contains only the active phase. Replace it when Phase 9 is complete.
 
@@ -78,3 +78,31 @@ Phase 9 does not include:
 * Create `docs/reviews/phase-9-review.md` covering all new workflows.
 
 **Verify:** Review approval grants permission to begin Phase 10.
+
+## Phase 9 completion report
+
+**What changed**
+
+Cratebug can now detect and present overlapping internal Unreal asset paths across enabled mods, on demand via a "Check for conflicts" trigger. `internal/modtype`'s classification cache now retains each mod's resolved internal path list alongside its `Identity`, so a conflict scan reuses Phase 7's already-fetched UAssetToolRivals listing instead of re-listing every mod's archive contents. A new, pure-Go `internal/conflict` package owns every conflict decision: enabled/disabled filtering, transitive grouping of overlapping mods, and same-priority ("duplicate priority") versus cross-priority classification, comparing `discovery.Priority`'s `Kind` and `Value` together. `app.go`'s `DetectConflicts` wires this into a Wails-bound call, treating tool failures and undeterminable (encrypted) mods as a clear "unavailable" result rather than a crash or a silently wrong one. The frontend gained a conflict badge in the catalog, a per-mod "check conflicts" context-menu entry, and a `ConflictDetailsDialog` that groups results by resolved character (hero thumbnail, name), shows a priority +/- switcher per participant wired to the existing Phase 4 priority mechanism, and lists each participant's specific overlapping files collapsed behind a disclosure toggle by default (added on request, since most conflicts are resolved by priority alone).
+
+**Files changed**
+
+Backend: `internal/conflict/` (new package: `detect.go`, `detect_test.go`, `doc.go`), `internal/modtype/cache.go` (`CachedClassification.Paths`), `internal/modtype/session.go` (`PathsForEntry`), `internal/modtype/determine.go` (exported `ListInternalPaths`), `app.go` (`DetectConflicts`, `ConflictType`), `app_test.go`. Frontend: `frontend/src/library/LibraryScreen.tsx` (`ConflictDetailsDialog` and related components), `frontend/src/library/ModCatalog.tsx` (conflict badge, context-menu entry), `frontend/src/library/entryPresentation.ts`/`.test.ts` (`characterHeroPortraitUrl`), `frontend/src/App.css`, generated Wails bindings. Docs: `docs/screenshots/phase-9/`, `docs/reviews/phase-9-review.md`, this file.
+
+**Validation and results**
+
+`check.ps1` passes clean (gofmt, Biome format/lint, `tsc`, vite build, `go vet`, `go test ./...`). A fresh, uncached `go test ./... -count=1` run passed all 216 tests, including 11 in `internal/conflict` (same-priority and cross-priority grouping, the leading-bang-vs-no-priority `Value`-collision case, disabled and orphaned-sidecar exclusion, an unavailable mod mixed into an otherwise-conflicting set, transitive grouping across a three-mod chain) and app-layer tests confirming a second scan of an unchanged library issues no new worker calls. `bun test` passed all 48 frontend tests. See `docs/reviews/phase-9-review.md` for the full write-up.
+
+Manually verified against the full `C:\ModsFixtures` library (72 mods) driving the running app: a real scan returned 4 duplicate-priority groups, 1 cross-priority group, and 2 unavailable mods, with the collapsed-by-default file-count toggle expanding correctly per participant and other rows staying independently collapsed. The scan returned with no visible delay.
+
+**Known limitations**
+
+`DetectConflicts` is a single synchronous call with no backend progress stream or cancel endpoint, matching classification's existing precedent exactly rather than introducing new infrastructure — an intentional scope boundary recorded in this file's 9.3 section, not an oversight. A substantially larger real library's responsiveness was not separately measured beyond the 72-mod fixture scale, though `Detect`'s complexity is linear in overlap-pair count rather than library size.
+
+**Deferred findings**
+
+None beyond the known limitations above.
+
+**Suggested commit message**
+
+`chore: finalize phase 9`
