@@ -508,7 +508,40 @@ func (a *App) PrepareInstall(modRoot string, filePaths []string, defaultFolder s
 	if len(filePaths) == 0 {
 		return install.PreviewResult{}, fmt.Errorf("no files selected")
 	}
+	return a.stageAndPreview(modRoot, filePaths, defaultFolder)
+}
 
+// InstallFromURL downloads a mod archive or bundle from rawURL, then runs it
+// through the exact same staging and preview flow as a locally-selected
+// file: the download is the only step that differs from PrepareInstall,
+// matching SPEC.md's requirement that a remote download carry no less
+// scrutiny than a local one. The downloaded temp file is removed once
+// staging has copied out of it, regardless of whether staging succeeds.
+func (a *App) InstallFromURL(modRoot, rawURL, defaultFolder string) (install.PreviewResult, error) {
+	ctx := a.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	onProgress := func(p install.Progress) {
+		if a.ctx != nil {
+			wailsRuntime.EventsEmit(a.ctx, "install:progress", p)
+		}
+	}
+
+	downloadedPath, cleanup, err := install.DownloadRemoteFile(ctx, rawURL, nil, onProgress)
+	if err != nil {
+		return install.PreviewResult{}, err
+	}
+	defer cleanup()
+
+	return a.stageAndPreview(modRoot, []string{downloadedPath}, defaultFolder)
+}
+
+// Stages filePaths into a fresh session and builds the install preview.
+// Shared by PrepareInstall (local files) and InstallFromURL (a downloaded
+// file), which differ only in how filePaths' single entry was obtained.
+func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder string) (install.PreviewResult, error) {
 	session, err := a.installSessionManager.CreateSession(filePaths)
 	if err != nil {
 		return install.PreviewResult{}, fmt.Errorf("create staging session: %w", err)

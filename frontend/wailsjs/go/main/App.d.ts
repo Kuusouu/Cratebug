@@ -41,6 +41,8 @@ export function DownloadUpdate(arg1:update.Release):Promise<string>;
 
 export function GetAppVersion():Promise<string>;
 
+export function InstallFromURL(arg1:string,arg2:string,arg3:string):Promise<install.PreviewResult>;
+
 export function LoadMetadata():Promise<main.MetadataState>;
 
 export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
