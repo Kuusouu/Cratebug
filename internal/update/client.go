@@ -30,16 +30,16 @@ var ErrNoRelease = errors.New("update: no matching release found")
 // A single GitHub release, resolved down to what Cratebug needs to decide
 // whether to update and what to show the user about it.
 type Release struct {
-	Version Version
-	HTMLURL string
-	Notes   string // the release body: the changelog section the release workflow copied in
-	Asset   ReleaseAsset
+	Version Version      `json:"version"`
+	HTMLURL string       `json:"htmlURL"`
+	Notes   string       `json:"notes"` // the release body: the changelog section the release workflow copied in
+	Asset   ReleaseAsset `json:"asset"`
 }
 
 // The Windows installer attached to a release.
 type ReleaseAsset struct {
-	Name string
-	URL  string
+	Name string `json:"name"`
+	URL  string `json:"url"`
 }
 
 // Fetches Cratebug releases from GitHub.

@@ -11,11 +11,11 @@ var tagPattern = regexp.MustCompile(`^(\d{4})\.(\d{2})\.(\d{2})(-.+)?$`)
 // Parsed Cratebug CalVer release tag, e.g. "2026.08.27" or
 // "2026.08.27-rc1".
 type Version struct {
-	Tag        string
-	Year       int
-	Month      int
-	Day        int
-	Prerelease string // suffix after the hyphen, without the hyphen; empty for a stable release
+	Tag        string `json:"tag"`
+	Year       int    `json:"year"`
+	Month      int    `json:"month"`
+	Day        int    `json:"day"`
+	Prerelease string `json:"prerelease,omitempty"` // suffix after the hyphen, without the hyphen; empty for a stable release
 }
 
 // Parses a CalVer release tag. It returns an error for anything

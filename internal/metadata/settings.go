@@ -49,3 +49,10 @@ func (doc *Document) SetAccentColor(color string) error {
 	doc.Settings.AccentColor = color
 	return nil
 }
+
+// Records that the post-update "what's new" notice has been shown for
+// version. Unlike the settings above, this isn't Wails-bound as a directly
+// callable setter, so it has no untrusted input to validate.
+func (doc *Document) SetLastSeenVersion(version string) {
+	doc.Settings.LastSeenVersion = version
+}

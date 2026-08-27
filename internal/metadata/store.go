@@ -29,6 +29,12 @@ type Settings struct {
 	Theme           string `json:"theme,omitempty"`
 	DefaultViewMode string `json:"defaultViewMode,omitempty"`
 	AccentColor     string `json:"accentColor,omitempty"`
+
+	// The release tag whose changelog was last shown as the post-update "what's
+	// new" notice. An empty value (including every document written before
+	// this field existed) is not an error case: it just means the notice
+	// hasn't been shown for the running build yet.
+	LastSeenVersion string `json:"lastSeenVersion,omitempty"`
 }
 
 // Document is the versioned envelope persisted to disk.
