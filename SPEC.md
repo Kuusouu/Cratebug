@@ -308,7 +308,6 @@ The initial release does not require:
 
 - Cross-platform support
 - Game launching
-- Automatic application updates
 - Full mod-directory backup and restore
 - Crash monitoring
 - Browser-extension or deep-link intake

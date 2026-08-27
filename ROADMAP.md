@@ -266,51 +266,34 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 - Large scans remain responsive.
 - Review approves terminology and presentation.
 
-## Phase 10 - Automatic updates and remote mod downloads
+## Phase 10 - Automatic updates, remote mod downloads, and release hardening
 
-**Outcome:** Users who already have Cratebug installed keep receiving new releases without manually reinstalling, and can install a mod directly from a URL instead of only a local file.
+**Outcome:** Cratebug has a real, CalVer-tagged GitHub release pipeline; an installed build can check for, download, and silently apply a new release in place and relaunch; a mod can be installed from a URL instead of only a local file; and the app is ready for its first public release.
 
-**Includes:**
-
-- Update check against published GitHub releases
-- User-visible update notification with manual-trigger download and apply
-- Applying an update through the existing NSIS installer flow
-- Downloading a mod archive from a user-provided URL into the existing Phase 8 staged-install pipeline
-- Treating a remote download as untrusted input, the same as a local archive
-
-**Excludes:** Silent or forced background updates, browser-extension or deep-link intake, and cross-platform packaging.
-
-**Exit criteria:**
-
-- An older installed build detects and offers a newer published release.
-- Applying an update succeeds without losing user settings or metadata.
-- A URL-sourced download goes through the same staging, validation, and preview as a local archive install.
-- Update and download failures report clearly and never leave a partially-applied install.
-- Review approves the update and remote-download flows.
-
-## Phase 11 - Release hardening
-
-**Outcome:** Cratebug is ready for its first public release.
+Phase 11 folded into this phase: the update/apply flow needs a real release to test against, so building the release pipeline and hardening the release itself happen together instead of in sequence.
 
 **Includes:**
 
-- Installer branding, upgrades, and uninstall behavior
-- Versioning and release notes
-- License and third-party notices
-- Clean-machine Windows 10 and 11 testing
-- Accessibility, scaling, performance, security, and recovery review
+- `CHANGELOG.md` plus a tag-triggered GitHub Actions release workflow that builds the installer and publishes a GitHub release, prerelease-tagged for `-rcN` builds
+- Update check against the published GitHub release, silent in-place apply through the existing per-user NSIS installer, and an automatic relaunch
+- A "what's new" changelog UI shown on an available update and once after an applied update
+- Downloading a mod archive from a user-provided URL into the existing Phase 8 staged-install pipeline, treated as untrusted input the same as a local archive
+- Installer branding, upgrade-in-place behavior, and uninstall correctness
+- License and third-party notices, clean-machine Windows 10/11 install/upgrade/uninstall testing
+- Accessibility, scaling, performance, security, and recovery review across the app
 - User documentation and reproducible release builds
 
-**Excludes:** Automatic updates, cross-platform packages, and unrelated convenience features.
+**Excludes:** Silent or forced background updates without user confirmation, browser-extension or deep-link intake, and cross-platform packaging.
 
 **Exit criteria:**
 
+- An older installed build detects and offers a newer published release, applies it without losing user settings or metadata, and relaunches showing the changelog.
+- A URL-sourced download goes through the same staging, validation, and preview as a local archive install.
+- Update and download failures report clearly and never leave a partially-applied install.
 - Clean systems can install, run, upgrade, and uninstall.
-- Core workflows pass automated and manual testing.
 - No known critical data-loss issue remains.
-- User-data retention matches documentation.
-- Release artifacts are reproducible.
-- Principal UI states receive final screenshot approval.
+- Release artifacts are reproducible from the tag-triggered workflow.
+- Review approves the update, remote-download, and release flows.
 
 ## Deferred post-release work
 
