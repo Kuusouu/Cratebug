@@ -589,3 +589,35 @@ func TestAppInstallCancel(t *testing.T) {
 		t.Fatalf("expected ApplyInstall to fail after CancelInstall, but it succeeded")
 	}
 }
+
+// Wails exposes every bound method to the frontend with no lower trust
+// boundary, so ApplyUpdate can't assume installerPath is always exactly
+// what DownloadUpdate produced. These only exercise the rejection paths:
+// the acceptance path calls update.ApplyUpdate, which spawns a real
+// detached process and isn't something a unit test should trigger.
+func TestApplyUpdate_RejectsPathOutsideExpectedDirectory(t *testing.T) {
+	app := testApp(t, false)
+
+	outsidePath := filepath.Join(t.TempDir(), "installer.exe")
+	if err := app.ApplyUpdate(outsidePath); err == nil {
+		t.Fatal("ApplyUpdate succeeded for a path outside the expected download directory, want an error")
+	}
+}
+
+func TestApplyUpdate_RejectsNonExeExtension(t *testing.T) {
+	app := testApp(t, false)
+
+	insidePath := filepath.Join(os.TempDir(), updateDownloadDirName, "installer.bat")
+	if err := app.ApplyUpdate(insidePath); err == nil {
+		t.Fatal("ApplyUpdate succeeded for a non-.exe path, want an error")
+	}
+}
+
+func TestApplyUpdate_RejectsPathTraversal(t *testing.T) {
+	app := testApp(t, false)
+
+	traversalPath := filepath.Join(os.TempDir(), updateDownloadDirName, "..", "..", "System32", "evil.exe")
+	if err := app.ApplyUpdate(traversalPath); err == nil {
+		t.Fatal("ApplyUpdate succeeded for a path traversal attempt, want an error")
+	}
+}
