@@ -1,0 +1,150 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]*'
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: 'Existing tag to build and release (e.g. 2026.08.27-rc1)'
+                required: true
+
+permissions:
+    contents: write
+
+concurrency:
+    group: release-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    release:
+        name: Build and publish
+        runs-on: blacksmith-2vcpu-windows-2025
+        timeout-minutes: 30
+
+        steps:
+            - name: Resolve tag and version
+              id: tag
+              shell: pwsh
+              run: |
+                  $tag = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+                      '${{ inputs.tag }}'
+                  } else {
+                      '${{ github.ref_name }}'
+                  }
+                  if ($tag -notmatch '^(\d{4})\.(\d{2})\.(\d{2})(-.+)?$') {
+                      throw "Tag '$tag' does not match the expected YYYY.MM.DD[-suffix] CalVer form."
+                  }
+
+                  # NSIS's VIProductVersion rejects zero-padded numeric parts the same
+                  # way MSBuild's <Version> does, so it needs the stripped form; the
+                  # literal tag stays as the separate display/informational version
+                  # embedded into the Go binary below. Read $matches before anything
+                  # else touches it -- `-match`/`-notmatch` overwrite it as a side
+                  # effect, which is why the prerelease check below uses the plain
+                  # string .Contains('-') method instead of another -match.
+                  $productVersion = "$([int]$matches[1]).$([int]$matches[2]).$([int]$matches[3])"
+                  $prerelease = $tag.Contains('-').ToString().ToLower()
+
+                  "value=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+                  "prerelease=$prerelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+                  "productVersion=$productVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+            - name: Check out repository
+              uses: actions/checkout@v6
+              with:
+                  lfs: true
+                  ref: ${{ steps.tag.outputs.value }}
+
+            - name: Install pinned toolchain
+              uses: jdx/mise-action@v4.2.3
+
+            - name: Install frontend dependencies
+              shell: pwsh
+              working-directory: frontend
+              run: mise exec -c "bun install --frozen-lockfile"
+
+            - name: Fetch pinned worker
+              shell: pwsh
+              run: .\fetch-uassettool.ps1
+
+            - name: Install NSIS
+              shell: pwsh
+              run: |
+                  if (Get-Command choco -ErrorAction SilentlyContinue) {
+                      choco install nsis --no-progress -y
+                  } elseif (Get-Command winget -ErrorAction SilentlyContinue) {
+                      winget install --id NSIS.NSIS --exact --silent --accept-package-agreements --accept-source-agreements
+                  }
+                  if (Test-Path "C:\Program Files (x86)\NSIS") {
+                      "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+                  }
+                  if (Test-Path "C:\Program Files\NSIS") {
+                      "C:\Program Files\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+                  }
+
+            - name: Set installer version metadata
+              shell: pwsh
+              run: |
+                  # Edits the checked-out working copy only; never committed back.
+                  $wailsConfig = Get-Content wails.json -Raw | ConvertFrom-Json
+                  $wailsConfig.info.productVersion = '${{ steps.tag.outputs.productVersion }}'
+                  $wailsConfig | ConvertTo-Json -Depth 10 | Set-Content wails.json -Encoding utf8
+
+            - name: Build Windows application and installer
+              shell: pwsh
+              run: |
+                  # Uses `mise exec --` (not `-c "<string>"`) here specifically because
+                  # -ldflags's value itself needs to reach `go build` as one quoted
+                  # argument containing a space; the `--` form hands args to mise
+                  # directly instead of round-tripping them through a shell string.
+                  $tag = '${{ steps.tag.outputs.value }}'
+                  mise exec -- go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build `
+                      -clean -platform windows/amd64 -nsis -installscope user -nocolour `
+                      -ldflags "-X main.AppVersion=$tag"
+                  if ($LASTEXITCODE -ne 0) {
+                      throw "wails build failed with exit code $LASTEXITCODE."
+                  }
+                  if (-not (Test-Path "build/bin/Cratebug-amd64-installer.exe")) {
+                      throw "Wails did not produce build/bin/Cratebug-amd64-installer.exe"
+                  }
+
+            - name: Extract changelog section
+              id: notes
+              shell: pwsh
+              run: |
+                  $tag = '${{ steps.tag.outputs.value }}'
+                  $lines = Get-Content CHANGELOG.md
+                  $sectionLines = New-Object System.Collections.Generic.List[string]
+                  $inSection = $false
+                  foreach ($line in $lines) {
+                      if ($line -match '^## \[') {
+                          if ($inSection) { break }
+                          if ($line -eq "## [$tag]") { $inSection = $true }
+                          continue
+                      }
+                      if ($inSection) { $sectionLines.Add($line) }
+                  }
+                  if ($sectionLines.Count -eq 0) {
+                      throw "CHANGELOG.md has no '## [$tag]' section. Add one before tagging a release."
+                  }
+                  $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+                  $sectionLines | Set-Content -Path $notesPath -Encoding utf8
+                  "path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+            - name: Create GitHub release
+              shell: pwsh
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  $tag = '${{ steps.tag.outputs.value }}'
+                  $prerelease = '${{ steps.tag.outputs.prerelease }}' -eq 'true'
+                  $ghArgs = @(
+                      'release', 'create', $tag,
+                      'build/bin/Cratebug-amd64-installer.exe',
+                      '--title', "Cratebug $tag",
+                      '--notes-file', '${{ steps.notes.outputs.path }}'
+                  )
+                  if ($prerelease) { $ghArgs += '--prerelease' }
+                  gh @ghArgs
