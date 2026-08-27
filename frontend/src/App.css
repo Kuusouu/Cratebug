@@ -290,7 +290,10 @@ button:disabled {
 }
 
 .library-sidebar {
-	overflow: auto;
+	/* Vertical folder list only; see .mod-grid for why this is split instead
+	   of the `overflow: auto` shorthand. */
+	overflow-x: hidden;
+	overflow-y: auto;
 	padding: 0.9rem 0.6rem;
 }
 
@@ -844,7 +847,14 @@ button:disabled {
 
 .mod-grid {
 	display: grid;
-	overflow: auto;
+	/* auto-fill/1fr columns already reflow to fit any width, so this never
+	   needs to scroll horizontally -- overflow-x: hidden clips the sub-pixel
+	   overflow that otherwise surfaces as a stray horizontal scrollbar at
+	   some Windows display-scaling factors, instead of the plain `overflow:
+	   auto` shorthand enabling scroll on an axis that was never intended to
+	   scroll. */
+	overflow-x: hidden;
+	overflow-y: auto;
 	/* Keep cards clear of the scrollbar across Windows scaling settings. */
 	padding-right: 1rem;
 	scrollbar-gutter: stable;
@@ -2235,7 +2245,8 @@ button:disabled {
 
 	.library-sidebar {
 		max-height: 12rem;
-		overflow: auto;
+		overflow-x: hidden;
+		overflow-y: auto;
 	}
 
 	.catalog-panel {

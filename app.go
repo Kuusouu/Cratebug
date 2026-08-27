@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/Kuusouu/Cratebug/internal/conflict"
@@ -253,6 +254,18 @@ func (a *App) DownloadUpdate(release update.Release) (string, error) {
 // is about to exit, not that the update finished applying -- that happens in
 // the detached helper after this process is gone.
 func (a *App) ApplyUpdate(installerPath string) error {
+	// Wails exposes every bound method to the frontend with no lower trust
+	// boundary, so this can't rely on the frontend only ever passing back
+	// exactly what DownloadUpdate gave it. Unlike the mutation methods
+	// (RenameMod, DeleteMod, ...), which are inherently constrained to paths
+	// already inside the user's mod library, a bare installerPath string has
+	// no such constraint -- confirm it actually points at something
+	// DownloadUpdate could have produced before spawning it as a process.
+	expectedDir := filepath.Join(os.TempDir(), updateDownloadDirName)
+	if !strings.EqualFold(filepath.Ext(installerPath), ".exe") || !pathWithinDir(expectedDir, installerPath) {
+		return fmt.Errorf("refusing to apply update from an unexpected path: %q", installerPath)
+	}
+
 	if err := update.ApplyUpdate(installerPath); err != nil {
 		return err
 	}
@@ -260,6 +273,13 @@ func (a *App) ApplyUpdate(installerPath string) error {
 		wailsRuntime.Quit(a.ctx)
 	}
 	return nil
+}
+
+// Reports whether path resolves to a location inside dir, rejecting any
+// ".." traversal component.
+func pathWithinDir(dir, path string) bool {
+	relative, err := filepath.Rel(dir, path)
+	return err == nil && filepath.IsLocal(relative)
 }
 
 func (a *App) updateClient() *update.Client {
