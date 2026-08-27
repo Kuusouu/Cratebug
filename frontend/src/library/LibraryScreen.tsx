@@ -528,9 +528,12 @@ export function LibraryScreen() {
 	const checkConflicts = useCallback(async () => {
 		if (!libraryRoot || !library) return;
 
+		const requestRoot = libraryRoot;
 		setIsCheckingConflicts(true);
 		try {
-			const result = await DetectConflicts(libraryRoot, library.entries);
+			const result = await DetectConflicts(requestRoot, library.entries);
+			if (activeLibraryRootRef.current !== requestRoot) return;
+
 			setConflictResult(result);
 			if ((result?.groups?.length ?? 0) === 0) {
 				showMutationFeedback("success", "No asset conflicts found.");
@@ -538,9 +541,12 @@ export function LibraryScreen() {
 				setConflictDetailsOpen(true);
 			}
 		} catch (error) {
+			if (activeLibraryRootRef.current !== requestRoot) return;
 			showMutationFeedback("error", `Could not check for conflicts: ${errorMessage(error)}`);
 		} finally {
-			setIsCheckingConflicts(false);
+			if (activeLibraryRootRef.current === requestRoot) {
+				setIsCheckingConflicts(false);
+			}
 		}
 	}, [libraryRoot, library, showMutationFeedback]);
 	const updateMutatedEntry = useCallback(
@@ -634,6 +640,10 @@ export function LibraryScreen() {
 
 			setLibrary(result);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+			// The rescanned set of mods may no longer match a conflict report taken
+			// before this mutation (a moved, deleted, or newly-installed mod can
+			// change what overlaps), so a stale report can't be trusted anymore.
+			setConflictResult(null);
 			classify(requestRoot, result.entries);
 			return result;
 		} catch (error) {
@@ -746,6 +756,9 @@ export function LibraryScreen() {
 
 					return new discovery.Library({ ...currentLibrary, entries });
 				});
+				// Enabled state determines conflict eligibility directly, so a report
+				// taken before this toggle can no longer be trusted.
+				setConflictResult(null);
 				showMutationFeedback(
 					"success",
 					`${enabled ? "Enabled" : "Disabled"} ${entry.displayName}.`,
@@ -2500,19 +2513,24 @@ function groupByCharacter(
 	const buckets = new Map<string, CharacterBucket>();
 
 	for (const group of groups ?? []) {
-		const characterIDs = (group.participants ?? [])
-			.map((p) => identitiesByEntryID[p.entryID]?.characterID ?? "")
-			.filter(Boolean);
+		const participants = group.participants ?? [];
+		const characterIDs = participants.map(
+			(p) => identitiesByEntryID[p.entryID]?.characterID ?? "",
+		);
 
+		// Every participant must resolve to the same non-empty character before this
+		// group is filed under it; an unresolved participant (identity not loaded yet,
+		// or no hero association at all) must not be silently dropped from the check,
+		// or a group could be mislabeled under just one participant's character.
 		const uniqueCharacters = [...new Set(characterIDs)];
 		const bucketKey =
-			uniqueCharacters.length === 1 && uniqueCharacters[0]
+			characterIDs.every(Boolean) && uniqueCharacters.length === 1 && uniqueCharacters[0]
 				? uniqueCharacters[0]
 				: "__mixed__";
 
 		const firstCharacterID = uniqueCharacters[0] ?? "";
 		const repParticipantID =
-			(group.participants ?? []).find(
+			participants.find(
 				(p) => identitiesByEntryID[p.entryID]?.characterID === firstCharacterID,
 			)?.entryID ?? "";
 		const characterName =
@@ -2546,8 +2564,13 @@ function ConflictDetailsDialog({
 	onClose,
 	onSetPriority,
 }: ConflictDetailsDialogProps) {
+	const closeButtonRef = useRef<HTMLButtonElement>(null);
 	const handleEscape = useCallback(() => onClose(), [onClose]);
 	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
+
+	useEffect(() => {
+		closeButtonRef.current?.focus();
+	}, []);
 
 	const entriesByID = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
 	const groups = result.groups ?? [];
@@ -2593,6 +2616,7 @@ function ConflictDetailsDialog({
 						</p>
 					</div>
 					<button
+						ref={closeButtonRef}
 						type="button"
 						className="icon-button conflict-dialog-close"
 						onClick={onClose}

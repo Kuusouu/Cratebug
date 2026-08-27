@@ -18,7 +18,7 @@ Phase 7 already resolves every mod's internal asset path listing through the UAs
 * Disabled mods are excluded from conflict detection but handled without crashing or misleading output.
 * Synthetic fixtures with deliberately overlapping internal paths produce expected, deterministic results.
 * UAssetToolRivals failures (including encrypted/undeterminable mods) produce a clear unavailable or partial state, never a crash or a silently wrong result.
-* A full-library conflict scan remains responsive and supports progress and cancellation.
+* A full-library conflict scan remains responsive, with a busy indicator matching the existing classification pattern (see 9.3 below for why true cancellation is out of scope here, same as classification).
 * A "Check for Conflicts" trigger runs the scan on demand; it does not enforce or auto-resolve anything, only reports.
 * Conflict results are presented in a details UI grouped by resolved character (thumbnail and name, not a raw character ID), with no automatic resolution.
 * Review covers success and major failure paths against representative fixtures.
@@ -74,7 +74,7 @@ Phase 9 does not include:
 * Run the canonical repository validation command (`check.ps1`).
 * Build synthetic fixtures with deliberately overlapping internal paths (reusing the disposable-fixture pattern from `internal/discovery`/`internal/install` tests) covering same-priority conflicts, cross-priority overlaps, and an encrypted/undeterminable mod mixed into an otherwise conflicting set.
 * Launch the app and verify the conflict details UI against a real or `C:\ModsFixtures`-scale library.
-* Confirm a full-library scan remains responsive and that cancellation works.
+* Confirm a full-library scan remains responsive under the busy-indicator-only design scoped in 9.3.
 * Create `docs/reviews/phase-9-review.md` covering all new workflows.
 
 **Verify:** Review approval grants permission to begin Phase 10.
