@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/Kuusouu/Cratebug/internal/conflict"
@@ -11,7 +14,20 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
+	"github.com/Kuusouu/Cratebug/internal/update"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+// The GitHub repository release.yml publishes to and CheckForUpdate reads from.
+const (
+	updateRepoOwner = "Kuusouu"
+	updateRepoName  = "Cratebug"
+
+	// Deliberately distinct from internal/update's own applyStagingDirName:
+	// writeApplyScript clears its staging directory with os.RemoveAll before
+	// writing the helper script, which would delete the downloaded installer
+	// if the two shared a directory.
+	updateDownloadDirName = "cratebug-update-download"
 )
 
 // Exposes the small backend surface used by the frontend.
@@ -69,6 +85,12 @@ func newApp(
 // Confirms that the frontend can reach the Go application.
 func (a *App) RuntimeStatus() string {
 	return "Go backend connected"
+}
+
+// GetAppVersion returns the running build's CalVer release tag, or "dev" for
+// a local or CI build, for display in Settings.
+func (a *App) GetAppVersion() string {
+	return AppVersion
 }
 
 // ClassificationType anchors modtype.Identity so Wails emits its TypeScript model into models.ts.
@@ -130,6 +152,125 @@ func (a *App) getCharacterTable() modtype.CharacterTable {
 	a.characterTable = table
 	a.tableLoaded = true
 	return a.characterTable
+}
+
+// UpdateType anchors update.Release so Wails emits its TypeScript model into models.ts.
+func (a *App) UpdateType() update.Release {
+	return update.Release{}
+}
+
+// Reports whether a newer Cratebug release is published, and its details when it is.
+type UpdateCheckResult struct {
+	Available bool           `json:"available"`
+	Release   update.Release `json:"release,omitempty"`
+}
+
+// Reports download progress for an in-progress update download, emitted on
+// the "update:downloadProgress" event as it downloads (matching
+// PrepareInstall's "install:progress" event for the same purpose).
+type UpdateDownloadProgress struct {
+	Downloaded int64 `json:"downloaded"`
+	Total      int64 `json:"total"`
+}
+
+// CheckForUpdate compares the running build against the latest published
+// GitHub release. A local or CI build (AppVersion is "dev", not a real
+// release tag) never reports one available, since there is nothing valid to
+// compare against.
+func (a *App) CheckForUpdate() (UpdateCheckResult, error) {
+	current, err := update.ParseVersion(AppVersion)
+	if err != nil {
+		return UpdateCheckResult{}, nil
+	}
+
+	release, err := a.updateClient().Latest(a.updateContext())
+	if err != nil {
+		if errors.Is(err, update.ErrNoRelease) {
+			return UpdateCheckResult{}, nil
+		}
+		return UpdateCheckResult{}, err
+	}
+
+	if !release.Version.IsNewer(current) {
+		return UpdateCheckResult{}, nil
+	}
+	return UpdateCheckResult{Available: true, Release: release}, nil
+}
+
+// CheckWhatsNew reports the changelog for the running build's own release,
+// once, the first time it runs after that build changed -- the "what's new"
+// notice shown right after an update relaunches Cratebug, not a check for a
+// further update. Persists the running version as seen immediately so a
+// crash before the frontend renders the notice can only lose it, never
+// repeat it on every subsequent launch.
+func (a *App) CheckWhatsNew() (UpdateCheckResult, error) {
+	current, err := update.ParseVersion(AppVersion)
+	if err != nil {
+		return UpdateCheckResult{}, nil
+	}
+
+	doc := a.loadMetadataDocument()
+	if doc.Settings.LastSeenVersion == current.Tag {
+		return UpdateCheckResult{}, nil
+	}
+
+	release, err := a.updateClient().Tag(a.updateContext(), current.Tag)
+	if err != nil {
+		// Best-effort: a missing or unreachable release for the running tag
+		// (offline, or a build that was never actually published) should not
+		// block startup or repeat every launch, so it's still marked seen.
+		doc.SetLastSeenVersion(current.Tag)
+		_ = a.metadataStore.Save(doc)
+		return UpdateCheckResult{}, nil
+	}
+
+	doc.SetLastSeenVersion(current.Tag)
+	if saveErr := a.metadataStore.Save(doc); saveErr != nil {
+		return UpdateCheckResult{}, fmt.Errorf("record the shown changelog version: %w", saveErr)
+	}
+	return UpdateCheckResult{Available: true, Release: release}, nil
+}
+
+// DownloadUpdate downloads release's installer, reporting progress through
+// the "update:downloadProgress" event. Returns the downloaded installer's
+// local path for a subsequent ApplyUpdate call.
+func (a *App) DownloadUpdate(release update.Release) (string, error) {
+	destDir := filepath.Join(os.TempDir(), updateDownloadDirName)
+	onProgress := func(downloaded, total int64) {
+		if a.ctx != nil {
+			wailsRuntime.EventsEmit(a.ctx, "update:downloadProgress", UpdateDownloadProgress{
+				Downloaded: downloaded,
+				Total:      total,
+			})
+		}
+	}
+	return a.updateClient().Download(a.updateContext(), release.Asset, destDir, onProgress)
+}
+
+// ApplyUpdate launches the detached helper that installs the update
+// downloaded to installerPath and relaunches Cratebug, then quits the
+// running instance so the helper can replace it. A nil error means Cratebug
+// is about to exit, not that the update finished applying -- that happens in
+// the detached helper after this process is gone.
+func (a *App) ApplyUpdate(installerPath string) error {
+	if err := update.ApplyUpdate(installerPath); err != nil {
+		return err
+	}
+	if a.ctx != nil {
+		wailsRuntime.Quit(a.ctx)
+	}
+	return nil
+}
+
+func (a *App) updateClient() *update.Client {
+	return &update.Client{Owner: updateRepoOwner, Repo: updateRepoName}
+}
+
+func (a *App) updateContext() context.Context {
+	if a.ctx != nil {
+		return a.ctx
+	}
+	return context.Background()
 }
 
 // Changes one current scanner entry to the requested enabled state.

@@ -6,12 +6,24 @@ export function ApplyInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['ApplyInstall'](arg1, arg2, arg3);
 }
 
+export function ApplyUpdate(arg1) {
+  return window['go']['main']['App']['ApplyUpdate'](arg1);
+}
+
 export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
 export function CancelInstall(arg1) {
   return window['go']['main']['App']['CancelInstall'](arg1);
+}
+
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
+export function CheckWhatsNew() {
+  return window['go']['main']['App']['CheckWhatsNew']();
 }
 
 export function ClassificationType() {
@@ -44,6 +56,14 @@ export function DeleteTag(arg1) {
 
 export function DetectConflicts(arg1, arg2) {
   return window['go']['main']['App']['DetectConflicts'](arg1, arg2);
+}
+
+export function DownloadUpdate(arg1) {
+  return window['go']['main']['App']['DownloadUpdate'](arg1);
+}
+
+export function GetAppVersion() {
+  return window['go']['main']['App']['GetAppVersion']();
 }
 
 export function LoadMetadata() {
@@ -112,4 +132,8 @@ export function SetTheme(arg1) {
 
 export function UnassignModTag(arg1, arg2) {
   return window['go']['main']['App']['UnassignModTag'](arg1, arg2);
+}
+
+export function UpdateType() {
+  return window['go']['main']['App']['UpdateType']();
 }

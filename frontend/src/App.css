@@ -171,6 +171,12 @@ h1 {
 	height: 1.15rem;
 }
 
+.icon-button.has-update {
+	border-color: color-mix(in srgb, var(--accent), transparent 40%);
+	background: color-mix(in srgb, var(--accent), transparent 82%);
+	color: var(--accent);
+}
+
 select,
 input,
 button {
@@ -1601,6 +1607,22 @@ button:disabled {
 	padding: 0.6rem 0.85rem;
 }
 
+/* Icon + label buttons (update dialog, updates settings row): lucide icons
+   default to 24px, which overwhelms a text button unless sized down. */
+.mutation-dialog-actions button,
+.update-settings-row button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.mutation-dialog-actions button svg,
+.update-settings-row button svg {
+	width: 1rem;
+	height: 1rem;
+	flex-shrink: 0;
+}
+
 .install-preview-dialog {
 	width: min(calc(100vw - 3rem), 56rem);
 	max-width: 56rem;
@@ -1966,7 +1988,11 @@ button:disabled {
 .mutation-toast {
 	display: flex;
 	position: fixed;
-	z-index: 20;
+	/* Above dialog backdrops (z-index 30) and the drop overlay (z-index 40) so
+	   a toast fired while a dialog is open (e.g. "Check for updates" finishing
+	   before Settings closes) isn't blurred and dimmed into unreadability by
+	   the backdrop sitting on top of it. */
+	z-index: 45;
 	bottom: 1.5rem;
 	left: 50%;
 	width: min(24rem, calc(100vw - 2.5rem));
@@ -2529,4 +2555,121 @@ button:disabled {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	max-width: 24rem;
+}
+
+/* Update settings section */
+
+.update-settings-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.update-settings-version {
+	font-size: 0.82rem;
+	color: var(--muted);
+}
+
+/* Update dialog */
+
+.update-dialog {
+	width: min(calc(100vw - 3rem), 32rem);
+	max-height: min(calc(100vh - 3.5rem), 44rem);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.update-dialog-version {
+	margin: 0.2rem 0 0;
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.update-dialog-body {
+	flex: 1;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	margin-bottom: 0.85rem;
+	padding-right: 0.25rem;
+}
+
+.update-changelog h3 {
+	margin: 0.9rem 0 0.3rem;
+	font-size: 0.88rem;
+	font-weight: 700;
+}
+
+.update-changelog h3:first-child {
+	margin-top: 0;
+}
+
+.update-changelog p {
+	margin: 0.3rem 0;
+	font-size: 0.85rem;
+	line-height: 1.5;
+	color: var(--muted);
+}
+
+.update-changelog-list {
+	margin: 0.25rem 0;
+	padding-left: 1.1rem;
+	font-size: 0.85rem;
+	line-height: 1.5;
+	color: var(--muted);
+}
+
+.update-changelog-empty {
+	font-size: 0.85rem;
+	color: var(--muted);
+}
+
+.update-download-progress {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 0.5rem 0;
+}
+
+.progress-bar {
+	height: 0.5rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--panel-raised), transparent 20%);
+	overflow: hidden;
+}
+
+.progress-fill {
+	height: 100%;
+	background: var(--accent);
+	transition: width 0.2s ease;
+}
+
+.update-download-progress-text {
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.update-ready-notice {
+	margin: 0.5rem 0 0;
+	font-size: 0.85rem;
+	color: var(--good);
+}
+
+.update-dialog-footer {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin: 0.85rem 0 0;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--line);
+	font-size: 0.76rem;
+	color: var(--muted);
+}
+
+.update-heart {
+	width: 0.85rem;
+	height: 0.85rem;
+	fill: var(--bad);
+	color: var(--bad);
 }

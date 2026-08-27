@@ -1,4 +1,4 @@
-import { Check, Moon, Monitor, RotateCcw, Sun } from "lucide-react";
+import { Check, Moon, Monitor, RefreshCw, RotateCcw, Sun } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { accentPresets, isValidHexColor } from "./accentColor";
 import { type Theme, themeLabels, themes } from "./libraryTypes";
@@ -7,9 +7,12 @@ import { useDialogFocusTrap } from "./useDialogFocusTrap";
 type SettingsDialogProps = {
 	theme: Theme;
 	accentColor: string;
+	appVersion: string;
+	isCheckingForUpdate: boolean;
 	onClose: () => void;
 	onSelectTheme: (theme: Theme) => void;
 	onSelectAccentColor: (hex: string) => void;
+	onCheckForUpdate: () => void;
 };
 
 const themeIcons = {
@@ -24,9 +27,12 @@ const themeIcons = {
 export function SettingsDialog({
 	theme,
 	accentColor,
+	appVersion,
+	isCheckingForUpdate,
 	onClose,
 	onSelectTheme,
 	onSelectAccentColor,
+	onCheckForUpdate,
 }: SettingsDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
 	const handleEscape = useCallback(() => onClose(), [onClose]);
@@ -141,6 +147,24 @@ export function SettingsDialog({
 								onChange={(event) => handleHexInput(event.target.value)}
 							/>
 						</label>
+					</div>
+				</div>
+				<div className="setting-section">
+					<h3>Updates</h3>
+					<div className="update-settings-row">
+						<span className="update-settings-version">Version {appVersion}</span>
+						<button
+							type="button"
+							className="quiet-button"
+							onClick={onCheckForUpdate}
+							disabled={isCheckingForUpdate}
+						>
+							<RefreshCw
+								className={isCheckingForUpdate ? "spinning-loader" : undefined}
+								aria-hidden="true"
+							/>
+							{isCheckingForUpdate ? "Checking..." : "Check for updates"}
+						</button>
 					</div>
 				</div>
 				<div className="mutation-dialog-actions">

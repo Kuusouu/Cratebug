@@ -165,3 +165,51 @@ func TestAccentColorSurvivesASaveLoadRoundTrip(t *testing.T) {
 		t.Errorf("Settings.AccentColor = %q, want %q", reloaded.Settings.AccentColor, "#8b5cf6")
 	}
 }
+
+func TestSetLastSeenVersion(t *testing.T) {
+	// Arrange
+	var doc Document
+
+	// Act
+	doc.SetLastSeenVersion("2026.08.27")
+
+	// Assert
+	if doc.Settings.LastSeenVersion != "2026.08.27" {
+		t.Errorf("Settings.LastSeenVersion = %q, want %q", doc.Settings.LastSeenVersion, "2026.08.27")
+	}
+}
+
+func TestLastSeenVersionSurvivesASaveLoadRoundTrip(t *testing.T) {
+	// Arrange
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	var doc Document
+	doc.SetLastSeenVersion("2026.08.27")
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	if reloaded.Settings.LastSeenVersion != "2026.08.27" {
+		t.Errorf("Settings.LastSeenVersion = %q, want %q", reloaded.Settings.LastSeenVersion, "2026.08.27")
+	}
+}
+
+func TestDocumentWithNoLastSeenVersionLoadsAsEmpty(t *testing.T) {
+	// Arrange: a document written before this field existed has no
+	// "lastSeenVersion" key at all, not an empty one.
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	if err := store.Save(Document{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	reloaded, _ := store.Load()
+
+	// Assert
+	if reloaded.Settings.LastSeenVersion != "" {
+		t.Errorf("Settings.LastSeenVersion = %q, want empty for a document that never set it", reloaded.Settings.LastSeenVersion)
+	}
+}

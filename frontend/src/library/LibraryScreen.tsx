@@ -22,13 +22,18 @@ import {
 	useState,
 } from "react";
 import {
+	ApplyUpdate,
 	AssignModTag,
+	CheckForUpdate,
+	CheckWhatsNew,
 	ClassifyLibrary,
 	CreateFolder,
 	CreateTag,
 	DeleteMod,
 	DeleteTag,
 	DetectConflicts,
+	DownloadUpdate,
+	GetAppVersion,
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
@@ -48,11 +53,12 @@ import {
 import {
 	conflict,
 	discovery,
+	type main,
 	type metadata,
 	type modtype,
 	type mutation,
 } from "../../wailsjs/go/models";
-import { OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
+import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
@@ -82,6 +88,7 @@ import {
 import { ModCatalog } from "./ModCatalog";
 import { SettingsDialog } from "./SettingsDialog";
 import { TagMenu } from "./TagMenu";
+import { type UpdateDownloadProgress, UpdateDialog } from "./UpdateDialog";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type LibraryIndex = {
@@ -347,6 +354,18 @@ export function LibraryScreen() {
 	const [conflictResult, setConflictResult] = useState<conflict.Result | null>(null);
 	const [isCheckingConflicts, setIsCheckingConflicts] = useState(false);
 	const [conflictDetailsOpen, setConflictDetailsOpen] = useState(false);
+	const [updateCheckResult, setUpdateCheckResult] = useState<main.UpdateCheckResult | null>(null);
+	const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
+	const [whatsNewResult, setWhatsNewResult] = useState<main.UpdateCheckResult | null>(null);
+	const [updateDialogMode, setUpdateDialogMode] = useState<"available" | "installed" | null>(
+		null,
+	);
+	const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false);
+	const [isUpdateReady, setIsUpdateReady] = useState(false);
+	const [updateDownloadProgress, setUpdateDownloadProgress] =
+		useState<UpdateDownloadProgress | null>(null);
+	const [downloadedInstallerPath, setDownloadedInstallerPath] = useState<string | null>(null);
+	const [appVersion, setAppVersion] = useState("dev");
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const [installDialogFiles, setInstallDialogFiles] = useState<string[] | null>(null);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
@@ -357,6 +376,7 @@ export function LibraryScreen() {
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
 	const hasLoadedInitialMetadataRef = useRef(false);
+	const hasCheckedWhatsNewRef = useRef(false);
 	const lastOrphanedTagNoticeCountRef = useRef(0);
 	const accentColorSaveTimeoutRef = useRef<number | undefined>(undefined);
 	const libraryRoot = library?.root;
@@ -449,6 +469,37 @@ export function LibraryScreen() {
 		OnFileDrop(handleDroppedFiles, false);
 		return () => OnFileDropOff();
 	}, [handleDroppedFiles]);
+
+	useEffect(() => {
+		return EventsOn("update:downloadProgress", (progress: UpdateDownloadProgress) => {
+			setUpdateDownloadProgress(progress);
+		});
+	}, []);
+
+	// Best-effort welcome notice: a failure here should not surface as an
+	// error toast, since there is nothing the user needs to act on.
+	useEffect(() => {
+		if (hasCheckedWhatsNewRef.current) return;
+		hasCheckedWhatsNewRef.current = true;
+
+		void (async () => {
+			try {
+				const result = await CheckWhatsNew();
+				if (result.available) {
+					setWhatsNewResult(result);
+					setUpdateDialogMode((current) => current ?? "installed");
+				}
+			} catch {
+				// Intentionally silent; see comment above.
+			}
+		})();
+
+		GetAppVersion()
+			.then(setAppVersion)
+			.catch(() => {
+				// Settings keeps its "dev" default; not worth a toast.
+			});
+	}, []);
 
 	// Tracks external OS file drags separately from the app's own internal drag-to-organize
 	// system (which carries "text/plain" data, not "Files") to show a drop-target overlay.
@@ -549,6 +600,56 @@ export function LibraryScreen() {
 			}
 		}
 	}, [libraryRoot, library, showMutationFeedback]);
+	// User-initiated only, same as checkConflicts: nothing polls GitHub in the
+	// background unasked.
+	// Closes Settings when an update turns up so the update dialog does not
+	// stack on top of it -- dialogs in this app assume exclusive focus.
+	const checkForUpdate = useCallback(async () => {
+		setIsCheckingForUpdate(true);
+		try {
+			const result = await CheckForUpdate();
+			setUpdateCheckResult(result.available ? result : null);
+			if (result.available) {
+				setSettingsOpen(false);
+				setUpdateDialogMode("available");
+			} else {
+				showMutationFeedback("success", "Cratebug is up to date.");
+			}
+		} catch (error) {
+			showMutationFeedback("error", `Could not check for updates: ${errorMessage(error)}`);
+		} finally {
+			setIsCheckingForUpdate(false);
+		}
+	}, [showMutationFeedback]);
+	const downloadUpdate = useCallback(async () => {
+		if (!updateCheckResult?.release) return;
+
+		setIsDownloadingUpdate(true);
+		setUpdateDownloadProgress(null);
+		try {
+			const path = await DownloadUpdate(updateCheckResult.release);
+			setDownloadedInstallerPath(path);
+			setIsUpdateReady(true);
+		} catch (error) {
+			showMutationFeedback("error", `Could not download the update: ${errorMessage(error)}`);
+		} finally {
+			setIsDownloadingUpdate(false);
+		}
+	}, [updateCheckResult, showMutationFeedback]);
+	// A successful call quits Cratebug from the Go side (see App.ApplyUpdate),
+	// so there is deliberately no further state update on success here: the
+	// detached helper takes over from this point, not the running frontend.
+	const applyUpdate = useCallback(async () => {
+		if (!downloadedInstallerPath) return;
+		try {
+			await ApplyUpdate(downloadedInstallerPath);
+		} catch (error) {
+			showMutationFeedback("error", `Could not apply the update: ${errorMessage(error)}`);
+		}
+	}, [downloadedInstallerPath, showMutationFeedback]);
+	const closeUpdateDialog = useCallback(() => {
+		setUpdateDialogMode(null);
+	}, []);
 	const updateMutatedEntry = useCallback(
 		(
 			result: mutation.Result,
@@ -1466,10 +1567,20 @@ export function LibraryScreen() {
 					</button>
 					<button
 						type="button"
-						className="icon-button"
+						className={
+							updateCheckResult?.available ? "icon-button has-update" : "icon-button"
+						}
 						onClick={() => setSettingsOpen(true)}
-						aria-label="Settings"
-						title="Settings"
+						aria-label={
+							updateCheckResult?.available
+								? "Settings (update available)"
+								: "Settings"
+						}
+						title={
+							updateCheckResult?.available
+								? "Settings -- a Cratebug update is available"
+								: "Settings"
+						}
 					>
 						<SettingsIcon aria-hidden="true" />
 					</button>
@@ -1695,9 +1806,12 @@ export function LibraryScreen() {
 				<SettingsDialog
 					theme={theme}
 					accentColor={accentColor}
+					appVersion={appVersion}
+					isCheckingForUpdate={isCheckingForUpdate}
 					onClose={() => setSettingsOpen(false)}
 					onSelectTheme={selectTheme}
 					onSelectAccentColor={selectAccentColor}
+					onCheckForUpdate={() => void checkForUpdate()}
 				/>
 			)}
 			{conflictDetailsOpen && conflictResult && library && (
@@ -1710,6 +1824,26 @@ export function LibraryScreen() {
 					onSetPriority={setModPriority}
 				/>
 			)}
+			{updateDialogMode &&
+				(() => {
+					const release =
+						updateDialogMode === "available"
+							? updateCheckResult?.release
+							: whatsNewResult?.release;
+					if (!release) return null;
+					return (
+						<UpdateDialog
+							release={release}
+							mode={updateDialogMode}
+							isDownloading={isDownloadingUpdate}
+							isReady={isUpdateReady}
+							downloadProgress={updateDownloadProgress}
+							onDownload={() => void downloadUpdate()}
+							onApply={() => void applyUpdate()}
+							onClose={closeUpdateDialog}
+						/>
+					);
+				})()}
 			{installDialogFiles && libraryRoot && (
 				<InstallPreviewDialog
 					modRoot={libraryRoot}
@@ -1743,6 +1877,7 @@ export function LibraryScreen() {
 				!activeFolderDialog &&
 				!settingsOpen &&
 				!conflictDetailsOpen &&
+				!updateDialogMode &&
 				!installDialogFiles && (
 					<div className="drop-overlay" aria-hidden="true">
 						<div className="drop-overlay-card">
