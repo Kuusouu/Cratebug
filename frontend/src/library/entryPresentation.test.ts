@@ -6,6 +6,7 @@ import {
 	canOrganizeMod,
 	canTagMod,
 	categorySlug,
+	characterHeroPortraitUrl,
 	entryCategoryLabel,
 	entryCharacterLabel,
 	entryHeroPortraitUrl,
@@ -223,5 +224,13 @@ describe("entryHeroPortraitUrl", () => {
 		expect(entryHeroPortraitUrl(undefined)).toBeNull();
 		expect(entryHeroPortraitUrl(null)).toBeNull();
 		expect(entryHeroPortraitUrl(new modtype.Identity({ category: "Mesh" }))).toBeNull();
+	});
+});
+
+describe("characterHeroPortraitUrl", () => {
+	it("returns null safely for missing characterID", () => {
+		expect(characterHeroPortraitUrl(undefined)).toBeNull();
+		expect(characterHeroPortraitUrl(null)).toBeNull();
+		expect(characterHeroPortraitUrl("")).toBeNull();
 	});
 });
