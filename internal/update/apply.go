@@ -13,9 +13,6 @@ import (
 
 const (
 	// Silent-install flag the Wails-generated per-user NSIS template accepts.
-	// Confirmed against that template as part of Phase 10 end-to-end testing
-	// (TASKS.md 10.6); if a future NSIS template ever drops support for it,
-	// ApplyUpdate needs to change alongside the installer.
 	nsisSilentInstallFlag = "/S"
 
 	// How often the helper script polls for the running Cratebug process to
@@ -34,32 +31,40 @@ const (
 // with fmt.Sprintf, since batch's own %VAR% syntax would otherwise collide
 // with Sprintf's % verb escaping on every substitution.
 //
-// Every external command (tasklist, findstr, timeout -- not the cmd.exe
-// built-ins like set/if/goto/start/del, which aren't resolved via PATH at
-// all) is called through its full %SystemRoot%\System32 path, not by bare
-// name. A bare `find` here previously resolved to GNU findutils' `find` on
-// a machine with Git for Windows/MSYS ahead of System32 on PATH -- which
-// treats "/I" as a starting directory rather than a flag and recursively
-// scans the filesystem from there instead of searching a pipe. Confirmed
-// live during Phase 10 testing, not a hypothetical.
+// External commands (tasklist, timeout) are called through their full
+// %SystemRoot%\System32 path rather than by bare name, since a PATH entry
+// ahead of System32 (Git for Windows, MSYS, Cygwin) can substitute a
+// different program with the same name.
+//
+// The still-running check writes tasklist's CSV output to a file and reads
+// it back with `for /f`, rather than piping to a second process and
+// branching on its errorlevel: that form put its retry `goto` inside a
+// parenthesized `if ( ... )` block, a self-referential goto-inside-parens
+// pattern that's erratic in cmd.exe, so every `if` below is a flat,
+// single-line branch instead. The snapshot file also sidesteps `for /f`
+// itself failing to parse a command string that contains its own quotes
+// (the exe path, the /FI filter value).
 var applyScriptTemplate = template.Must(template.New("apply").Parse(`@echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 
 set "SYS=%SystemRoot%\System32"
 set "TARGET_PID={{.TargetPID}}"
 set "EXE_PATH={{.ExePath}}"
 set "INSTALLER_PATH={{.InstallerPath}}"
-set "WAITED=0"
+set "SNAPSHOT=%TEMP%\cratebug-update-tasklist.tmp"
+set /a "WAITED=0"
 
 :waitloop
-"%SYS%\tasklist.exe" /FI "PID eq %TARGET_PID%" 2>NUL | "%SYS%\findstr.exe" /I "%TARGET_PID%" >NUL
-if not errorlevel 1 (
-    if %WAITED% GEQ {{.MaxWaitSeconds}} goto waitfailed
-    set /a WAITED+=1
-    "%SYS%\timeout.exe" /T {{.PollIntervalSeconds}} /NOBREAK >NUL
-    goto waitloop
-)
+set "FOUND_PID="
+"%SYS%\tasklist.exe" /FI "PID eq %TARGET_PID%" /FO CSV /NH > "%SNAPSHOT%" 2>NUL
+for /f "tokens=2 delims=," %%P in (%SNAPSHOT%) do set "FOUND_PID=%%~P"
+if not "!FOUND_PID!"=="%TARGET_PID%" goto waitdone
+if !WAITED! GEQ {{.MaxWaitSeconds}} goto waitfailed
+set /a "WAITED+=1"
+"%SYS%\timeout.exe" /T {{.PollIntervalSeconds}} /NOBREAK >NUL
+goto waitloop
 
+:waitdone
 echo Running installer silently...
 start /wait "" "%INSTALLER_PATH%" {{.SilentFlag}}
 if errorlevel 1 goto installfailed
@@ -77,6 +82,7 @@ echo Installer reported a failure; not relaunching Cratebug.
 goto cleanup
 
 :cleanup
+del "%SNAPSHOT%" 2>nul
 del "%INSTALLER_PATH%" 2>nul
 (goto) 2>nul & del "%~f0" & exit
 `))
@@ -116,12 +122,18 @@ func ApplyUpdate(installerPath string) error {
 
 	cmd := exec.Command(systemCommandPath("cmd.exe"), "/C", scriptPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		// DETACHED_PROCESS: survives Cratebug exiting: without it, Windows
-		// treats the helper as a child of a console-less GUI app and may not
-		// keep it alive independently.
-		// CREATE_NEW_PROCESS_GROUP: isolates it from Cratebug's process
+		// Windows doesn't kill child processes when their parent exits, so
+		// nothing else is needed to keep this running after Cratebug quits.
+		//
+		// CREATE_NO_WINDOW suppresses the console Windows would otherwise
+		// auto-allocate for cmd.exe spawned from a console-less GUI parent.
+		// It must not be combined with DETACHED_PROCESS or
+		// CREATE_NEW_CONSOLE: per Microsoft's Process Creation Flags docs,
+		// it's silently ignored when combined with either.
+		//
+		// CREATE_NEW_PROCESS_GROUP isolates it from Cratebug's process
 		// group so it isn't sent the same termination signals.
-		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS,
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.CREATE_NO_WINDOW,
 	}
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("update: launch apply helper: %w", err)

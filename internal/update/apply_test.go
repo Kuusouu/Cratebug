@@ -34,20 +34,32 @@ func TestWriteApplyScriptRendersExpectedContent(t *testing.T) {
 		`"%INSTALLER_PATH%" ` + nsisSilentInstallFlag,
 		`start "" "%EXE_PATH%"`,
 		`"%SYS%\tasklist.exe"`,
-		`"%SYS%\findstr.exe"`,
 		`"%SYS%\timeout.exe"`,
+		`for /f "tokens=2 delims=," %%P in (%SNAPSHOT%)`,
+		`/FO CSV /NH`,
+		`if not "!FOUND_PID!"=="%TARGET_PID%" goto waitdone`,
+		`EnableDelayedExpansion`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("rendered script missing expected content %q\nfull script:\n%s", want, script)
 		}
 	}
 
-	// Regression guard: a bare `find` here previously resolved to GNU
-	// findutils' find on a machine with Git for Windows/MSYS ahead of
-	// System32 on PATH, which hung scanning the whole filesystem instead of
-	// searching a pipe. Confirmed live during Phase 10 testing.
-	if strings.Contains(script, `| find `) || strings.Contains(script, `| find/`) {
-		t.Errorf("rendered script calls bare `find`, which PATH can redirect to a different program:\n%s", script)
+	// A bare `find`/`findstr` here can resolve to GNU findutils' find
+	// instead of Windows' own tool on a machine with Git for Windows/MSYS
+	// ahead of System32 on PATH.
+	if strings.Contains(script, `| find `) || strings.Contains(script, `| find/`) || strings.Contains(script, `findstr`) {
+		t.Errorf("rendered script pipes to find/findstr instead of parsing tasklist output directly:\n%s", script)
+	}
+
+	// The still-running check previously branched on a piped command's
+	// errorlevel from inside a parenthesized `if ( ... goto waitloop ... )`
+	// block -- a self-referential goto-inside-parens that worked fine typed
+	// interactively but hung when the script was actually invoked (spawned
+	// detached via CreateProcess). Every branch must be a single-line,
+	// no-parens `if` now.
+	if strings.Contains(script, "errorlevel 1 (") {
+		t.Errorf("rendered script branches on pipe errorlevel from inside a parenthesized block:\n%s", script)
 	}
 }
 
