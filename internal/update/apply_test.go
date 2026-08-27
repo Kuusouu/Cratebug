@@ -33,10 +33,21 @@ func TestWriteApplyScriptRendersExpectedContent(t *testing.T) {
 		`set "INSTALLER_PATH=` + installerPath + `"`,
 		`"%INSTALLER_PATH%" ` + nsisSilentInstallFlag,
 		`start "" "%EXE_PATH%"`,
+		`"%SYS%\tasklist.exe"`,
+		`"%SYS%\findstr.exe"`,
+		`"%SYS%\timeout.exe"`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("rendered script missing expected content %q\nfull script:\n%s", want, script)
 		}
+	}
+
+	// Regression guard: a bare `find` here previously resolved to GNU
+	// findutils' find on a machine with Git for Windows/MSYS ahead of
+	// System32 on PATH, which hung scanning the whole filesystem instead of
+	// searching a pipe. Confirmed live during Phase 10 testing.
+	if strings.Contains(script, `| find `) || strings.Contains(script, `| find/`) {
+		t.Errorf("rendered script calls bare `find`, which PATH can redirect to a different program:\n%s", script)
 	}
 }
 

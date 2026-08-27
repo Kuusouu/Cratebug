@@ -33,20 +33,30 @@ const (
 // Renders the apply helper as a Windows batch script rather than building it
 // with fmt.Sprintf, since batch's own %VAR% syntax would otherwise collide
 // with Sprintf's % verb escaping on every substitution.
+//
+// Every external command (tasklist, findstr, timeout -- not the cmd.exe
+// built-ins like set/if/goto/start/del, which aren't resolved via PATH at
+// all) is called through its full %SystemRoot%\System32 path, not by bare
+// name. A bare `find` here previously resolved to GNU findutils' `find` on
+// a machine with Git for Windows/MSYS ahead of System32 on PATH -- which
+// treats "/I" as a starting directory rather than a flag and recursively
+// scans the filesystem from there instead of searching a pipe. Confirmed
+// live during Phase 10 testing, not a hypothetical.
 var applyScriptTemplate = template.Must(template.New("apply").Parse(`@echo off
 setlocal
 
+set "SYS=%SystemRoot%\System32"
 set "TARGET_PID={{.TargetPID}}"
 set "EXE_PATH={{.ExePath}}"
 set "INSTALLER_PATH={{.InstallerPath}}"
 set "WAITED=0"
 
 :waitloop
-tasklist /FI "PID eq %TARGET_PID%" 2>NUL | find /I "%TARGET_PID%" >NUL
+"%SYS%\tasklist.exe" /FI "PID eq %TARGET_PID%" 2>NUL | "%SYS%\findstr.exe" /I "%TARGET_PID%" >NUL
 if not errorlevel 1 (
     if %WAITED% GEQ {{.MaxWaitSeconds}} goto waitfailed
     set /a WAITED+=1
-    timeout /T {{.PollIntervalSeconds}} /NOBREAK >NUL
+    "%SYS%\timeout.exe" /T {{.PollIntervalSeconds}} /NOBREAK >NUL
     goto waitloop
 )
 
@@ -104,7 +114,7 @@ func ApplyUpdate(installerPath string) error {
 		return err
 	}
 
-	cmd := exec.Command("cmd.exe", "/C", scriptPath)
+	cmd := exec.Command(systemCommandPath("cmd.exe"), "/C", scriptPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		// DETACHED_PROCESS: survives Cratebug exiting: without it, Windows
 		// treats the helper as a child of a console-less GUI app and may not
@@ -117,6 +127,20 @@ func ApplyUpdate(installerPath string) error {
 		return fmt.Errorf("update: launch apply helper: %w", err)
 	}
 	return nil
+}
+
+// Resolves name to its full path under the OS's System32 directory instead
+// of relying on exec.Command's own PATH search, so a PATH entry ahead of
+// System32 (Git for Windows, MSYS, Cygwin, ...) can never substitute a
+// different program with the same bare name. Falls back to the bare name
+// only if SystemRoot somehow isn't set, which is exec.Command's prior
+// behavior, not a regression.
+func systemCommandPath(name string) string {
+	systemRoot := os.Getenv("SystemRoot")
+	if systemRoot == "" {
+		return name
+	}
+	return filepath.Join(systemRoot, "System32", name)
 }
 
 // Renders the apply helper script into a fresh staging directory and

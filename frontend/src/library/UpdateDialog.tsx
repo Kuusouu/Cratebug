@@ -181,34 +181,31 @@ export function UpdateDialog({
 					)}
 				</div>
 
-				<div className="mutation-dialog-actions">
-					{mode === "available" && !isReady && (
-						<button
-							type="button"
-							className="quiet-button"
-							onClick={() => BrowserOpenURL(release.htmlURL)}
-							disabled={isDownloading}
-						>
-							View release
-						</button>
-					)}
-					{mode === "available" && !isReady && (
-						<button type="button" onClick={onDownload} disabled={isDownloading}>
-							<Download aria-hidden="true" />
-							{isDownloading ? "Downloading..." : "Download update"}
-						</button>
-					)}
-					{mode === "available" && isReady && (
-						<button type="button" onClick={onApply}>
-							Install &amp; restart
-						</button>
-					)}
-					{mode === "installed" && (
-						<button type="button" onClick={onClose}>
-							Nice!
-						</button>
-					)}
-				</div>
+				{mode === "available" && (
+					<div className="mutation-dialog-actions">
+						{!isReady && (
+							<button
+								type="button"
+								className="quiet-button"
+								onClick={() => BrowserOpenURL(release.htmlURL)}
+								disabled={isDownloading}
+							>
+								View release
+							</button>
+						)}
+						{!isReady && (
+							<button type="button" onClick={onDownload} disabled={isDownloading}>
+								<Download aria-hidden="true" />
+								{isDownloading ? "Downloading..." : "Download update"}
+							</button>
+						)}
+						{isReady && (
+							<button type="button" onClick={onApply}>
+								Install &amp; restart
+							</button>
+						)}
+					</div>
+				)}
 
 				<p className="update-dialog-footer">
 					Brought to you with <Heart className="update-heart" aria-hidden="true" /> by the
