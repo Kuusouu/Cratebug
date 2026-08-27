@@ -3,6 +3,7 @@ import {
 	CircleAlert,
 	CircleCheckBig,
 	Grid2X2,
+	Link,
 	List,
 	Package,
 	PanelsTopLeft,
@@ -73,7 +74,8 @@ import {
 	hasMissingSidecar,
 } from "./entryPresentation";
 import { FolderNavigation } from "./FolderNavigation";
-import { InstallPreviewDialog } from "./InstallPreviewDialog";
+import { InstallFromUrlDialog } from "./InstallFromUrlDialog";
+import { type InstallSource, InstallPreviewDialog } from "./InstallPreviewDialog";
 import { formatWailsError as errorMessage } from "./installPresentation";
 import {
 	type DraggedItem,
@@ -367,7 +369,8 @@ export function LibraryScreen() {
 	const [downloadedInstallerPath, setDownloadedInstallerPath] = useState<string | null>(null);
 	const [appVersion, setAppVersion] = useState("dev");
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
-	const [installDialogFiles, setInstallDialogFiles] = useState<string[] | null>(null);
+	const [installSource, setInstallSource] = useState<InstallSource | null>(null);
+	const [installFromUrlOpen, setInstallFromUrlOpen] = useState(false);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
 	const externalDragDepthRef = useRef(0);
 	const activeLibraryRootRef = useRef<string | null>(null);
@@ -445,12 +448,16 @@ export function LibraryScreen() {
 		try {
 			const files = await SelectFilesForInstall();
 			if (files && files.length > 0) {
-				setInstallDialogFiles(files);
+				setInstallSource({ kind: "files", paths: files });
 			}
 		} catch (error) {
 			showMutationFeedback("error", `Could not open file selector: ${errorMessage(error)}`);
 		}
 	}, [showMutationFeedback]);
+	const submitInstallFromUrl = useCallback((url: string) => {
+		setInstallFromUrlOpen(false);
+		setInstallSource({ kind: "url", url });
+	}, []);
 	const handleDroppedFiles = useCallback(
 		(_x: number, _y: number, paths: string[]) => {
 			if (paths.length === 0) return;
@@ -458,7 +465,7 @@ export function LibraryScreen() {
 				showMutationFeedback("error", "Set a mod library folder before installing.");
 				return;
 			}
-			setInstallDialogFiles(paths);
+			setInstallSource({ kind: "files", paths });
 		},
 		[libraryRoot, showMutationFeedback],
 	);
@@ -1544,6 +1551,16 @@ export function LibraryScreen() {
 					<button
 						type="button"
 						className="icon-button"
+						onClick={() => setInstallFromUrlOpen(true)}
+						disabled={!libraryRoot || libraryState === "loading"}
+						aria-label="Install from URL"
+						title="Download and install a mod from a direct URL"
+					>
+						<Link aria-hidden="true" />
+					</button>
+					<button
+						type="button"
+						className="icon-button"
 						onClick={() => {
 							if ((conflictResult?.groups?.length ?? 0) > 0) {
 								setConflictDetailsOpen(true);
@@ -1844,15 +1861,21 @@ export function LibraryScreen() {
 						/>
 					);
 				})()}
-			{installDialogFiles && libraryRoot && (
+			{installFromUrlOpen && (
+				<InstallFromUrlDialog
+					onSubmit={submitInstallFromUrl}
+					onCancel={() => setInstallFromUrlOpen(false)}
+				/>
+			)}
+			{installSource && libraryRoot && (
 				<InstallPreviewDialog
 					modRoot={libraryRoot}
-					sourceFiles={installDialogFiles}
+					source={installSource}
 					defaultFolder={selectedFolder === "all" ? "" : selectedFolder}
 					folders={libraryIndex.folders}
 					libraryEntries={library.entries}
 					onDone={(result) => {
-						setInstallDialogFiles(null);
+						setInstallSource(null);
 						setLibrary(result.reconciledLibrary);
 						setLibraryState(
 							result.reconciledLibrary.entries.length === 0 ? "empty" : "populated",
@@ -1869,7 +1892,7 @@ export function LibraryScreen() {
 							setSelectedEntryID(firstInstalledID);
 						}
 					}}
-					onCancel={() => setInstallDialogFiles(null)}
+					onCancel={() => setInstallSource(null)}
 				/>
 			)}
 			{isDraggingExternalFiles &&
@@ -1878,7 +1901,8 @@ export function LibraryScreen() {
 				!settingsOpen &&
 				!conflictDetailsOpen &&
 				!updateDialogMode &&
-				!installDialogFiles && (
+				!installFromUrlOpen &&
+				!installSource && (
 					<div className="drop-overlay" aria-hidden="true">
 						<div className="drop-overlay-card">
 							<PackagePlus aria-hidden="true" />

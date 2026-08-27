@@ -9,7 +9,12 @@ import {
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { ApplyInstall, CancelInstall, PrepareInstall } from "../../wailsjs/go/main/App";
+import {
+	ApplyInstall,
+	CancelInstall,
+	InstallFromURL,
+	PrepareInstall,
+} from "../../wailsjs/go/main/App";
 import { type discovery, install } from "../../wailsjs/go/models";
 import {
 	categorySlug,
@@ -30,9 +35,14 @@ import {
 } from "./installPresentation";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
+// A locally-selected/dropped set of files, or a single remote URL to
+// download first -- InstallFromURL handles the download and stages the
+// result through the exact same pipeline PrepareInstall uses for local files.
+export type InstallSource = { kind: "files"; paths: string[] } | { kind: "url"; url: string };
+
 export type InstallPreviewDialogProps = {
 	modRoot: string;
-	sourceFiles: string[];
+	source: InstallSource;
 	defaultFolder: string;
 	folders: string[];
 	libraryEntries?: readonly discovery.Entry[];
@@ -44,7 +54,7 @@ type DialogPhase = "preparing" | "ready" | "applying" | "error";
 
 export function InstallPreviewDialog({
 	modRoot,
-	sourceFiles,
+	source,
 	defaultFolder,
 	folders,
 	libraryEntries = [],
@@ -91,7 +101,10 @@ export function InstallPreviewDialog({
 			setPhase("preparing");
 			setErrorMessage("");
 			try {
-				const result = await PrepareInstall(modRoot, sourceFiles, defaultFolder);
+				const result =
+					source.kind === "url"
+						? await InstallFromURL(modRoot, source.url, defaultFolder)
+						: await PrepareInstall(modRoot, source.paths, defaultFolder);
 				sessionIdRef.current = result.sessionId;
 
 				if (!isMounted) {
@@ -126,7 +139,7 @@ export function InstallPreviewDialog({
 		return () => {
 			isMounted = false;
 		};
-	}, [modRoot, sourceFiles, defaultFolder]);
+	}, [modRoot, source, defaultFolder]);
 
 	const items = previewResult?.items ?? [];
 
@@ -275,7 +288,11 @@ export function InstallPreviewDialog({
 				{phase === "preparing" && (
 					<div className="install-preview-status-state">
 						<Loader2 className="spinning-loader" aria-hidden="true" />
-						<p>Extracting archives and discovering mod bundles...</p>
+						<p>
+							{source.kind === "url"
+								? "Downloading, extracting, and discovering mod bundles..."
+								: "Extracting archives and discovering mod bundles..."}
+						</p>
 					</div>
 				)}
 
