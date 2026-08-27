@@ -12,6 +12,12 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// AppVersion is the running build's CalVer release tag (e.g. "2026.08.27" or
+// "2026.08.27-rc1"). The release workflow overrides it at build time via
+// -ldflags "-X main.AppVersion=...". Left at "dev" for local and CI builds,
+// which never claim to be a real release for update-check purposes.
+var AppVersion = "dev"
+
 func main() {
 	app, err := NewApp()
 	if err != nil {
