@@ -295,6 +295,28 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Release artifacts are reproducible from the tag-triggered workflow.
 - Review approves the update, remote-download, and release flows.
 
+## Phase 12 - Provider-based library auto-detection (post-release)
+
+**Outcome:** Cratebug can find the Marvel Rivals mod library itself instead of requiring a pasted path. Detection is built around a small per-store provider seam, with Steam implemented first and Epic Games added once it can be verified against a real Epic installation. When the game install is found but the `~mods` library does not exist, the user is offered a confirmed, single-folder creation.
+
+**Includes:**
+
+- `internal/gamedetect`: minimal provider interface and registry, Steam provider first
+- Steam detection via the Windows registry, `libraryfolders.vdf` parsing, and install-shape validation
+- Wails-bound detect and confirm-to-create methods; persisted provider setting defaulting to Steam
+- Library toolbar detect control showing the active store's logo, and a provider selector in Settings
+- Store-logo assets and trademark notice
+
+**Excludes:** Epic Games provider implementation (gated on a real Epic installation for path verification and live testing), any other deferred roadmap item.
+
+**Exit criteria:**
+
+- Detection is read-only; the only write outside a configured mod root is the user-confirmed creation of an empty `~mods` directory inside a provider-verified game install.
+- An existing Steam library is detected and applied; a missing `~mods` offers creation; no Steam install reports clearly.
+- The provider setting persists and the toolbar control reflects the active store.
+- The provider seam lets the Epic provider land without changing call sites.
+- Canonical checks pass; running-app states are screenshotted and reviewed.
+
 ## Deferred post-release work
 
 Potential later work includes BentoMod/Repak-X state migration, batch operations, filesystem watching, full backup and restore, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
