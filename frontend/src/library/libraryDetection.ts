@@ -30,12 +30,14 @@ export function detectionOutcome(
 
 // Windows paths are case-insensitive, and the user may have set the current
 // root by pasting the same library with different casing or a trailing
-// separator.
+// separator. Uses locale-independent toLowerCase so Turkish locale (I -> ı)
+// does not break the comparison - Windows case folding is invariant, matching
+// Go's strings.EqualFold.
 function sameWindowsPath(left: string, right: string): boolean {
 	const normalize = (value: string) =>
 		value
 			.trim()
 			.replace(/[\\/]+$/, "")
-			.toLocaleLowerCase();
+			.toLowerCase();
 	return normalize(left) === normalize(right);
 }

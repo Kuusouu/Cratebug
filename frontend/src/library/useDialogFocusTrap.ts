@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const focusableSelector =
+export const focusableSelector =
 	'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // role="dialog" aria-modal="true" only describes the intent; nothing in the

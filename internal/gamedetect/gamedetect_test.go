@@ -341,6 +341,30 @@ func TestRegistryCreateLibraryReturnsAnExistingLibraryUnchanged(t *testing.T) {
 	}
 }
 
+func TestRegistryCreateLibraryRejectsFileAtLibraryPath(t *testing.T) {
+	// Arrange: a regular file occupies the ~mods path rather than a directory.
+	paksPath := t.TempDir()
+	libraryPath := filepath.Join(paksPath, LibraryDirName)
+	if err := os.WriteFile(libraryPath, []byte("not a directory"), fixtureFilePerm); err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry(stubProvider{
+		name:      ProviderSteam,
+		detection: Detection{State: StateInstallFound, PaksPath: paksPath},
+	})
+
+	// Act
+	_, err := registry.CreateLibrary(ProviderSteam)
+
+	// Assert
+	if err == nil {
+		t.Fatal("CreateLibrary() succeeded with a file at the library path, want an error")
+	}
+	if !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("CreateLibrary() error = %q, want to mention not a directory", err.Error())
+	}
+}
+
 func TestRegistryCreateLibraryRefusesWithoutAnInstall(t *testing.T) {
 	// Arrange
 	registry := NewRegistry(stubProvider{
