@@ -1,8 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { gamedetect } from "../../wailsjs/go/models";
 import { type LibraryProvider, libraryProviderLabels } from "./libraryTypes";
 import { SteamLogo } from "./StoreLogos";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import { focusableSelector, useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type DetectLibraryDialogProps = {
 	provider: LibraryProvider;
@@ -35,6 +35,32 @@ export function DetectLibraryDialog({
 		if (!isWorking) onClose();
 	}, [isWorking, onClose]);
 	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
+	const cancelButtonRef = useRef<HTMLButtonElement>(null);
+	const primaryButtonRef = useRef<HTMLButtonElement>(null);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: ref.current is stable; effect intentionally re-runs only on isWorking/mode for focus management
+	useEffect(() => {
+		const primary = primaryButtonRef.current;
+		if (primary && !primary.disabled) {
+			primary.focus();
+			return;
+		}
+		const cancel = cancelButtonRef.current;
+		if (cancel && !cancel.disabled) {
+			cancel.focus();
+			return;
+		}
+		const dialog = dialogRef.current;
+		if (!dialog) return;
+		const fallback = dialog.querySelector<HTMLElement>(focusableSelector);
+		if (fallback) {
+			fallback.focus();
+			return;
+		}
+		// Both actions disabled during creation - keep focus inside dialog so
+		// the Escape listener on the container remains reachable.
+		dialog.focus();
+	}, [isWorking, mode]);
 
 	return (
 		<div className="mutation-dialog-backdrop">
@@ -44,6 +70,7 @@ export function DetectLibraryDialog({
 				aria-labelledby="detect-library-dialog-title"
 				aria-modal="true"
 				role="dialog"
+				tabIndex={-1}
 			>
 				<div>
 					<p className="eyebrow">
@@ -81,6 +108,7 @@ export function DetectLibraryDialog({
 				</div>
 				<div className="mutation-dialog-actions">
 					<button
+						ref={cancelButtonRef}
 						type="button"
 						className="quiet-button"
 						onClick={onClose}
@@ -89,11 +117,21 @@ export function DetectLibraryDialog({
 						Cancel
 					</button>
 					{mode === "apply" ? (
-						<button type="button" onClick={onApply} disabled={isWorking}>
+						<button
+							ref={primaryButtonRef}
+							type="button"
+							onClick={onApply}
+							disabled={isWorking}
+						>
 							Use this library
 						</button>
 					) : (
-						<button type="button" onClick={onCreate} disabled={isWorking}>
+						<button
+							ref={primaryButtonRef}
+							type="button"
+							onClick={onCreate}
+							disabled={isWorking}
+						>
 							{isWorking ? "Creating..." : "Create library"}
 						</button>
 					)}
