@@ -1,10 +1,12 @@
 package update
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"text/template"
 
@@ -36,6 +38,12 @@ const (
 // ahead of System32 (Git for Windows, MSYS, Cygwin) can substitute a
 // different program with the same name.
 //
+// EnableDelayedExpansion is deliberately left off: it would corrupt any
+// literal ! or % in the embedded paths (user profile names, release asset
+// names). Every branch below is a flat, single-line `if`, so per-line %VAR%
+// expansion is sufficient; writeApplyScript escapes % in path data for the
+// same reason.
+//
 // The still-running check writes tasklist's CSV output to a file and reads
 // it back with `for /f`, rather than piping to a second process and
 // branching on its errorlevel: that form put its retry `goto` inside a
@@ -44,8 +52,12 @@ const (
 // single-line branch instead. The snapshot file also sidesteps `for /f`
 // itself failing to parse a command string that contains its own quotes
 // (the exe path, the /FI filter value).
+//
+// The template is LF-only for readability; writeApplyScript translates to
+// CRLF when writing, since cmd.exe batch parsing has documented failure
+// modes with LF-only files (goto label scanning among them).
 var applyScriptTemplate = template.Must(template.New("apply").Parse(`@echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 
 set "SYS=%SystemRoot%\System32"
 set "TARGET_PID={{.TargetPID}}"
@@ -58,8 +70,8 @@ set /a "WAITED=0"
 set "FOUND_PID="
 "%SYS%\tasklist.exe" /FI "PID eq %TARGET_PID%" /FO CSV /NH > "%SNAPSHOT%" 2>NUL
 for /f "tokens=2 delims=," %%P in (%SNAPSHOT%) do set "FOUND_PID=%%~P"
-if not "!FOUND_PID!"=="%TARGET_PID%" goto waitdone
-if !WAITED! GEQ {{.MaxWaitSeconds}} goto waitfailed
+if not "%FOUND_PID%"=="%TARGET_PID%" goto waitdone
+if %WAITED% GEQ {{.MaxWaitSeconds}} goto waitfailed
 set /a "WAITED+=1"
 "%SYS%\timeout.exe" /T {{.PollIntervalSeconds}} /NOBREAK >NUL
 goto waitloop
@@ -176,14 +188,26 @@ func writeApplyScript(exePath, installerPath string, pid int) (string, error) {
 
 	data := applyScriptData{
 		TargetPID:           pid,
-		ExePath:             exePath,
-		InstallerPath:       installerPath,
+		ExePath:             batchEscape(exePath),
+		InstallerPath:       batchEscape(installerPath),
 		SilentFlag:          nsisSilentInstallFlag,
 		MaxWaitSeconds:      applyHelperMaxWaitSeconds,
 		PollIntervalSeconds: applyHelperPollIntervalSeconds,
 	}
-	if err := applyScriptTemplate.Execute(file, data); err != nil {
+	var rendered bytes.Buffer
+	if err := applyScriptTemplate.Execute(&rendered, data); err != nil {
 		return "", fmt.Errorf("update: render apply helper script: %w", err)
 	}
+	script := strings.ReplaceAll(rendered.String(), "\n", "\r\n")
+	if _, err := file.WriteString(script); err != nil {
+		return "", fmt.Errorf("update: write apply helper script: %w", err)
+	}
 	return scriptPath, nil
+}
+
+// Doubles percent signs so a literal percent in a path survives cmd.exe's
+// variable-expansion pass over the `set` line that embeds it. Exclamation
+// marks need no equivalent once EnableDelayedExpansion is off.
+func batchEscape(path string) string {
+	return strings.ReplaceAll(path, "%", "%%")
 }

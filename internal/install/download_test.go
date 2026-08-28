@@ -20,12 +20,12 @@ func TestDownloadRemoteFile_UsesURLPathFileName(t *testing.T) {
 
 	// Act
 	path, cleanup, err := DownloadRemoteFile(context.Background(), server.URL+"/MyMod.zip", server.Client(), nil)
-	defer cleanup()
 
 	// Assert
 	if err != nil {
 		t.Fatalf("DownloadRemoteFile returned unexpected error: %v", err)
 	}
+	defer cleanup()
 	if filepath.Base(path) != "MyMod.zip" {
 		t.Errorf("downloaded file name = %q, want %q", filepath.Base(path), "MyMod.zip")
 	}
@@ -48,12 +48,12 @@ func TestDownloadRemoteFile_PrefersContentDispositionFileName(t *testing.T) {
 
 	// Act
 	path, cleanup, err := DownloadRemoteFile(context.Background(), server.URL+"/download?id=123", server.Client(), nil)
-	defer cleanup()
 
 	// Assert
 	if err != nil {
 		t.Fatalf("DownloadRemoteFile returned unexpected error: %v", err)
 	}
+	defer cleanup()
 	if filepath.Base(path) != "RealModName.7z" {
 		t.Errorf("downloaded file name = %q, want %q", filepath.Base(path), "RealModName.7z")
 	}
@@ -141,12 +141,12 @@ func TestDownloadRemoteFile_ReportsProgress(t *testing.T) {
 		calls++
 		lastProgress = p
 	})
-	defer cleanup()
 
 	// Assert
 	if err != nil {
 		t.Fatalf("DownloadRemoteFile returned unexpected error: %v", err)
 	}
+	defer cleanup()
 	if calls == 0 {
 		t.Fatal("onProgress was never called")
 	}
