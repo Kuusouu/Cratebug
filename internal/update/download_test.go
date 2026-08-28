@@ -2,6 +2,7 @@ package update
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestValidateAssetURL(t *testing.T) {
@@ -77,6 +79,42 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 }
 
 const testAssetURL = "https://github.com/Kuusouu/Cratebug/releases/download/2026.08.27/Cratebug-amd64-installer.exe"
+
+// The regression this guards: the default download client once inherited
+// httpClient()'s 15s metadata timeout, whose body-inclusive cap failed any
+// installer download slower than size/15s with no way for retries to recover.
+func TestDownloadClientHasNoOverallTimeout(t *testing.T) {
+	client := &Client{Owner: "Kuusouu", Repo: "Cratebug"}
+
+	if got := client.downloadHTTPClient().Timeout; got != 0 {
+		t.Errorf("download client Timeout = %s, want 0: liveness is bounded by the header and read-idle timeouts instead", got)
+	}
+}
+
+func TestDownloadOnceStalledBodyFailsAsRetryable(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("partial"))
+		w.(http.Flusher).Flush()
+		<-release
+	}))
+	t.Cleanup(server.Close)
+	// Registered after server.Close so cleanup (LIFO) releases the blocked
+	// handler before Close waits on it.
+	t.Cleanup(func() { close(release) })
+
+	client := &Client{Owner: "Kuusouu", Repo: "Cratebug"}
+	destPath := filepath.Join(t.TempDir(), "installer.exe.download")
+
+	err := client.downloadOnce(context.Background(), server.URL, destPath, 100*time.Millisecond, nil)
+
+	if !errors.Is(err, errDownloadStalled) {
+		t.Fatalf("downloadOnce error = %v, want errDownloadStalled", err)
+	}
+	if !isRetryable(err) {
+		t.Error("a stalled download must be classified retryable, unlike a caller cancel")
+	}
+}
 
 func TestDownloadSucceeds(t *testing.T) {
 	content := strings.Repeat("cratebug-installer-bytes", 1000)

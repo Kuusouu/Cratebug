@@ -37,8 +37,8 @@ func TestWriteApplyScriptRendersExpectedContent(t *testing.T) {
 		`"%SYS%\timeout.exe"`,
 		`for /f "tokens=2 delims=," %%P in (%SNAPSHOT%)`,
 		`/FO CSV /NH`,
-		`if not "!FOUND_PID!"=="%TARGET_PID%" goto waitdone`,
-		`EnableDelayedExpansion`,
+		`if not "%FOUND_PID%"=="%TARGET_PID%" goto waitdone`,
+		`if %WAITED% GEQ`,
 	} {
 		if !strings.Contains(script, want) {
 			t.Errorf("rendered script missing expected content %q\nfull script:\n%s", want, script)
@@ -60,6 +60,46 @@ func TestWriteApplyScriptRendersExpectedContent(t *testing.T) {
 	// no-parens `if` now.
 	if strings.Contains(script, "errorlevel 1 (") {
 		t.Errorf("rendered script branches on pipe errorlevel from inside a parenthesized block:\n%s", script)
+	}
+
+	// Delayed expansion would corrupt any literal ! or % in the embedded
+	// paths (user profile names, release asset names), so the script must
+	// keep working with per-line expansion only.
+	if strings.Contains(script, "EnableDelayedExpansion") || strings.Contains(script, "!FOUND_PID!") || strings.Contains(script, "!WAITED!") {
+		t.Errorf("rendered script uses delayed expansion, which corrupts literal ! and %% in embedded paths:\n%s", script)
+	}
+
+	// cmd.exe batch parsing has documented failure modes with LF-only files,
+	// so every line ending must be CRLF.
+	if bareLF := strings.Count(script, "\n") - strings.Count(script, "\r\n"); bareLF != 0 {
+		t.Errorf("rendered script has %d bare LF line endings; batch files must be CRLF:\n%s", bareLF, script)
+	}
+}
+
+func TestWriteApplyScriptEscapesPercentInPaths(t *testing.T) {
+	exePath := `C:\Users\50%off\Programs\Cratebug\Cratebug.exe`
+	installerPath := `C:\Users\test\AppData\Local\Temp\cratebug-update\Cratebug!-installer.exe`
+
+	scriptPath, err := writeApplyScript(exePath, installerPath, 1)
+	if err != nil {
+		t.Fatalf("writeApplyScript returned unexpected error: %v", err)
+	}
+
+	content, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("reading rendered script: %v", err)
+	}
+	script := string(content)
+
+	for _, want := range []string{
+		// % must be doubled to survive the set line's expansion pass; ! must
+		// survive verbatim now that delayed expansion is off.
+		`set "EXE_PATH=C:\Users\50%%off\Programs\Cratebug\Cratebug.exe"`,
+		`set "INSTALLER_PATH=C:\Users\test\AppData\Local\Temp\cratebug-update\Cratebug!-installer.exe"`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Errorf("rendered script missing expected escaped content %q\nfull script:\n%s", want, script)
+		}
 	}
 }
 

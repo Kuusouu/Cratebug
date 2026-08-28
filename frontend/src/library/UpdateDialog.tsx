@@ -50,6 +50,23 @@ function parseChangelog(notes: string): ChangelogBlock[] {
 		});
 }
 
+// Renders a block's text with CHANGELOG's **bold** convention. An unmatched
+// ** has no closing pair, so it renders literally rather than swallowing the
+// rest of the line.
+function renderInlineFormatting(text: string): React.ReactNode[] {
+	const parts = text.split("**");
+	if (parts.length < 3 || parts.length % 2 === 0) return [text];
+
+	let boldRun = 0;
+	return parts.map((part, index) => {
+		if (index % 2 !== 1) return part;
+		boldRun += 1;
+		// Content plus occurrence number: stable across renders, unique even
+		// when one line bolds the same word twice, and never the array index.
+		return <strong key={`${part}#${boldRun}`}>{part}</strong>;
+	});
+}
+
 function ChangelogBody({ notes }: { notes: string }) {
 	const blocks = parseChangelog(notes);
 	if (blocks.length === 0) {
@@ -65,7 +82,7 @@ function ChangelogBody({ notes }: { notes: string }) {
 		rendered.push(
 			<ul key={`list-${firstItem.key}`} className="update-changelog-list">
 				{pendingItems.map((item) => (
-					<li key={item.key}>{item.text}</li>
+					<li key={item.key}>{renderInlineFormatting(item.text)}</li>
 				))}
 			</ul>,
 		);
@@ -80,9 +97,9 @@ function ChangelogBody({ notes }: { notes: string }) {
 		flushItems();
 		rendered.push(
 			block.kind === "heading" ? (
-				<h3 key={block.key}>{block.text}</h3>
+				<h3 key={block.key}>{renderInlineFormatting(block.text)}</h3>
 			) : (
-				<p key={block.key}>{block.text}</p>
+				<p key={block.key}>{renderInlineFormatting(block.text)}</p>
 			),
 		);
 	}
