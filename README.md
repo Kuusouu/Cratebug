@@ -4,172 +4,73 @@
 
 # Cratebug
 
+**A fast, safe mod manager for Marvel Rivals**
+
+[![Latest release](https://img.shields.io/github/v/release/Kuusouu/Cratebug?style=flat-square)](https://github.com/Kuusouu/Cratebug/releases/latest)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](LICENSE)
+
+<img src="main.png" alt="The Cratebug library: mods with hero portraits, category and priority badges, and enable toggles" width="100%" />
+
 </div>
 
-Cratebug is an open-source, Windows-first mod manager for Marvel Rivals.
+Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It treats related mod files as one logical bundle, makes every filesystem change planned and recoverable, and shows you exactly what is about to happen before it happens.
 
-The project is a fresh implementation built with Go, Wails, React, and TypeScript, built to be what BentoMod was meant to be: a better implementation of [Repak-X](https://github.com/XzantGaming/Repak-X). It aims to preserve useful workflows and compatibility with existing mod libraries while making filesystem operations safe, predictable, and recoverable.
+## Features
 
-## Project status
+- **Whole-library view** - classic and IoStore mods side by side, with hero, skin, category, and portrait detected automatically
+- **Safe enable and disable** - flip mods on and off without breaking their sidecar files
+- **Organization** - rename, set priority, sort into folders, and tag mods; tags and settings survive renames and moves
+- **Recoverable deletion** - mods go to the Recycle Bin, never straight to the void
+- **Archive installs with a preview** - drop in a `.zip`, `.7z`, `.rar`, or bare `.pak` and review exactly what will be installed first
+- **Install from a URL** - paste a direct download link, get the same preview flow
+- **Conflict detection** - find mods stepping on the same assets, with a one-click priority fix
+- **Self-updating** - check for updates in Settings, download, restart, done
 
-Cratebug is under active development and not yet ready for general use. See
-[ROADMAP.md](ROADMAP.md) for full phase detail. This table tracks feature
-status at a glance.
+## Install
 
-[implemented]: https://img.shields.io/badge/Implemented-3ddc97?style=flat-square
-[next]: https://img.shields.io/badge/Next-8ab6e0?style=flat-square
-[deferred]: https://img.shields.io/badge/Deferred-9e9e9e?style=flat-square
+1. Download `Cratebug-amd64-installer.exe` from the [latest release](https://github.com/Kuusouu/Cratebug/releases/latest).
+2. Run it. Cratebug installs for your user account only - no administrator rights needed.
+3. Launch it from the Start Menu or the desktop shortcut.
 
-| Feature | Status |
-| --- | --- |
-| Read-only mod discovery and library browsing | ![Implemented][implemented] |
-| Safe mod enable/disable | ![Implemented][implemented] |
-| Rename, priority, folder organization, recoverable deletion | ![Implemented][implemented] |
-| Metadata and settings persistence, tags | ![Implemented][implemented] |
-| Mod type/hero/skin classification via UAssetToolRivals | ![Implemented][implemented] |
-| Archive installation (zip/7z/tar/rar, drag-and-drop) | ![Implemented][implemented] |
-| Asset conflict detection and inspection | ![Implemented][implemented] |
-| Automatic app updates, remote mod downloads | ![Next][next] |
-| Release hardening (signing, upgrades, accessibility) | ![Next][next] |
-| BentoMod/Repak-X state import | ![Deferred][deferred] |
-| Batch operations, filesystem watching, full backup/restore | ![Deferred][deferred] |
-| Browser intake, game launching, crash monitoring | ![Deferred][deferred] |
-| Character data updates, recompression, VFX updating | ![Deferred][deferred] |
-| Virtual collections, permanent deletion, external-rename reconciliation | ![Deferred][deferred] |
+Cratebug is not code-signed yet, so Windows SmartScreen may warn on first run. See [troubleshooting](docs/TROUBLESHOOTING.md).
 
-See:
+## Updating
 
-- [Product specification](SPEC.md)
-- [Roadmap](ROADMAP.md)
-- [Active tasks](TASKS.md)
-- [Contributor and agent guidance](AGENTS.md)
-- [Toolchain baseline](docs/decisions/0001-toolchain-baseline.md)
-- [Organize action pattern](docs/decisions/0002-organize-action-pattern.md)
+Open **Settings** and click **Check for updates**. If a newer release exists, Cratebug shows the changelog, downloads it, and applies it silently on restart. You can also update manually from the [releases page](https://github.com/Kuusouu/Cratebug/releases/latest).
 
-## Prerequisites
+## Installing mods
 
-Development currently targets 64-bit Windows 10 version 1909 or newer and Windows 11. Install:
+Use the install button, drag and drop files onto the window, or paste a direct download link (the link icon in the header). Every path ends at the same preview: see the destination folder, the mod name, and any collisions before anything is written. Details in the [user guide](docs/USER_GUIDE.md).
 
-- Git and [Git LFS](https://git-lfs.com/)
-- [`mise`](https://mise.jdx.dev/installing-mise.html)
-- Microsoft WebView2 Runtime
-- NSIS 3 when building the installer
+## Building from source
 
-Install `mise` and NSIS with Windows Package Manager:
-
-```powershell
-winget install jdx.mise
-winget install NSIS.NSIS --silent
-```
-
-Restart the terminal after installing system tools so their updated paths are available.
-
-## Setup
-
-Initialize Git LFS and clone the repository:
+You need 64-bit Windows 10 (1909+) or 11, Git with [Git LFS](https://git-lfs.com/), and the Microsoft WebView2 Runtime. [`mise`](https://mise.jdx.dev/) pins the toolchain but is optional:
 
 ```powershell
 git lfs install
 git clone https://github.com/Kuusouu/Cratebug.git
 Set-Location Cratebug
-git lfs pull
-```
-
-Install the pinned Go and Bun versions through `mise`:
-
-```powershell
 mise install
-```
-
-Install the pinned Wails CLI:
-
-```powershell
-mise exec -c "go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0"
-$env:Path = "$(mise exec -c "go env GOPATH")\bin;$env:Path"
-```
-
-Install frontend dependencies from the committed Bun lockfile:
-
-```powershell
 Push-Location frontend
 mise exec -c "bun install --frozen-lockfile"
 Pop-Location
+mise exec -c "wails dev"        # run the app
+.\check.ps1                     # run every check
 ```
 
-Verify the installed versions:
+The full contributor workflow, including running without `mise` and building the installer, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```powershell
-mise exec -c "go version"
-mise exec -c "bun --version"
-mise exec -c "wails version"
-```
+## Contributing
 
-See the [toolchain decision](docs/decisions/0001-toolchain-baseline.md) for exact versions and the upgrade policy.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for getting started, the coding standards, and the project's conventions.
 
-## Development
+## Documentation
 
-Start the Wails development application from the repository root:
-
-```powershell
-mise exec -c "wails dev"
-```
-
-Wails installs frontend dependencies from `frontend/bun.lock`, starts Vite through Bun, generates typed application bindings, and launches the desktop window.
-
-## Validation
-
-Run every required frontend and Go check from the repository root:
-
-```powershell
-.\check.ps1
-```
-
-The frontend scripts are run from `frontend`:
-
-| Command | Purpose |
-| --- | --- |
-| `mise exec -c "bun run dev"` | Start the Vite development server |
-| `mise exec -c "bun run build"` | Type-check and build the frontend |
-| `mise exec -c "bun run format"` | Apply Biome formatting |
-| `mise exec -c "bun run format:check"` | Check Biome formatting without changes |
-| `mise exec -c "bun run lint"` | Run Biome lint rules |
-| `mise exec -c "bun run typecheck"` | Run TypeScript without emitting files |
-| `mise exec -c "bun run check"` | Run all frontend checks and the build |
-
-Canonical Go commands are run from the repository root:
-
-```powershell
-mise exec -c "go fmt ./..."
-mise exec -c "go vet ./..."
-mise exec -c "go test ./..."
-```
-
-## Production build
-
-Build the production Windows AMD64 application from the repository root:
-
-```powershell
-mise exec -c "wails build -clean -platform windows/amd64 -nopackage -nocolour"
-```
-
-The production executable is written to `build/bin/Cratebug.exe`. The generated `build` directory is intentionally ignored by Git.
-
-## Windows installer
-
-After installing NSIS, build the per-user Windows AMD64 installer:
-
-```powershell
-mise exec -c "wails build -clean -platform windows/amd64 -nsis -installscope user -nocolour"
-```
-
-The installer is written to `build/bin/Cratebug-amd64-installer.exe`. A default installation uses `%LOCALAPPDATA%\Programs\Cratebug`, creates Start menu and desktop shortcuts, and can be removed from Windows Settings or with the installed `uninstall.exe`.
-
-Phase 0 packages are unsigned, so Windows may display an unrecognized-app warning. Signing, upgrades, and release publishing are deferred to release hardening.
-
-## Continuous integration
-
-GitHub Actions runs the canonical checks and a clean Windows application build on Blacksmith for pushes and pull requests to `master`. CI verifies the application without publishing packages or build artifacts.
+- [User guide](docs/USER_GUIDE.md) - installing, updating, and URL installs in detail
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - SmartScreen, WebView2, uninstalling, and other common problems
+- [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md) - what is done and what is next
 
 ## License
 
-Cratebug is licensed under the GNU General Public License version 3. See [LICENSE](LICENSE).
+Cratebug is licensed under the GNU General Public License version 3. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md) for origin and credits.
