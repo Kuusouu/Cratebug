@@ -42,6 +42,10 @@ export function CreateFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
 }
 
+export function CreateLibrary(arg1) {
+  return window['go']['main']['App']['CreateLibrary'](arg1);
+}
+
 export function CreateTag(arg1) {
   return window['go']['main']['App']['CreateTag'](arg1);
 }
@@ -56,6 +60,10 @@ export function DeleteTag(arg1) {
 
 export function DetectConflicts(arg1, arg2) {
   return window['go']['main']['App']['DetectConflicts'](arg1, arg2);
+}
+
+export function DetectLibrary(arg1) {
+  return window['go']['main']['App']['DetectLibrary'](arg1);
 }
 
 export function DownloadUpdate(arg1) {
@@ -116,6 +124,10 @@ export function SetAccentColor(arg1) {
 
 export function SetDefaultViewMode(arg1) {
   return window['go']['main']['App']['SetDefaultViewMode'](arg1);
+}
+
+export function SetLibraryProvider(arg1) {
+  return window['go']['main']['App']['SetLibraryProvider'](arg1);
 }
 
 export function SetModEnabled(arg1, arg2, arg3) {

@@ -7,6 +7,7 @@ import {discovery} from '../models';
 import {conflict} from '../models';
 import {mutation} from '../models';
 import {metadata} from '../models';
+import {gamedetect} from '../models';
 import {update} from '../models';
 
 export function ApplyInstall(arg1:string,arg2:string,arg3:Array<install.ApplyItem>):Promise<install.ApplyResult>;
@@ -29,6 +30,8 @@ export function ConflictType():Promise<conflict.Result>;
 
 export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
+export function CreateLibrary(arg1:string):Promise<string>;
+
 export function CreateTag(arg1:string):Promise<metadata.Tag>;
 
 export function DeleteMod(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
@@ -36,6 +39,8 @@ export function DeleteMod(arg1:string,arg2:string,arg3:boolean):Promise<mutation
 export function DeleteTag(arg1:string):Promise<void>;
 
 export function DetectConflicts(arg1:string,arg2:Array<discovery.Entry>):Promise<conflict.Result>;
+
+export function DetectLibrary(arg1:string):Promise<gamedetect.Detection>;
 
 export function DownloadUpdate(arg1:update.Release):Promise<string>;
 
@@ -66,6 +71,8 @@ export function SelectFilesForInstall():Promise<Array<string>>;
 export function SetAccentColor(arg1:string):Promise<void>;
 
 export function SetDefaultViewMode(arg1:string):Promise<void>;
+
+export function SetLibraryProvider(arg1:string):Promise<void>;
 
 export function SetModEnabled(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
 

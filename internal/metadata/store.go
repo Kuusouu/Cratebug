@@ -30,6 +30,11 @@ type Settings struct {
 	DefaultViewMode string `json:"defaultViewMode,omitempty"`
 	AccentColor     string `json:"accentColor,omitempty"`
 
+	// The store provider library auto-detection targets. An empty value
+	// (including every document written before this field existed) means the
+	// default provider, not an error case.
+	LibraryProvider string `json:"libraryProvider,omitempty"`
+
 	// The release tag whose changelog was last shown as the post-update "what's
 	// new" notice. An empty value (including every document written before
 	// this field existed) is not an error case: it just means the notice

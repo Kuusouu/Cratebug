@@ -29,10 +29,12 @@ import {
 	CheckWhatsNew,
 	ClassifyLibrary,
 	CreateFolder,
+	CreateLibrary,
 	CreateTag,
 	DeleteMod,
 	DeleteTag,
 	DetectConflicts,
+	DetectLibrary,
 	DownloadUpdate,
 	GetAppVersion,
 	LoadMetadata,
@@ -45,6 +47,7 @@ import {
 	SelectFilesForInstall,
 	SetAccentColor,
 	SetDefaultViewMode,
+	SetLibraryProvider,
 	SetModEnabled,
 	SetModPriority,
 	SetModRoot,
@@ -54,6 +57,7 @@ import {
 import {
 	conflict,
 	discovery,
+	type gamedetect,
 	type main,
 	type metadata,
 	type modtype,
@@ -62,6 +66,7 @@ import {
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
+import { DetectLibraryDialog } from "./DetectLibraryDialog";
 import {
 	canChangeModState,
 	canDeleteMod,
@@ -77,10 +82,14 @@ import { FolderNavigation } from "./FolderNavigation";
 import { InstallFromUrlDialog } from "./InstallFromUrlDialog";
 import { type InstallSource, InstallPreviewDialog } from "./InstallPreviewDialog";
 import { formatWailsError as errorMessage } from "./installPresentation";
+import { detectionOutcome } from "./libraryDetection";
 import {
 	type DraggedItem,
 	isValidDropTarget,
+	type LibraryProvider,
 	type LibraryState,
+	libraryProviderLabels,
+	libraryProviders,
 	type Theme,
 	themes,
 	type ViewMode,
@@ -89,6 +98,7 @@ import {
 } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
 import { SettingsDialog } from "./SettingsDialog";
+import { providerLogos } from "./StoreLogos";
 import { TagMenu } from "./TagMenu";
 import { type UpdateDownloadProgress, UpdateDialog } from "./UpdateDialog";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
@@ -368,6 +378,13 @@ export function LibraryScreen() {
 		useState<UpdateDownloadProgress | null>(null);
 	const [downloadedInstallerPath, setDownloadedInstallerPath] = useState<string | null>(null);
 	const [appVersion, setAppVersion] = useState("dev");
+	const [libraryProvider, setLibraryProvider] = useState<LibraryProvider>("steam");
+	const [isDetectingLibrary, setIsDetectingLibrary] = useState(false);
+	const [isCreatingLibrary, setIsCreatingLibrary] = useState(false);
+	const [detectionDialog, setDetectionDialog] = useState<{
+		mode: "apply" | "create";
+		detection: gamedetect.Detection;
+	} | null>(null);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const [installSource, setInstallSource] = useState<InstallSource | null>(null);
 	const [installFromUrlOpen, setInstallFromUrlOpen] = useState(false);
@@ -383,6 +400,7 @@ export function LibraryScreen() {
 	const lastOrphanedTagNoticeCountRef = useRef(0);
 	const accentColorSaveTimeoutRef = useRef<number | undefined>(undefined);
 	const libraryRoot = library?.root;
+	const ActiveProviderLogo = providerLogos[libraryProvider];
 
 	const libraryIndex = useMemo(() => indexLibrary(library), [library]);
 	const assignedTagIDsForSelection = useMemo(
@@ -825,6 +843,28 @@ export function LibraryScreen() {
 			}, 400);
 		},
 		[showMutationFeedback],
+	);
+
+	// Switches the store provider auto-detect targets, with the same
+	// optimistic-then-revert pattern as the theme so the selector feels
+	// instant but never lies if the save fails.
+	const selectLibraryProvider = useCallback(
+		async (provider: LibraryProvider) => {
+			if (provider === libraryProvider) return;
+
+			const previousProvider = libraryProvider;
+			setLibraryProvider(provider);
+			try {
+				await SetLibraryProvider(provider);
+			} catch (error) {
+				setLibraryProvider(previousProvider);
+				showMutationFeedback(
+					"error",
+					`Could not save the library provider: ${errorMessage(error)}`,
+				);
+			}
+		},
+		[libraryProvider, showMutationFeedback],
 	);
 
 	const setModEnabled = useCallback(
@@ -1367,6 +1407,76 @@ export function LibraryScreen() {
 		});
 	}, []);
 
+	// Runs one auto-detection attempt against the active provider and routes
+	// its three-state outcome: a found library applies directly when nothing
+	// is configured (or confirms a switch when something is), a missing
+	// library offers the one-folder creation, and no installation reports
+	// through the regular feedback toast.
+	async function detectLibrary() {
+		if (isDetectingLibrary || isMutationLocked) return;
+
+		setIsDetectingLibrary(true);
+		try {
+			const detection = await DetectLibrary(libraryProvider);
+			const outcome = detectionOutcome(detection, modRoot);
+			switch (outcome.kind) {
+				case "apply":
+					setDetectionDialog({ mode: "apply", detection });
+					break;
+				case "create":
+					setDetectionDialog({ mode: "create", detection });
+					break;
+				case "same-library": {
+					const libraryPath = detection.libraryPath ?? "";
+					setModRoot(libraryPath);
+					await scan(libraryPath);
+					showMutationFeedback("success", "This library is already active.");
+					break;
+				}
+				case "not-found":
+					showMutationFeedback(
+						"error",
+						`Could not find a Marvel Rivals installation in your ${libraryProviderLabels[libraryProvider]} libraries.`,
+					);
+					break;
+			}
+		} catch (error) {
+			showMutationFeedback("error", `Could not detect a mod library: ${errorMessage(error)}`);
+		} finally {
+			setIsDetectingLibrary(false);
+		}
+	}
+
+	// Applies a detected library through the normal scan flow, which also
+	// persists it as the mod root.
+	async function applyDetectedLibrary(libraryPath: string) {
+		setDetectionDialog(null);
+		setModRoot(libraryPath);
+		await scan(libraryPath);
+	}
+
+	// Creates the missing library folder behind the user's confirmation.
+	// Cratebug re-detects on the Go side, so this can only ever create the
+	// folder of an installation the provider just verified.
+	async function createDetectedLibrary() {
+		setIsCreatingLibrary(true);
+		try {
+			const libraryPath = await CreateLibrary(libraryProvider);
+			setDetectionDialog(null);
+			setModRoot(libraryPath);
+			await scan(libraryPath);
+			showMutationFeedback("success", "Mod library folder created.");
+		} catch (error) {
+			setDetectionDialog(null);
+			showMutationFeedback(
+				"error",
+				`Could not create the mod library folder: ${errorMessage(error)}`,
+			);
+		} finally {
+			setIsCreatingLibrary(false);
+		}
+	}
+
 	// Replaces the catalog only after a scan finishes successfully. Accepts an
 	// explicit root so the initial-launch scan of a persisted mod root does not
 	// have to wait a render cycle for the modRoot input's state to catch up.
@@ -1453,6 +1563,13 @@ export function LibraryScreen() {
 				const persistedAccentColor = state.document.settings.accentColor;
 				if (persistedAccentColor && isValidHexColor(persistedAccentColor)) {
 					setAccentColor(persistedAccentColor);
+				}
+				const persistedProvider = state.document.settings.libraryProvider;
+				if (
+					persistedProvider &&
+					libraryProviders.includes(persistedProvider as LibraryProvider)
+				) {
+					setLibraryProvider(persistedProvider as LibraryProvider);
 				}
 
 				const persistedRoot = state.document.settings.modRoot?.trim();
@@ -1625,6 +1742,18 @@ export function LibraryScreen() {
 						{libraryState === "loading" ? "Scanning..." : "Scan library"}
 					</button>
 				</form>
+				<button
+					type="button"
+					className="quiet-button detect-button"
+					onClick={() => void detectLibrary()}
+					disabled={isDetectingLibrary || isMutationLocked}
+					title={`Automatically detect the Marvel Rivals mod library in your ${libraryProviderLabels[libraryProvider]} installation`}
+				>
+					<ActiveProviderLogo className="detect-button-logo" />
+					{isDetectingLibrary
+						? "Detecting..."
+						: `Detect ${libraryProviderLabels[libraryProvider]} library`}
+				</button>
 				{library && (
 					<button
 						type="button"
@@ -1738,6 +1867,20 @@ export function LibraryScreen() {
 						state={libraryState}
 						scanError={scanError}
 						hasLibrary={library !== null}
+						initialStateAction={
+							<button
+								type="button"
+								className="quiet-button detect-button"
+								onClick={() => void detectLibrary()}
+								disabled={isDetectingLibrary || isMutationLocked}
+								title={`Automatically detect the Marvel Rivals mod library in your ${libraryProviderLabels[libraryProvider]} installation`}
+							>
+								<ActiveProviderLogo className="detect-button-logo" />
+								{isDetectingLibrary
+									? "Detecting..."
+									: `Detect ${libraryProviderLabels[libraryProvider]} library`}
+							</button>
+						}
 						mutatingEntryIDs={mutatingEntryIDs}
 						isMutationLocked={isMutationLocked}
 						tagsByEntryID={entryTags}
@@ -1825,10 +1968,25 @@ export function LibraryScreen() {
 					accentColor={accentColor}
 					appVersion={appVersion}
 					isCheckingForUpdate={isCheckingForUpdate}
+					libraryProvider={libraryProvider}
 					onClose={() => setSettingsOpen(false)}
 					onSelectTheme={selectTheme}
 					onSelectAccentColor={selectAccentColor}
+					onSelectLibraryProvider={(provider) => void selectLibraryProvider(provider)}
 					onCheckForUpdate={() => void checkForUpdate()}
+				/>
+			)}
+			{detectionDialog && (
+				<DetectLibraryDialog
+					provider={libraryProvider}
+					mode={detectionDialog.mode}
+					detection={detectionDialog.detection}
+					isWorking={isCreatingLibrary}
+					onApply={() =>
+						void applyDetectedLibrary(detectionDialog.detection.libraryPath ?? "")
+					}
+					onCreate={() => void createDetectedLibrary()}
+					onClose={() => setDetectionDialog(null)}
 				/>
 			)}
 			{conflictDetailsOpen && conflictResult && library && (
@@ -1902,6 +2060,7 @@ export function LibraryScreen() {
 				!conflictDetailsOpen &&
 				!updateDialogMode &&
 				!installFromUrlOpen &&
+				!detectionDialog &&
 				!installSource && (
 					<div className="drop-overlay" aria-hidden="true">
 						<div className="drop-overlay-card">

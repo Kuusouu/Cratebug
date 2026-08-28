@@ -1,7 +1,15 @@
 import { Check, Moon, Monitor, RefreshCw, RotateCcw, Sun } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { accentPresets, isValidHexColor } from "./accentColor";
-import { type Theme, themeLabels, themes } from "./libraryTypes";
+import {
+	type LibraryProvider,
+	libraryProviders,
+	libraryProviderLabels,
+	type Theme,
+	themeLabels,
+	themes,
+} from "./libraryTypes";
+import { EpicGamesLogo, providerLogos } from "./StoreLogos";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type SettingsDialogProps = {
@@ -9,9 +17,11 @@ type SettingsDialogProps = {
 	accentColor: string;
 	appVersion: string;
 	isCheckingForUpdate: boolean;
+	libraryProvider: LibraryProvider;
 	onClose: () => void;
 	onSelectTheme: (theme: Theme) => void;
 	onSelectAccentColor: (hex: string) => void;
+	onSelectLibraryProvider: (provider: LibraryProvider) => void;
 	onCheckForUpdate: () => void;
 };
 
@@ -29,9 +39,11 @@ export function SettingsDialog({
 	accentColor,
 	appVersion,
 	isCheckingForUpdate,
+	libraryProvider,
 	onClose,
 	onSelectTheme,
 	onSelectAccentColor,
+	onSelectLibraryProvider,
 	onCheckForUpdate,
 }: SettingsDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -148,6 +160,50 @@ export function SettingsDialog({
 							/>
 						</label>
 					</div>
+				</div>
+				<div className="setting-section">
+					<h3>Mod library detection</h3>
+					<div
+						className="provider-picker"
+						role="radiogroup"
+						aria-label="Store provider for library auto-detection"
+					>
+						{libraryProviders.map((option) => {
+							const Logo = providerLogos[option];
+							const selected = libraryProvider === option;
+							return (
+								<button
+									key={option}
+									type="button"
+									className={
+										selected ? "provider-option selected" : "provider-option"
+									}
+									aria-pressed={selected}
+									onClick={() => onSelectLibraryProvider(option)}
+									title={`${libraryProviderLabels[option]} library auto-detection`}
+								>
+									<Logo className="provider-option-logo" />
+									{libraryProviderLabels[option]}
+									{selected && (
+										<Check className="theme-option-check" aria-hidden="true" />
+									)}
+								</button>
+							);
+						})}
+						<button
+							type="button"
+							className="provider-option"
+							disabled
+							title="Epic Games support is coming in a future update"
+						>
+							<EpicGamesLogo className="provider-option-logo" />
+							Epic Games
+						</button>
+					</div>
+					<p className="setting-section-hint">
+						Which store's Marvel Rivals installation the library auto-detect searches.
+						Epic Games support is coming soon.
+					</p>
 				</div>
 				<div className="setting-section">
 					<h3>Updates</h3>

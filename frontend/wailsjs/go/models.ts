@@ -243,6 +243,27 @@ export namespace discovery {
 
 }
 
+export namespace gamedetect {
+	
+	export class Detection {
+	    state: string;
+	    libraryPath?: string;
+	    paksPath?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Detection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.libraryPath = source["libraryPath"];
+	        this.paksPath = source["paksPath"];
+	    }
+	}
+
+}
+
 export namespace install {
 	
 	export class ApplyItem {
@@ -504,6 +525,7 @@ export namespace metadata {
 	    theme?: string;
 	    defaultViewMode?: string;
 	    accentColor?: string;
+	    libraryProvider?: string;
 	    lastSeenVersion?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -516,6 +538,7 @@ export namespace metadata {
 	        this.theme = source["theme"];
 	        this.defaultViewMode = source["defaultViewMode"];
 	        this.accentColor = source["accentColor"];
+	        this.libraryProvider = source["libraryProvider"];
 	        this.lastSeenVersion = source["lastSeenVersion"];
 	    }
 	}

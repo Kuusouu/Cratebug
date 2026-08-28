@@ -166,6 +166,88 @@ func TestAccentColorSurvivesASaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSetLibraryProviderRejectsAnUnknownProvider(t *testing.T) {
+	// Arrange
+	var doc Document
+
+	// Act
+	err := doc.SetLibraryProvider("epic")
+
+	// Assert
+	if err == nil {
+		t.Fatal("SetLibraryProvider() succeeded for an unregistered provider, want an error")
+	}
+}
+
+func TestSetLibraryProviderAcceptsARegisteredProvider(t *testing.T) {
+	// Arrange
+	var doc Document
+
+	// Act
+	err := doc.SetLibraryProvider("steam")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetLibraryProvider() = %v, want no error", err)
+	}
+	if doc.Settings.LibraryProvider != "steam" {
+		t.Errorf("Settings.LibraryProvider = %q, want %q", doc.Settings.LibraryProvider, "steam")
+	}
+}
+
+func TestSetLibraryProviderAcceptsAnEmptyValueToRestoreTheDefault(t *testing.T) {
+	// Arrange
+	doc := Document{Settings: Settings{LibraryProvider: "steam"}}
+
+	// Act
+	err := doc.SetLibraryProvider("")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetLibraryProvider(\"\") = %v, want no error", err)
+	}
+	if doc.Settings.LibraryProvider != "" {
+		t.Errorf("Settings.LibraryProvider = %q, want empty", doc.Settings.LibraryProvider)
+	}
+}
+
+func TestLibraryProviderSurvivesASaveLoadRoundTrip(t *testing.T) {
+	// Arrange
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	var doc Document
+	if err := doc.SetLibraryProvider("steam"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	if reloaded.Settings.LibraryProvider != "steam" {
+		t.Errorf("Settings.LibraryProvider = %q, want %q", reloaded.Settings.LibraryProvider, "steam")
+	}
+}
+
+func TestDocumentWithNoLibraryProviderLoadsAsEmpty(t *testing.T) {
+	// Arrange: a document written before this field existed has no
+	// "libraryProvider" key at all, not an empty one.
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	if err := store.Save(Document{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	reloaded, _ := store.Load()
+
+	// Assert
+	if reloaded.Settings.LibraryProvider != "" {
+		t.Errorf("Settings.LibraryProvider = %q, want empty for a document that never set it", reloaded.Settings.LibraryProvider)
+	}
+}
+
 func TestSetLastSeenVersion(t *testing.T) {
 	// Arrange
 	var doc Document
