@@ -266,6 +266,14 @@ func (a *App) ApplyUpdate(installerPath string) error {
 		return fmt.Errorf("refusing to apply update from an unexpected path: %q", installerPath)
 	}
 
+	// Checked here rather than in the helper so the failure surfaces while
+	// the app can still report it: after this call succeeds the app quits,
+	// and a helper whose installer vanished (antivirus quarantine, a temp
+	// cleaner) would otherwise close Cratebug silently without relaunching.
+	if _, err := os.Stat(installerPath); err != nil {
+		return fmt.Errorf("downloaded installer %q is not available: %w", installerPath, err)
+	}
+
 	if err := update.ApplyUpdate(installerPath); err != nil {
 		return err
 	}

@@ -27,11 +27,19 @@ jobs:
             - name: Resolve tag and version
               id: tag
               shell: pwsh
+              # GitHub expression interpolation goes through env: rather than
+              # being spliced into the script text, per GitHub's own
+              # hardening guidance: a hostile tag or input value can then
+              # never break out of quoting to execute arbitrary script.
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  DISPATCH_TAG: ${{ inputs.tag }}
+                  REF_NAME: ${{ github.ref_name }}
               run: |
-                  $tag = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
-                      '${{ inputs.tag }}'
+                  $tag = if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+                      $env:DISPATCH_TAG
                   } else {
-                      '${{ github.ref_name }}'
+                      $env:REF_NAME
                   }
                   if ($tag -notmatch '^(\d{4})\.(\d{2})\.(\d{2})(-.+)?$') {
                       throw "Tag '$tag' does not match the expected YYYY.MM.DD[-suffix] CalVer form."
@@ -86,20 +94,24 @@ jobs:
 
             - name: Set installer version metadata
               shell: pwsh
+              env:
+                  PRODUCT_VERSION: ${{ steps.tag.outputs.productVersion }}
               run: |
                   # Edits the checked-out working copy only; never committed back.
                   $wailsConfig = Get-Content wails.json -Raw | ConvertFrom-Json
-                  $wailsConfig.info.productVersion = '${{ steps.tag.outputs.productVersion }}'
+                  $wailsConfig.info.productVersion = $env:PRODUCT_VERSION
                   $wailsConfig | ConvertTo-Json -Depth 10 | Set-Content wails.json -Encoding utf8
 
             - name: Build Windows application and installer
               shell: pwsh
+              env:
+                  RELEASE_TAG: ${{ steps.tag.outputs.value }}
               run: |
                   # Uses `mise exec --` (not `-c "<string>"`) here specifically because
                   # -ldflags's value itself needs to reach `go build` as one quoted
                   # argument containing a space; the `--` form hands args to mise
                   # directly instead of round-tripping them through a shell string.
-                  $tag = '${{ steps.tag.outputs.value }}'
+                  $tag = $env:RELEASE_TAG
                   mise exec -- go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build `
                       -clean -platform windows/amd64 -nsis -installscope user -nocolour `
                       -ldflags "-X main.AppVersion=$tag"
@@ -113,8 +125,10 @@ jobs:
             - name: Extract changelog section
               id: notes
               shell: pwsh
+              env:
+                  RELEASE_TAG: ${{ steps.tag.outputs.value }}
               run: |
-                  $tag = '${{ steps.tag.outputs.value }}'
+                  $tag = $env:RELEASE_TAG
                   $lines = Get-Content CHANGELOG.md
                   $sectionLines = New-Object System.Collections.Generic.List[string]
                   $inSection = $false
@@ -137,9 +151,11 @@ jobs:
               shell: pwsh
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  RELEASE_TAG: ${{ steps.tag.outputs.value }}
+                  RELEASE_PRERELEASE: ${{ steps.tag.outputs.prerelease }}
               run: |
-                  $tag = '${{ steps.tag.outputs.value }}'
-                  $prerelease = '${{ steps.tag.outputs.prerelease }}' -eq 'true'
+                  $tag = $env:RELEASE_TAG
+                  $prerelease = $env:RELEASE_PRERELEASE -eq 'true'
                   $ghArgs = @(
                       'release', 'create', $tag,
                       'build/bin/Cratebug-amd64-installer.exe',

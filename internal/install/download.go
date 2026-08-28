@@ -11,6 +11,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"time"
 )
 
 // Prefix for the temporary directory a remote download is written into,
@@ -18,6 +20,23 @@ import (
 // since a download's own temp file is cleaned up as soon as staging has
 // copied out of it, well before the staging session itself is done with.
 const remoteDownloadDirPrefix = "cratebug-remote-download-"
+
+const (
+	// Size of each chunk read from the response body while streaming a
+	// download to disk.
+	downloadChunkSize = 32 * 1024
+
+	// Bounds server response headers on a download: a server that accepts
+	// the connection but never responds fails after this long instead of
+	// hanging. Dial and TLS setup keep the transport's own defaults.
+	downloadResponseHeaderTimeout = 30 * time.Second
+
+	// Bounds a stalled body rather than the download as a whole: the
+	// download fails only after this long with no new bytes. There is
+	// deliberately no overall timeout -- a slow but progressing download of
+	// a large mod must be allowed to finish.
+	downloadReadIdleTimeout = 30 * time.Second
+)
 
 // Downloads the mod archive or bundle at rawURL into a fresh temporary
 // directory and returns its local path in the same form CreateSession
@@ -32,12 +51,19 @@ const remoteDownloadDirPrefix = "cratebug-remote-download-"
 // the mod content itself already being treated as untrusted regardless of
 // origin.
 //
-// httpClient is nil in production (defaulting to http.DefaultClient); tests
-// pass an httptest.Server's own client so the HTTPS requirement can be
-// exercised against a real TLS connection instead of only ever failing it.
+// httpClient is nil in production (defaulting to a client bounded by
+// downloadResponseHeaderTimeout); tests pass an httptest.Server's own client
+// so the HTTPS requirement can be exercised against a real TLS connection
+// instead of only ever failing it.
 func DownloadRemoteFile(ctx context.Context, rawURL string, httpClient *http.Client, onProgress func(Progress)) (downloadPath string, cleanup func(), err error) {
+	return downloadRemoteFile(ctx, rawURL, httpClient, onProgress, downloadReadIdleTimeout)
+}
+
+func downloadRemoteFile(ctx context.Context, rawURL string, httpClient *http.Client, onProgress func(Progress), idleTimeout time.Duration) (downloadPath string, cleanup func(), err error) {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.ResponseHeaderTimeout = downloadResponseHeaderTimeout
+		httpClient = &http.Client{Transport: transport}
 	}
 
 	parsed, err := url.Parse(rawURL)
@@ -47,6 +73,13 @@ func DownloadRemoteFile(ctx context.Context, rawURL string, httpClient *http.Cli
 	if parsed.Scheme != "https" {
 		return "", nil, fmt.Errorf("download URL must be HTTPS, got %q", rawURL)
 	}
+
+	// The idle timer interrupts a blocked body read by cancelling this
+	// download's context. stalled distinguishes that from the caller
+	// cancelling, so a stall reports as its own failure.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var stalled atomic.Bool
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -63,6 +96,15 @@ func DownloadRemoteFile(ctx context.Context, rawURL string, httpClient *http.Cli
 	if resp.StatusCode != http.StatusOK {
 		return "", nil, fmt.Errorf("download %q returned %s", rawURL, resp.Status)
 	}
+
+	// Armed only once the body starts: dial, TLS, and header latency have
+	// their own transport bound, and together they can legitimately exceed
+	// the idle timeout.
+	idle := time.AfterFunc(idleTimeout, func() {
+		stalled.Store(true)
+		cancel()
+	})
+	defer idle.Stop()
 
 	fileName, ok := remoteDownloadFileName(resp.Header.Get("Content-Disposition"), parsed)
 	if !ok {
@@ -95,9 +137,26 @@ func DownloadRemoteFile(ctx context.Context, rawURL string, httpClient *http.Cli
 		writer = &progressWriter{w: out, total: total, onProgress: onProgress}
 	}
 
-	if _, err := io.Copy(writer, resp.Body); err != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("write downloaded file %q: %w", destPath, err)
+	buf := make([]byte, downloadChunkSize)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			idle.Reset(idleTimeout)
+			if _, writeErr := writer.Write(buf[:n]); writeErr != nil {
+				cleanup()
+				return "", nil, fmt.Errorf("write downloaded file %q: %w", destPath, writeErr)
+			}
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			cleanup()
+			if stalled.Load() {
+				return "", nil, fmt.Errorf("download %q stalled: no bytes received for %s", rawURL, idleTimeout)
+			}
+			return "", nil, fmt.Errorf("read download stream from %q: %w", rawURL, readErr)
+		}
 	}
 
 	return destPath, cleanup, nil

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDownloadRemoteFile_UsesURLPathFileName(t *testing.T) {
@@ -121,6 +122,31 @@ func TestDownloadRemoteFile_RejectsNonOKStatus(t *testing.T) {
 	if err == nil {
 		cleanup()
 		t.Fatal("DownloadRemoteFile succeeded against a 404, want an error")
+	}
+}
+
+func TestDownloadRemoteFile_StalledServer(t *testing.T) {
+	// Arrange: a server that sends a few bytes and then stalls forever,
+	// modelling a dead connection that would otherwise hang the transfer
+	// with no error and no cancel.
+	release := make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("partial"))
+		w.(http.Flusher).Flush()
+		<-release
+	}))
+	t.Cleanup(server.Close)
+	// Registered after server.Close so cleanup (LIFO) releases the blocked
+	// handler before Close waits on it.
+	t.Cleanup(func() { close(release) })
+
+	// Act
+	_, _, err := downloadRemoteFile(context.Background(), server.URL+"/Mod.zip", server.Client(), nil, 100*time.Millisecond)
+
+	// Assert: the failure path self-cleans (nil cleanup), so there is
+	// nothing to defer here.
+	if err == nil || !strings.Contains(err.Error(), "stalled") {
+		t.Fatalf("downloadRemoteFile error = %v, want a stall failure", err)
 	}
 }
 
