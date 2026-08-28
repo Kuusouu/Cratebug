@@ -17,6 +17,7 @@ Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It trea
 
 ## Features
 
+- **Automatic library detection** - let Cratebug find your Marvel Rivals install through Steam and wire up its `~mods` folder for you; it asks before creating the folder if it's missing. Epic Games support is coming soon
 - **Whole-library view** - classic and IoStore mods side by side, with hero, skin, category, and portrait detected automatically
 - **Safe enable and disable** - flip mods on and off without breaking their sidecar files
 - **Organization** - rename, set priority, sort into folders, and tag mods; tags and settings survive renames and moves

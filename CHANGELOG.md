@@ -13,6 +13,14 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.08.28]
+
+### Finding your crate
+
+- No more path hunting. Cratebug can now find your Marvel Rivals install through Steam all by itself and point your library at the right folder. First launch, click Detect, done.
+- If your `~mods` folder doesn't exist yet, Cratebug asks first and then creates exactly that one folder. Nothing else is touched.
+- You can pick the store Cratebug searches through in Settings. Epic Games detection is coming soon! Until then, pasting a folder path to manage your crates works the same as before.
+
 ## [2026.08.27]
 
 Welcome to Cratebug! First release, and the whole crate is stocked.
