@@ -1,7 +1,7 @@
 # Phase 12 Review
 
 **Date:** 2026-08-28
-**Status:** Awaiting review
+**Status:** Approved
 
 ## Outcome
 
@@ -67,4 +67,4 @@ The maintainer's real Steam installation was used read-only for detection, and f
 
 ## Review decision
 
-**Pending maintainer review.** All Phase 12 tasks (12.1 through 12.5) are implemented with the canonical checks, unit suites, and a live end-to-end drive passing. Approval closes the phase; the Epic Games provider follow-up is then scoped against the installed Epic copy.
+**Decision:** Approved. All Phase 12 tasks (12.1 through 12.5) and exit criteria are met per the canonical checks, the unit suites, and the live end-to-end drive. Phase 12 is complete; the Epic Games provider follow-up is next, scoped against the maintainer's installed Epic copy.
