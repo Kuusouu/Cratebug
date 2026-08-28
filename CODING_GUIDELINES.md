@@ -8,6 +8,7 @@ These guidelines define the shared readability and maintainability standards for
 - Prefer clear names and straightforward control flow over clever abstractions.
 - When a file-level declaration is justified, group types, interfaces, constants, and configuration before functions.
 - Avoid file-level globals. Keep single-use values local, and introduce a narrowly scoped shared definition only when multiple consumers need it.
+- Do not use magic numbers. Put unexplained literals in named constants or variables, with a comment explaining what the value means. Trivial literals such as `0`, `1`, or an empty string may stay inline.
 - Use blank lines to separate distinct validation and control-flow decisions when that makes the code easier to scan.
 - Comment why a decision, constraint, or workaround exists. Do not narrate the next line of code.
 - Write documentation comments as a natural description of behavior or purpose; do not repeat the identifier they document.
