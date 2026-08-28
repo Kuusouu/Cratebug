@@ -10,6 +10,7 @@ import (
 
 	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/gamedetect"
 	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
@@ -22,6 +23,19 @@ type staticGameRunningChecker struct {
 
 func (checker staticGameRunningChecker) IsGameRunning() (bool, error) {
 	return checker.gameRunning, nil
+}
+
+type staticDetectionProvider struct {
+	name      string
+	detection gamedetect.Detection
+}
+
+func (provider staticDetectionProvider) Name() string {
+	return provider.name
+}
+
+func (provider staticDetectionProvider) Detect() (gamedetect.Detection, error) {
+	return provider.detection, nil
 }
 
 func testMetadataStore(t *testing.T) metadata.Store {
@@ -240,6 +254,81 @@ func TestSetModRootPersistsAcrossLoads(t *testing.T) {
 	// Assert
 	if state.Document.Settings.ModRoot != `C:\Mods` {
 		t.Errorf("Settings.ModRoot = %q, want %q", state.Document.Settings.ModRoot, `C:\Mods`)
+	}
+}
+
+func TestDetectLibraryDispatchesToTheNamedProvider(t *testing.T) {
+	// Arrange
+	want := gamedetect.Detection{State: gamedetect.StateLibraryFound, LibraryPath: `C:\Mods\~mods`}
+	app := testApp(t, false)
+	app.detector = gamedetect.NewRegistry(staticDetectionProvider{name: "steam", detection: want})
+
+	// Act
+	detection, err := app.DetectLibrary("steam")
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection != want {
+		t.Errorf("DetectLibrary() = %+v, want %+v", detection, want)
+	}
+}
+
+func TestDetectLibraryRejectsAnUnknownProvider(t *testing.T) {
+	// Arrange
+	app := testApp(t, false)
+
+	// Act
+	_, err := app.DetectLibrary("egs")
+
+	// Assert
+	if err == nil {
+		t.Fatal("DetectLibrary() succeeded for an unknown provider, want an error")
+	}
+}
+
+func TestCreateLibrarySurfacesTheCreatedPath(t *testing.T) {
+	// Arrange
+	paksPath := t.TempDir()
+	app := testApp(t, false)
+	app.detector = gamedetect.NewRegistry(staticDetectionProvider{
+		name:      "steam",
+		detection: gamedetect.Detection{State: gamedetect.StateInstallFound, PaksPath: paksPath},
+	})
+
+	// Act
+	libraryPath, err := app.CreateLibrary("steam")
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(paksPath, gamedetect.LibraryDirName); libraryPath != want {
+		t.Errorf("CreateLibrary() = %q, want %q", libraryPath, want)
+	}
+	if _, err := os.Stat(libraryPath); err != nil {
+		t.Errorf("the created mod library directory is missing: %v", err)
+	}
+}
+
+func TestSetLibraryProviderPersistsAndRejectsUnknownValues(t *testing.T) {
+	// Arrange
+	app := testApp(t, false)
+	if err := app.SetLibraryProvider("steam"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	state := app.LoadMetadata()
+	rejectErr := app.SetLibraryProvider("egs")
+
+	// Assert
+	if state.Document.Settings.LibraryProvider != "steam" {
+		t.Errorf("Settings.LibraryProvider = %q, want %q", state.Document.Settings.LibraryProvider, "steam")
+	}
+	if rejectErr == nil {
+		t.Error("SetLibraryProvider() succeeded for an unknown provider, want an error")
 	}
 }
 

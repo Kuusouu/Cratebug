@@ -17,4 +17,8 @@ Cratebug is released under the GNU General Public License version 3, the same li
 - Cratebug - Copyright (C) 2026 mewclouds (Kuusouu)
 - Based on Repak-X - Copyright (C) 2026 XzantGaming
 
+## Trademarks
+
+The Steam logo is a trademark of Valve Corporation. The Epic Games logo is a trademark of Epic Games, Inc. These marks appear in Cratebug only to identify which store provider library detection targets, and their use does not imply endorsement by or affiliation with Valve or Epic Games. Logo path data comes from [Simple Icons](https://simpleicons.org/).
+
 If you enjoy Cratebug, then credit where it is due: none of this exists without the original.

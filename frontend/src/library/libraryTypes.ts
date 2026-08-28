@@ -41,3 +41,14 @@ export const themeLabels: Record<Theme, string> = {
 	light: "Light",
 	dark: "Dark",
 };
+
+// Store providers library auto-detection can target, matching the providers
+// the Go side registers. Epic Games joins when its provider ships; the
+// Settings selector shows it as unavailable until then.
+export const libraryProviders = ["steam"] as const;
+
+export type LibraryProvider = (typeof libraryProviders)[number];
+
+export const libraryProviderLabels: Record<LibraryProvider, string> = {
+	steam: "Steam",
+};

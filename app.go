@@ -11,6 +11,7 @@ import (
 
 	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/gamedetect"
 	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
@@ -39,6 +40,7 @@ type App struct {
 	metadataStore         metadata.Store
 	classifier            *modtype.SessionClassifier
 	installSessionManager *install.SessionManager
+	detector              *gamedetect.Registry
 	tableMu               sync.Mutex
 	characterTable        modtype.CharacterTable
 	tableLoaded           bool
@@ -75,6 +77,7 @@ func newApp(
 		metadataStore:         metadataStore,
 		classifier:            classifier,
 		installSessionManager: installSessionManager,
+		detector:              gamedetect.NewDefaultRegistry(),
 	}
 	if characterTable != nil {
 		app.characterTable = *characterTable
@@ -410,6 +413,30 @@ func (a *App) loadMetadataDocument() metadata.Document {
 func (a *App) SetModRoot(modRoot string) error {
 	doc := a.loadMetadataDocument()
 	doc.Settings.ModRoot = modRoot
+	return a.metadataStore.Save(doc)
+}
+
+// DetectLibrary locates the named store provider's Marvel Rivals
+// installation and mod library. Read-only: nothing is written for any
+// detection outcome.
+func (a *App) DetectLibrary(provider string) (gamedetect.Detection, error) {
+	return a.detector.Detect(provider)
+}
+
+// CreateLibrary re-detects the named store provider's installation and
+// creates its missing mod-library folder, the one write Cratebug performs
+// outside a configured mod root. The frontend calls it only after the user
+// confirmed the creation in a dialog.
+func (a *App) CreateLibrary(provider string) (string, error) {
+	return a.detector.CreateLibrary(provider)
+}
+
+// Persists which store provider library auto-detection targets.
+func (a *App) SetLibraryProvider(provider string) error {
+	doc := a.loadMetadataDocument()
+	if err := doc.SetLibraryProvider(provider); err != nil {
+		return err
+	}
 	return a.metadataStore.Save(doc)
 }
 

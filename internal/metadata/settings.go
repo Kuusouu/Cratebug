@@ -3,6 +3,8 @@ package metadata
 import (
 	"fmt"
 	"regexp"
+
+	"github.com/Kuusouu/Cratebug/internal/gamedetect"
 )
 
 var validThemes = map[string]bool{
@@ -47,6 +49,17 @@ func (doc *Document) SetAccentColor(color string) error {
 		return fmt.Errorf("accent color must be a 6-digit hex value like #f0a54d, got %q", color)
 	}
 	doc.Settings.AccentColor = color
+	return nil
+}
+
+// Sets the store provider library auto-detection targets, rejecting any
+// value outside the set of providers this build registers. An empty string
+// clears the override and restores the default provider.
+func (doc *Document) SetLibraryProvider(provider string) error {
+	if provider != "" && !gamedetect.ValidProvider(provider) {
+		return fmt.Errorf("unsupported library provider: %q", provider)
+	}
+	doc.Settings.LibraryProvider = provider
 	return nil
 }
 

@@ -1,5 +1,5 @@
 import { Package, ShieldAlert, X } from "lucide-react";
-import { type DragEvent, memo, type MouseEvent } from "react";
+import { type DragEvent, memo, type MouseEvent, type ReactNode } from "react";
 import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
 import {
 	canChangeModState,
@@ -22,6 +22,9 @@ type ModCatalogProps = {
 	state: LibraryState;
 	scanError: string;
 	hasLibrary: boolean;
+	// Extra affordance shown under the initial ("choose a library") state's
+	// message, such as the auto-detect call to action.
+	initialStateAction?: ReactNode;
 	mutatingEntryIDs: ReadonlySet<string>;
 	isMutationLocked: boolean;
 	tagsByEntryID: ReadonlyMap<string, metadata.Tag[]>;
@@ -100,11 +103,17 @@ function scanStateMessage(state: LibraryState, scanError: string): CatalogMessag
 }
 
 // Renders a concise catalog state without duplicating its visual structure.
-function CatalogState({ heading, message, isError = false }: CatalogMessage) {
+function CatalogState({
+	heading,
+	message,
+	isError = false,
+	children,
+}: CatalogMessage & { children?: ReactNode }) {
 	return (
 		<div className={`catalog-state${isError ? " error" : ""}`}>
 			<h3>{heading}</h3>
 			<p>{message}</p>
+			{children}
 		</div>
 	);
 }
@@ -115,6 +124,7 @@ export function ModCatalog({
 	state,
 	scanError,
 	hasLibrary,
+	initialStateAction,
 	mutatingEntryIDs,
 	isMutationLocked,
 	tagsByEntryID,
@@ -133,7 +143,11 @@ export function ModCatalog({
 }: ModCatalogProps) {
 	const stateMessage = scanStateMessage(state, scanError);
 	if (stateMessage) {
-		return <CatalogState {...stateMessage} />;
+		return (
+			<CatalogState {...stateMessage}>
+				{state === "initial" && initialStateAction}
+			</CatalogState>
+		);
 	}
 
 	if (hasLibrary && entries.length === 0) {
