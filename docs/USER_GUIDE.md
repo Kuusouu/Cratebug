@@ -1,6 +1,6 @@
 # Cratebug user guide
 
-This covers installing Cratebug, keeping it updated, and installing mods from a URL. For everyday library management (enabling mods, organizing folders, tags, conflict checking), the app itself is the reference — this guide only covers the parts that happen outside normal day-to-day use.
+This covers installing Cratebug, keeping it updated, and installing mods from a URL. For everyday library management (enabling mods, organizing folders, tags, conflict checking), the app itself is the reference — this guide only covers the parts that happen outside normal day-to-day use. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
 
 ## Installing
 
