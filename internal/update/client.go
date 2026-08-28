@@ -147,5 +147,5 @@ func findInstallerAsset(assets []releaseAssetPayload) (ReleaseAsset, error) {
 			return ReleaseAsset{Name: a.Name, URL: a.BrowserDownloadURL}, nil
 		}
 	}
-	return ReleaseAsset{}, fmt.Errorf("no .exe installer asset found among %d release assets", len(assets))
+	return ReleaseAsset{}, fmt.Errorf("update: no .exe installer asset found among %d release assets", len(assets))
 }

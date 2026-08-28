@@ -621,3 +621,15 @@ func TestApplyUpdate_RejectsPathTraversal(t *testing.T) {
 		t.Fatal("ApplyUpdate succeeded for a path traversal attempt, want an error")
 	}
 }
+
+// A path that passes the shape checks but points at nothing must fail before
+// the helper is launched and the app quits, or a vanished installer (e.g.
+// antivirus quarantine) would close Cratebug with no relaunch and no error.
+func TestApplyUpdate_RejectsMissingInstallerFile(t *testing.T) {
+	app := testApp(t, false)
+
+	missingPath := filepath.Join(os.TempDir(), updateDownloadDirName, "missing-installer.exe")
+	if err := app.ApplyUpdate(missingPath); err == nil {
+		t.Fatal("ApplyUpdate succeeded for an installer file that does not exist, want an error")
+	}
+}

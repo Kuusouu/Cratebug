@@ -157,6 +157,41 @@ func TestDownloadSucceeds(t *testing.T) {
 	}
 }
 
+func TestDownloadSanitizesAssetName(t *testing.T) {
+	content := "safe-bytes"
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(content))
+	})
+
+	t.Run("traversal name is reduced to its base inside destDir", func(t *testing.T) {
+		asset := ReleaseAsset{Name: `..\..\evil.exe`, URL: testAssetURL}
+		destDir := t.TempDir()
+
+		path, err := client.Download(context.Background(), asset, destDir, nil)
+		if err != nil {
+			t.Fatalf("Download returned unexpected error: %v", err)
+		}
+		if filepath.Dir(path) != destDir {
+			t.Errorf("download path %q escaped the destination directory %q", path, destDir)
+		}
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("reading downloaded file: %v", err)
+		}
+		if string(got) != content {
+			t.Errorf("downloaded content = %q, want %q", got, content)
+		}
+	})
+
+	t.Run("unusable name fails the download", func(t *testing.T) {
+		asset := ReleaseAsset{Name: "..", URL: testAssetURL}
+
+		if _, err := client.Download(context.Background(), asset, t.TempDir(), nil); err == nil {
+			t.Fatal("Download succeeded for an unusable asset name, want an error")
+		}
+	})
+}
+
 func TestDownloadRetriesOnServerErrorThenSucceeds(t *testing.T) {
 	var attempts int32
 	content := "eventually-succeeds"

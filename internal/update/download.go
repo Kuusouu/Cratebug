@@ -117,6 +117,10 @@ func (c *Client) ValidateAssetURL(rawURL string) error {
 // failures with a short backoff. Returns the full path to the downloaded
 // file on success.
 //
+// asset.Name comes from a Wails-bound call chain and is not trusted: it is
+// reduced to a bare file name before being joined into destDir, and
+// Download fails rather than writing anywhere else.
+//
 // The file is written under a ".download" suffix and only renamed to its
 // final name once fully and successfully written, so a failed or cancelled
 // download never leaves something that looks like a finished, executable
@@ -133,7 +137,11 @@ func (c *Client) Download(ctx context.Context, asset ReleaseAsset, destDir strin
 		return "", fmt.Errorf("update: creating download directory %s: %w", destDir, err)
 	}
 
-	finalPath := filepath.Join(destDir, asset.Name)
+	fileName := sanitizedAssetFileName(asset.Name)
+	if fileName == "" {
+		return "", fmt.Errorf("update: release asset name %q is not a usable file name", asset.Name)
+	}
+	finalPath := filepath.Join(destDir, fileName)
 	tempPath := finalPath + ".download"
 
 	var lastErr error
@@ -161,6 +169,17 @@ func (c *Client) Download(ctx context.Context, asset ReleaseAsset, destDir strin
 		return "", fmt.Errorf("update: finalizing downloaded file: %w", err)
 	}
 	return finalPath, nil
+}
+
+// Reduces a release asset name to a bare file name so it can never be used
+// to escape destDir, reporting "" for anything that reduces to nothing
+// usable.
+func sanitizedAssetFileName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." || name == "/" || name == "\\" {
+		return ""
+	}
+	return filepath.Base(filepath.FromSlash(name))
 }
 
 func (c *Client) downloadOnce(ctx context.Context, assetURL, tempPath string, idleTimeout time.Duration, onProgress func(downloaded, total int64)) error {
