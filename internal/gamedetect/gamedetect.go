@@ -112,8 +112,17 @@ func (r *Registry) CreateLibrary(provider string) (string, error) {
 	}
 
 	libraryPath := filepath.Join(detection.PaksPath, LibraryDirName)
-	if err := os.Mkdir(libraryPath, modLibraryDirPerm); err != nil && !os.IsExist(err) {
-		return "", fmt.Errorf("create the %s mod library directory: %w", provider, err)
+	if err := os.Mkdir(libraryPath, modLibraryDirPerm); err != nil {
+		if !os.IsExist(err) {
+			return "", fmt.Errorf("create the %s mod library directory: %w", provider, err)
+		}
+		info, statErr := os.Stat(libraryPath)
+		if statErr != nil {
+			return "", fmt.Errorf("check the %s mod library path: %w", provider, statErr)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("the %s mod library path is not a directory", provider)
+		}
 	}
 	return libraryPath, nil
 }
