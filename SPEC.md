@@ -114,7 +114,7 @@ This is distinct from a destination filename collision, invalid bundle, or dupli
 
 Cratebug should eventually allow users to:
 
-- Locate or configure the Marvel Rivals mod directory.
+- Locate or configure the Marvel Rivals mod directory, including automatic detection of store-installed libraries through per-store providers.
 - Scan and display installed mods and physical folders.
 - Search, filter, and inspect the library.
 - Enable and disable mods.
@@ -189,6 +189,8 @@ Before changing files, Cratebug must:
 6. Produce an operation plan before applying mutations.
 
 Installation must use staging and reject path traversal, unsafe links, and destination escape.
+
+The one permitted write outside a configured mod root is creating an empty mod-library directory inside a provider-verified game installation, and only after explicit user confirmation.
 
 Failed or cancelled installation must not leave a partial bundle presented as installed.
 
