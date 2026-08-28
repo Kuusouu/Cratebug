@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 12 - Provider-based library auto-detection (post-release)
-**Status:** Not started
+**Status:** Complete. Review approved 2026-08-28; see `docs/reviews/phase-12-review.md`.
 
 This file contains only the active phase. Replace it when Phase 12 is complete.
 
