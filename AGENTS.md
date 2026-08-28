@@ -79,51 +79,25 @@ If visual verification cannot be performed, say so clearly.
 
 Run `mise exec -c "wails dev"`. Wails serves a fully-bound dev URL alongside the
 native window — the startup log prints it (normally `http://localhost:34115`).
-Navigating a plain browser tab there loads the real frontend with a working
-`window.go.main.App` bridge to the Go backend, identical to the native window.
-Use the `playwright` MCP tools (configured in this repo's `.mcp.json`) to navigate
-there, click, type, read the DOM/console, and screenshot — no native-window capture
-or WebView2 debug-port setup needed.
+Drive that URL with playwright-cli:
 
-The `playwright` server launches its own bundled Chromium (`--browser chromium`)
-rather than real Chrome, since installing Chrome requires admin rights this machine
-doesn't have. That bundled build is a separate download from the `playwright` npm
-package's own copy — on a fresh machine, first run
-`mise exec -- bunx @playwright/mcp@latest install-browser chrome-for-testing` once,
-or MCP calls fail with "Chromium distribution ... is not found".
+```powershell
+mise exec -c "bunx @playwright/cli open http://localhost:34115"
+mise exec -c "bunx @playwright/cli snapshot"   # accessibility tree with element refs
+mise exec -c "bunx @playwright/cli click <ref>"
+mise exec -c "bunx @playwright/cli screenshot"
+```
 
-**If the `playwright` MCP tools aren't available** (observed in background/headless
-sessions, where MCP servers needing an interactive subprocess spawn don't connect —
-check with a ToolSearch query like `"playwright browser navigate"` before assuming),
-fall back to driving a real browser directly instead of giving up on live
-verification:
+`bunx` downloads and caches the CLI on first use. Every command prints the
+current page state; take the `<ref>` for the next action from the latest
+snapshot. End sessions with `close-all`.
 
-* Write a standalone `.mjs` script in a scratch directory (not the repo) that
-  imports `playwright-core` — `npm add`/`bun add playwright-core` there first. Don't
-  add it to `frontend/package.json`; it's a throwaway verification tool, not a
-  project dependency.
-* Launch with `chromium.launch({ channel: "msedge", headless: false })`. Real Edge
-  ships built into Windows already, so `channel: "msedge"` needs no install step
-  (unlike Chrome). `headless: false` opens a visible window — prefer this over
-  headless when a person is available to watch, since they can confirm the result
-  directly and it costs nothing extra.
-* Navigate to the `wails dev` URL exactly as the MCP flow would, then drive it with
-  normal Playwright APIs (`page.goto`, `page.click`, `page.evaluate`, etc.).
-* This is a genuinely separate browser process from the native WebView2 window, not
-  a view into it. Two consequences: (1) DOM/CSS/scroll behavior can differ by real
-  window size and DPI, not just engine — a check that passes here is not proof it
-  holds in the native window at its actual size, so say so explicitly rather than
-  reporting it as confirmed; ask the person running the native window to verify
-  anything size/DPI-sensitive (scroll containment, layout overflow) directly. (2)
-  Application state (e.g. theme, any in-memory React state) does not live-sync
-  between this browser and the native window — only calls that hit the shared Go
-  backend (any exported Wails binding) have an effect the native window could ever
-  observe, and only after its own next refresh or restart, not live.
-* CDP-attaching to the native window's own WebView2 instance (the same pattern
-  `playwright-bentomod` uses for BentoMod) would avoid all of the above since it's
-  the literal live window, not a proxy — but has had unresolved issues on this
-  machine. Worth another attempt if the MCP route is unavailable and the above
-  proxy-browser caveats matter for the task, but don't assume it'll work.
+The CLI's browser is a separate process from the native WebView2 window, not a
+view into it. Calls that reach the shared Go backend (any exported Wails
+binding) affect real application state; in-memory frontend state does not
+live-sync, and DOM/CSS behavior can differ by window size and DPI. Say when a
+check ran in the browser only, and ask the person running the native window to
+verify anything size- or DPI-sensitive directly.
 
 - Save screenshots as `docs/screenshots/<phase>/task-<number>-<state>.png`.
 - Fixtures: `C:\ModsFixtures` is the standing library for manually driving the app —
@@ -137,13 +111,8 @@ verification:
   represent, ask the user to point at one rather than fabricating something that
   pretends to be real data.
 - BentoMod can be launched the same way as a live comparison reference when a task
-  calls for it; see `archive/BentoMod/AGENTS.md`. This repo's `.mcp.json` also
-  defines a `playwright-bentomod` server that attaches over CDP to BentoMod's debug
-  port (`http://localhost:9223`) instead of launching its own browser, so both
-  `playwright` and `playwright-bentomod` tools are available in the same session for
-  side-by-side comparison — no directory switching needed. BentoMod must already be
-  running (`pnpm tauri dev` from `bentomod/`) for that port to have anything to
-  attach to.
+  calls for it; see `archive/BentoMod/AGENTS.md`. A second playwright-cli session
+  (`-s=<name>`) can hold it side by side with the Cratebug tab.
 - Close the dev process (and its Vite/bindings child processes) once verification
   is done.
 
