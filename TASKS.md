@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 10 - Automatic updates, remote mod downloads, and release hardening
-**Status:** In progress.
+**Status:** Complete. Review approved 2026-08-27; see `docs/reviews/phase-10-review.md`.
 
 This file contains only the active phase. Replace it when Phase 10 is complete.
 
