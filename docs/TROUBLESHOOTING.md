@@ -14,6 +14,10 @@ Cratebug renders through Microsoft's WebView2 Runtime. Windows 11 ships with it;
 
 Cratebug installs to `%LOCALAPPDATA%\Programs\Cratebug` for your user account only. Uninstall from **Windows Settings > Apps**, or run `uninstall.exe` from that folder. Uninstalling removes Cratebug itself; the mods in your mod library folder are left alone.
 
+## Auto-detect can't find the game
+
+**Detect Steam library** searches your Steam installation and every Steam library folder for Marvel Rivals. If it reports it couldn't find one: make sure the game is installed through Steam, then try again. If Steam is installed somewhere unusual, detection may still miss it — paste the mod folder path (the game's `Paks\~mods` folder) into the **Mod library folder** box and scan; that always works.
+
 ## Check for updates says I'm up to date
 
 Then you are on the latest release. You can always browse what is published on the [releases page](https://github.com/Kuusouu/Cratebug/releases).

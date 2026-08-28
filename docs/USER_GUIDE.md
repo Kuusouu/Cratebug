@@ -10,6 +10,16 @@ This covers installing Cratebug, keeping it updated, and installing mods from a 
 
 Cratebug isn't code-signed yet, so Windows SmartScreen may show an "unrecognized app" warning on first run. Click **More info** then **Run anyway**.
 
+## Finding your mod library
+
+On first launch, Cratebug can find your Marvel Rivals mod library for you — no path hunting required.
+
+1. Click **Detect Steam library** in the toolbar at the top (or the same button in the middle of the screen).
+2. If your game is installed through Steam, Cratebug finds it and points your library at its `~mods` folder.
+3. If the game is there but the `~mods` folder doesn't exist yet, Cratebug asks first: **Create library** makes exactly that one empty folder, nothing else.
+
+The store Cratebug searches is the **Mod library detection** setting (gear icon > Settings). Steam is the default; Epic Games support is coming. You can always paste a folder path into the **Mod library folder** box instead — both paths end at the same scan.
+
 ## Updating
 
 Cratebug doesn't update itself silently in the background — you're always the one who decides when to check.
