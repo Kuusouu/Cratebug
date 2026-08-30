@@ -37,6 +37,8 @@ $env:Path = "$(mise exec -c "go env GOPATH")\bin;$env:Path"
 Push-Location frontend
 mise exec -c "bun install --frozen-lockfile"
 Pop-Location
+
+.\fetch-uassettool.ps1
 ```
 
 Verify the toolchain:
@@ -46,6 +48,18 @@ mise exec -c "go version"
 mise exec -c "bun --version"
 mise exec -c "wails version"
 ```
+
+### Fetch the pinned UAssetTool worker
+
+The app classifies mods through a pinned `UAssetTool.exe` worker binary that ships outside the repository, so it is missing from a fresh clone. The fetch step in the getting-started block above runs `fetch-uassettool.ps1` from the repository root:
+
+```powershell
+.\fetch-uassettool.ps1
+```
+
+The script downloads the pinned release, verifies its SHA-256 checksum, extracts it to `build\uassettool\`, and confirms the binary reports the pinned source revision. Rerunning it is a no-op once a verified copy is in place. The pinned version and the reasoning behind pinning are in the [UAssetTool worker decision](docs/decisions/0004-pin-uassettool-worker.md).
+
+`wails dev` and installer builds read the binary from `build\uassettool\`. The Go test suite substitutes a fake worker and CI fetches the binary itself, so both run without it.
 
 ## Day-to-day development
 

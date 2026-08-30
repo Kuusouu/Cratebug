@@ -54,6 +54,7 @@ mise install
 Push-Location frontend
 mise exec -c "bun install --frozen-lockfile"
 Pop-Location
+.\fetch-uassettool.ps1          # fetch the pinned UAssetTool worker
 mise exec -c "wails dev"        # run the app
 .\check.ps1                     # run every check
 ```
