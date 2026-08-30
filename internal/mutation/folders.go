@@ -231,6 +231,93 @@ func moveFolderWithFunctions(
 	return Result{PreviousFolderPath: sourceFolder, FolderPath: destinationFolder}, nil
 }
 
+// Deletes one scanner-known physical folder and its contents through the
+// Recycle Bin. The shell operation moves the whole tree with undo support,
+// so an accidental deletion is restorable until the bin is emptied.
+func deleteFolder(modRoot, folder string, confirmed bool) (Result, error) {
+	return deleteFolderWithRecycle(modRoot, folder, confirmed, recycleFiles)
+}
+
+// Allows folder-deletion tests to substitute the Windows Recycle Bin boundary.
+func deleteFolderWithRecycle(modRoot, folder string, confirmed bool, recycle func([]string) error) (Result, error) {
+	if !confirmed {
+		return Result{}, fmt.Errorf("deletion requires explicit confirmation")
+	}
+
+	library, err := discovery.Scan(modRoot)
+	if err != nil {
+		return Result{}, fmt.Errorf("scan mod library before deleting folder: %w", err)
+	}
+	folder, err = mutableKnownFolder(library.Folders, folder)
+	if err != nil {
+		return Result{}, err
+	}
+
+	root, err := filepath.Abs(modRoot)
+	if err != nil {
+		return Result{}, fmt.Errorf("resolve mod root: %w", err)
+	}
+	absolutePath, err := resolveFolderPath(root, folder)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := requireDirectoryAncestry(root, filepath.Dir(absolutePath), requireDirectory); err != nil {
+		return Result{}, err
+	}
+	if err := requireDirectory(absolutePath, "deleted folder"); err != nil {
+		return Result{}, err
+	}
+
+	if err := recycle([]string{absolutePath}); err != nil {
+		return Result{}, fmt.Errorf("send folder to Recycle Bin: %w", err)
+	}
+
+	if _, err := os.Lstat(absolutePath); err == nil {
+		return Result{}, fmt.Errorf("Recycle Bin operation completed but folder remains: %q", folder)
+	} else if !os.IsNotExist(err) {
+		return Result{}, fmt.Errorf("reconcile deleted folder: %w", err)
+	}
+
+	updated, err := discovery.Scan(modRoot)
+	if err != nil {
+		return Result{}, fmt.Errorf("rescan mod library after deleting folder: %w", err)
+	}
+	for _, known := range updated.Folders {
+		if strings.EqualFold(known, folder) {
+			return Result{}, fmt.Errorf("Recycle Bin operation completed but deleted folder remains in the scan: %q", folder)
+		}
+	}
+	return Result{PreviousFolderPath: folder, Deleted: true}, nil
+}
+
+// Reports whether one scanner-known physical folder holds no entries at all,
+// including files the scanner does not model, so a delete confirmation can
+// warn about contents that would be lost with it.
+func FolderIsEmpty(modRoot, folder string) (bool, error) {
+	library, err := discovery.Scan(modRoot)
+	if err != nil {
+		return false, fmt.Errorf("scan mod library before checking folder: %w", err)
+	}
+	folder, err = knownFolder(library.Folders, folder)
+	if err != nil {
+		return false, err
+	}
+
+	root, err := filepath.Abs(modRoot)
+	if err != nil {
+		return false, fmt.Errorf("resolve mod root: %w", err)
+	}
+	absolutePath, err := resolveFolderPath(root, folder)
+	if err != nil {
+		return false, err
+	}
+	entries, err := os.ReadDir(absolutePath)
+	if err != nil {
+		return false, fmt.Errorf("read folder %q: %w", folder, err)
+	}
+	return len(entries) == 0, nil
+}
+
 // Validates all existing directories used by a bundle plan immediately before
 // its moves begin. File paths can be scanner-known while a parent junction has
 // changed since scanning, so both source and destination ancestry are checked.

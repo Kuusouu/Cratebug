@@ -34,6 +34,8 @@ export function CreateLibrary(arg1:string):Promise<string>;
 
 export function CreateTag(arg1:string):Promise<metadata.Tag>;
 
+export function DeleteFolder(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
+
 export function DeleteMod(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
 
 export function DeleteTag(arg1:string):Promise<void>;
@@ -47,6 +49,8 @@ export function DownloadUpdate(arg1:update.Release):Promise<string>;
 export function GetAppVersion():Promise<string>;
 
 export function InstallFromURL(arg1:string,arg2:string,arg3:string):Promise<install.PreviewResult>;
+
+export function IsFolderEmpty(arg1:string,arg2:string):Promise<boolean>;
 
 export function LoadMetadata():Promise<main.MetadataState>;
 
