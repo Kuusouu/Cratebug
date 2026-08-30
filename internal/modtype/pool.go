@@ -78,7 +78,12 @@ func (p *WorkerPool) workerLoop() {
 
 	var w PoolWorker
 	if p.launcher != nil {
-		w, _ = p.launcher()
+		// A launcher error must leave w as an untyped nil interface. NewPinnedWorker
+		// returns a typed nil *Worker on failure, and a typed nil wrapped in the
+		// interface compares non-nil, so callers would dereference it and panic.
+		if newW, err := p.launcher(); err == nil {
+			w = newW
+		}
 	}
 	defer func() {
 		if w != nil {
