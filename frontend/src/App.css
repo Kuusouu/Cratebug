@@ -673,6 +673,27 @@ button:disabled {
 	padding: 0.65rem 0.75rem;
 }
 
+/* The search field's clear glyph is browser-drawn, so a color rule cannot
+   reach it. Rebuilding it as a mask lets it follow the theme palette. */
+.search-control input::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 1rem;
+	height: 1rem;
+	background-color: var(--muted);
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	cursor: pointer;
+}
+
+.search-control input::-webkit-search-cancel-button:hover {
+	background-color: var(--text);
+}
+
 .catalog-controls {
 	display: flex;
 	align-items: center;
@@ -1332,8 +1353,8 @@ button:disabled {
 }
 
 .mod-toggle[aria-checked="true"] {
-	border-color: color-mix(in srgb, var(--good), transparent 40%);
-	background: var(--good);
+	border-color: color-mix(in srgb, var(--accent), transparent 40%);
+	background: var(--accent);
 }
 
 .mod-toggle[aria-busy="true"] {
