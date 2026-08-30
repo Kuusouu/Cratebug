@@ -1,4 +1,4 @@
-import { ChevronRight, Folder, LibraryBig } from "lucide-react";
+import { ChevronRight, Folder, FolderRoot, LibraryBig } from "lucide-react";
 import { memo, type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { type DraggedItem, isValidDropTarget } from "./libraryTypes";
@@ -20,6 +20,7 @@ type FolderNavigationProps = {
 	onDragEnd: () => void;
 	onDropOnFolder: (destinationFolder: string) => void;
 	entryCount: number;
+	rootEntryCount: number;
 	folderEntryCounts: ReadonlyMap<string, number>;
 };
 
@@ -89,6 +90,7 @@ export const FolderNavigation = memo(function FolderNavigation({
 	onDragEnd,
 	onDropOnFolder,
 	entryCount,
+	rootEntryCount,
 	folderEntryCounts,
 }: FolderNavigationProps) {
 	const tree = useMemo(() => buildFolderTree(folders), [folders]);
@@ -153,10 +155,35 @@ export const FolderNavigation = memo(function FolderNavigation({
 
 	return (
 		<nav className="folder-navigation">
+			{/* Both rows drop onto the root folder, but they track drag-over under
+			    different keys ("all" vs "") so only the hovered row highlights. */}
 			<button
 				type="button"
-				className={`folder-row${selectedFolder === "all" ? " selected" : ""}${isValidDropTarget(draggedItem, "") && dragOverFolder === "" ? " drag-over" : ""}`}
+				className={`folder-row${selectedFolder === "all" ? " selected" : ""}${isValidDropTarget(draggedItem, "") && dragOverFolder === "all" ? " drag-over" : ""}`}
 				onClick={() => onSelect("all")}
+				onContextMenu={(event) => {
+					event.preventDefault();
+					onContextMenu("", event);
+				}}
+				onDragOver={(event) => {
+					if (!isValidDropTarget(draggedItem, "")) return;
+					event.preventDefault();
+					handleDragOverTarget("all");
+				}}
+				onDrop={(event) => {
+					if (!isValidDropTarget(draggedItem, "")) return;
+					event.preventDefault();
+					handleDrop("");
+				}}
+			>
+				<LibraryBig aria-hidden="true" className="folder-icon" />
+				<span className="folder-name">All mods</span>
+				<span className="folder-count">{entryCount}</span>
+			</button>
+			<button
+				type="button"
+				className={`folder-row${selectedFolder === "" ? " selected" : ""}${isValidDropTarget(draggedItem, "") && dragOverFolder === "" ? " drag-over" : ""}`}
+				onClick={() => onSelect("")}
 				onContextMenu={(event) => {
 					event.preventDefault();
 					onContextMenu("", event);
@@ -172,9 +199,9 @@ export const FolderNavigation = memo(function FolderNavigation({
 					handleDrop("");
 				}}
 			>
-				<LibraryBig aria-hidden="true" className="folder-icon" />
-				<span className="folder-name">All mods</span>
-				<span className="folder-count">{entryCount}</span>
+				<FolderRoot aria-hidden="true" className="folder-icon" />
+				<span className="folder-name">Library root</span>
+				<span className="folder-count">{rootEntryCount}</span>
 			</button>
 			{tree.map((node) => (
 				<FolderTreeItem

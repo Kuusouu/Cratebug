@@ -11,14 +11,17 @@ export type DraggedItem =
 	| { type: "folder"; path: string }
 	| { type: "mod"; entry: discovery.Entry };
 
-// A dragged folder cannot be dropped into itself or its own descendant; a
-// dragged mod has no such constraint, any folder is a valid destination.
+// A dragged folder cannot be dropped into itself or its own descendant, nor
+// onto the root when it already sits at the root (the backend rejects that
+// move as a no-op, so the drop target offers no valid action). A dragged mod
+// has no such constraint, any folder is a valid destination.
 // Shared by FolderNavigation (deciding whether to show drag-over highlight
 // and allow the drop) and LibraryScreen (deciding whether to execute the
 // move once dropped) so the two can't drift out of sync.
 export function isValidDropTarget(draggedItem: DraggedItem | null, targetFolder: string): boolean {
 	if (!draggedItem) return false;
 	if (draggedItem.type === "mod") return true;
+	if (targetFolder === "" && !draggedItem.path.includes("/")) return false;
 	return draggedItem.path !== targetFolder && !targetFolder.startsWith(`${draggedItem.path}/`);
 }
 
