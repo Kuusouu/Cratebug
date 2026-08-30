@@ -82,13 +82,17 @@ native window — the startup log prints it (normally `http://localhost:34115`).
 Drive that URL with playwright-cli:
 
 ```powershell
-mise exec -c "bunx @playwright/cli open http://localhost:34115"
-mise exec -c "bunx @playwright/cli snapshot"   # accessibility tree with element refs
-mise exec -c "bunx @playwright/cli click <ref>"
-mise exec -c "bunx @playwright/cli screenshot"
+mise exec -c "npm i -g @playwright/cli"   # only if playwright-cli is not installed yet
+mise exec -c "playwright-cli install-browser chromium"   # only if no browser is installed yet
+mise exec -c "playwright-cli open http://localhost:34115"
+mise exec -c "playwright-cli snapshot"   # accessibility tree with element refs
+mise exec -c "playwright-cli click <ref>"
+mise exec -c "playwright-cli screenshot"
 ```
 
-`bunx` downloads and caches the CLI on first use. Every command prints the
+The CLI is installed globally through npm, not run through `bunx` (bun had
+issues on this setup). The global npm bin lives inside mise's node install, so
+commands run through `mise exec`. Every command prints the
 current page state; take the `<ref>` for the next action from the latest
 snapshot. End sessions with `close-all`.
 
