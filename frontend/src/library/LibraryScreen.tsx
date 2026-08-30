@@ -124,6 +124,7 @@ type SelectedModPanelProps = {
 	isMutationLocked: boolean;
 	onClear: () => void;
 	onSetEnabled: (entry: discovery.Entry) => void;
+	onDelete: () => void;
 };
 
 type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags";
@@ -1207,7 +1208,6 @@ export function LibraryScreen() {
 				if (activeLibraryRootRef.current !== libraryRoot) return false;
 
 				const createdFolderPath = result.folderPath ?? name;
-				setSelectedFolder(result.folderPath ?? "all");
 				showMutationFeedback("success", `Created folder ${createdFolderPath}.`);
 				return true;
 			} catch (error) {
@@ -1861,6 +1861,7 @@ export function LibraryScreen() {
 							setActiveDialog(null);
 						}}
 						onSetEnabled={setModEnabled}
+						onDelete={() => setActiveDialog("delete")}
 					/>
 					<ModCatalog
 						entries={displayedEntries}
@@ -2719,6 +2720,7 @@ function SelectedModPanel({
 	isMutationLocked,
 	onClear,
 	onSetEnabled,
+	onDelete,
 }: SelectedModPanelProps) {
 	if (!entry) {
 		return (
@@ -2780,6 +2782,16 @@ function SelectedModPanel({
 								: enabled
 									? "Disable"
 									: "Enable"}
+					</button>
+				)}
+				{canDeleteMod(entry) && (
+					<button
+						type="button"
+						className="destructive-button"
+						disabled={isMutationLocked}
+						onClick={onDelete}
+					>
+						Delete
 					</button>
 				)}
 				<button

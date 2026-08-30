@@ -1383,10 +1383,14 @@ button:disabled {
 }
 
 .selected-mod-actions .mod-action,
-.selected-mod-actions .quiet-button {
+.selected-mod-actions .quiet-button,
+.selected-mod-actions .destructive-button {
 	min-height: 2.8rem;
 	padding: 0.65rem 0.9rem;
 	align-self: auto;
+	/* .mod-action's own 0.78rem would otherwise leave the panel's buttons at
+	   two different font sizes. */
+	font-size: inherit;
 }
 
 .mutation-dialog-backdrop {
