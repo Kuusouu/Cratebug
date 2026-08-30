@@ -107,6 +107,7 @@ type LibraryIndex = {
 	folders: string[];
 	folderEntries: ReadonlyMap<string, discovery.Entry[]>;
 	folderEntryCounts: ReadonlyMap<string, number>;
+	rootEntryCount: number;
 };
 
 type ViewModeButtonProps = {
@@ -232,6 +233,8 @@ function indexLibrary(library: discovery.Library | null): LibraryIndex {
 		folderEntryCounts: new Map(
 			[...folderEntries].map(([folder, entriesInFolder]) => [folder, entriesInFolder.length]),
 		),
+		rootEntryCount: (library?.entries ?? []).filter((entry) => entry.relativeFolder === "")
+			.length,
 	};
 }
 
@@ -331,7 +334,12 @@ function libraryStatusMessage(
 		case "empty":
 			return "No supported mods found.";
 		case "populated": {
-			const scope = selectedFolder === "all" ? "library" : selectedFolder;
+			const scope =
+				selectedFolder === "all"
+					? "library"
+					: selectedFolder === ""
+						? "library root"
+						: selectedFolder;
 			const matchesSearch = search.trim() !== "" ? " matching" : "";
 			return `${viewModeLabels[viewMode]} view. ${entryCount}${matchesSearch} mods shown in ${scope}.`;
 		}
@@ -426,10 +434,13 @@ export function LibraryScreen() {
 
 	const displayedEntries = useMemo(() => {
 		const normalizedSearch = search.trim().toLocaleLowerCase();
+		const libraryEntries = library?.entries ?? [];
 		const scopedEntries =
 			selectedFolder === "all"
-				? (library?.entries ?? [])
-				: (libraryIndex.folderEntries.get(selectedFolder) ?? []);
+				? libraryEntries
+				: selectedFolder === ""
+					? libraryEntries.filter((entry) => entry.relativeFolder === "")
+					: (libraryIndex.folderEntries.get(selectedFolder) ?? []);
 
 		return scopedEntries.filter((entry) => {
 			if (normalizedSearch !== "") {
@@ -1808,6 +1819,7 @@ export function LibraryScreen() {
 						onDragEnd={endDrag}
 						onDropOnFolder={handleDropOnFolder}
 						entryCount={library?.entries?.length ?? 0}
+						rootEntryCount={libraryIndex.rootEntryCount}
 						folderEntryCounts={libraryIndex.folderEntryCounts}
 					/>
 				</aside>
@@ -1816,7 +1828,13 @@ export function LibraryScreen() {
 					<div className="catalog-header">
 						<div>
 							<p className="eyebrow">Mod library</p>
-							<h2>{selectedFolder === "all" ? "All mods" : selectedFolder}</h2>
+							<h2>
+								{selectedFolder === "all"
+									? "All mods"
+									: selectedFolder === ""
+										? "Library root"
+										: selectedFolder}
+							</h2>
 						</div>
 						<div className="catalog-controls">
 							<label className="search-control">
