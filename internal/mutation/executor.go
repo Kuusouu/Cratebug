@@ -88,6 +88,14 @@ type DeleteModOperation struct {
 	confirmed bool
 }
 
+// Deletes one scanner-known physical folder and its contents through the
+// Windows Recycle Bin.
+type DeleteFolderOperation struct {
+	modRoot   string
+	folder    string
+	confirmed bool
+}
+
 // Creates a mutation executor with the supplied game-running detector.
 func NewExecutor(gameRunningChecker GameRunningChecker) Executor {
 	return Executor{gameRunningChecker: gameRunningChecker}
@@ -131,6 +139,11 @@ func NewMoveFolderOperation(modRoot, folder, destinationParent string) MoveFolde
 // Creates the narrow Recycle Bin deletion operation exposed by the Phase 4 application boundary.
 func NewDeleteModOperation(modRoot, entryID string, confirmed bool) DeleteModOperation {
 	return DeleteModOperation{modRoot: modRoot, entryID: entryID, confirmed: confirmed}
+}
+
+// Creates the narrow folder-deletion operation exposed by the Phase 4 application boundary.
+func NewDeleteFolderOperation(modRoot, folder string, confirmed bool) DeleteFolderOperation {
+	return DeleteFolderOperation{modRoot: modRoot, folder: folder, confirmed: confirmed}
 }
 
 // Applies the operation only after its game-running restriction has been enforced.
@@ -237,4 +250,14 @@ func (operation DeleteModOperation) GameRunningRequirement() GameRunningRequirem
 // Sends the scanner-selected bundle to the Recycle Bin after safety checks succeed.
 func (operation DeleteModOperation) Execute() (Result, error) {
 	return deleteMod(operation.modRoot, operation.entryID, operation.confirmed)
+}
+
+// Blocks folder deletion while the game may be using files inside it.
+func (operation DeleteFolderOperation) GameRunningRequirement() GameRunningRequirement {
+	return BlockedWhileGameRunning
+}
+
+// Sends the scanner-selected folder tree to the Recycle Bin after safety checks succeed.
+func (operation DeleteFolderOperation) Execute() (Result, error) {
+	return deleteFolder(operation.modRoot, operation.folder, operation.confirmed)
 }

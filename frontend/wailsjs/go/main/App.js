@@ -50,6 +50,10 @@ export function CreateTag(arg1) {
   return window['go']['main']['App']['CreateTag'](arg1);
 }
 
+export function DeleteFolder(arg1, arg2, arg3) {
+  return window['go']['main']['App']['DeleteFolder'](arg1, arg2, arg3);
+}
+
 export function DeleteMod(arg1, arg2, arg3) {
   return window['go']['main']['App']['DeleteMod'](arg1, arg2, arg3);
 }
@@ -76,6 +80,10 @@ export function GetAppVersion() {
 
 export function InstallFromURL(arg1, arg2, arg3) {
   return window['go']['main']['App']['InstallFromURL'](arg1, arg2, arg3);
+}
+
+export function IsFolderEmpty(arg1, arg2) {
+  return window['go']['main']['App']['IsFolderEmpty'](arg1, arg2);
 }
 
 export function LoadMetadata() {

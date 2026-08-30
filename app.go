@@ -353,6 +353,17 @@ func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Resul
 	return a.mutationExecutor.Execute(operation)
 }
 
+// Deletes one scanner-known physical folder and its contents through the Windows Recycle Bin.
+func (a *App) DeleteFolder(modRoot, folder string, confirmed bool) (mutation.Result, error) {
+	operation := mutation.NewDeleteFolderOperation(modRoot, folder, confirmed)
+	return a.mutationExecutor.Execute(operation)
+}
+
+// Reports whether one scanner-known physical folder holds no entries at all.
+func (a *App) IsFolderEmpty(modRoot, folder string) (bool, error) {
+	return mutation.FolderIsEmpty(modRoot, folder)
+}
+
 // Executes operation, then re-points any persisted metadata (currently tag
 // assignments) from its previous scanner ID to its new one so a rename,
 // priority change, or move does not orphan a mod's metadata.

@@ -399,3 +399,170 @@ func TestMoveFolderReconcilesPostMoveValidationFailure(t *testing.T) {
 	}
 	assertFileContents(t, filepath.Join(root, "destination", "source", ".keep"), "source")
 }
+
+// Verifies deleting an empty folder recycles the directory itself and the
+// rescan no longer lists it.
+func TestDeleteFolderRecyclesEmptyFolder(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "empty"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	recycleBin := t.TempDir()
+
+	// Act
+	result, err := deleteFolderWithRecycle(root, "empty", true, moveToDisposableRecycleBin(t, recycleBin))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if result.PreviousFolderPath != "empty" || !result.Deleted {
+		t.Errorf("result = %#v, want empty folder marked deleted", result)
+	}
+	if _, err := os.Stat(filepath.Join(root, "empty")); !os.IsNotExist(err) {
+		t.Errorf("folder stat error = %v, want removed folder", err)
+	}
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, known := range library.Folders {
+		if strings.EqualFold(known, "empty") {
+			t.Errorf("scan still lists deleted folder %q", known)
+		}
+	}
+}
+
+// Verifies deleting a folder that still holds mods recycles the entire tree,
+// matching the confirmation dialog's warning that all contents go with it.
+func TestDeleteFolderRecyclesFolderWithContents(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	for path, contents := range map[string]string{
+		"doomed/Example_9999999_P.pak":  "primary",
+		"doomed/Example_9999999_P.utoc": "utoc",
+		"doomed/.keep":                  "unmodeled file",
+	} {
+		writeFile(t, filepath.Join(root, path), contents)
+	}
+	if err := os.Mkdir(filepath.Join(root, "survivor"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "survivor", ".keep"), "other folder")
+	recycleBin := t.TempDir()
+
+	// Act
+	if _, err := deleteFolderWithRecycle(root, "doomed", true, moveToDisposableRecycleBin(t, recycleBin)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	want := map[string]string{"survivor/.keep": "other folder"}
+	if got := snapshotFiles(t, root, ""); !reflect.DeepEqual(got, want) {
+		t.Errorf("library after folder deletion = %#v, want %#v", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(recycleBin, "doomed")); err != nil {
+		t.Errorf("deleted folder was not moved to the recycle boundary: %v", err)
+	}
+}
+
+// Ensures unconfirmed requests and unsafe targets leave the library intact.
+func TestDeleteFolderRejectsUnsafeRequestsWithoutChanges(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		run  func(root string) error
+	}{
+		{
+			name: "unconfirmed deletion",
+			run: func(root string) error {
+				_, err := deleteFolderWithRecycle(root, "doomed", false, func([]string) error {
+					return errors.New("recycle must not be reached")
+				})
+				return err
+			},
+		},
+		{
+			name: "root folder",
+			run: func(root string) error {
+				_, err := deleteFolder(root, "", true)
+				return err
+			},
+		},
+		{
+			name: "unknown folder",
+			run: func(root string) error {
+				_, err := deleteFolder(root, "missing", true)
+				return err
+			},
+		},
+		{
+			name: "recycle failure keeps folder",
+			run: func(root string) error {
+				_, err := deleteFolderWithRecycle(root, "doomed", true, func([]string) error {
+					return errors.New("shell operation failed")
+				})
+				return err
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			root := t.TempDir()
+			if err := os.Mkdir(filepath.Join(root, "doomed"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			writeFile(t, filepath.Join(root, "doomed", ".keep"), "keep")
+
+			// Act
+			err := test.run(root)
+
+			// Assert
+			if err == nil {
+				t.Fatal("deletion succeeded, want rejection")
+			}
+			if test.name == "unconfirmed deletion" {
+				return
+			}
+			if _, err := os.Stat(filepath.Join(root, "doomed", ".keep")); err != nil {
+				t.Errorf("fixture changed during rejected deletion: %v", err)
+			}
+		})
+	}
+}
+
+// Verifies the emptiness check that drives the delete dialog's warning treats
+// unmodeled files as contents and rejects unknown folders.
+func TestFolderIsEmpty(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "empty"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "occupied"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "occupied", ".keep"), "unmodeled file")
+
+	// Act
+	empty, err := FolderIsEmpty(root, "empty")
+	if err != nil {
+		t.Fatal(err)
+	}
+	occupied, err := FolderIsEmpty(root, "occupied")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, unknownErr := FolderIsEmpty(root, "missing")
+
+	// Assert
+	if !empty {
+		t.Error("FolderIsEmpty(empty) = false, want true")
+	}
+	if occupied {
+		t.Error("FolderIsEmpty(occupied) = true, want false: unmodeled files are contents")
+	}
+	if unknownErr == nil {
+		t.Error("FolderIsEmpty(missing) error = nil, want unknown-folder rejection")
+	}
+}
