@@ -18,6 +18,7 @@ Pin the following runtime and application-tool versions:
 | Go | `1.26.5` |
 | Wails | `v2.13.0` |
 | Bun | `1.3.14` |
+| Node | `24.20.0` |
 | React | `19.2.8` |
 | React DOM | `19.2.8` |
 | TypeScript | `7.0.2` |
@@ -27,7 +28,7 @@ Pin the following runtime and application-tool versions:
 | `@types/react` | `19.2.17` |
 | `@types/react-dom` | `19.2.3` |
 
-Go and Bun are pinned in the root `mise.toml`.
+Go, Bun, and Node are pinned in the root `mise.toml`. Node was added on 2026-08-30 because the agentic-development workflow (see `AGENTS.md`) installs the Playwright CLI globally through npm, which requires a mise-managed Node on a clean machine; Cratebug's own frontend tooling remains Bun-only.
 
 Task 0.3 must pin Wails in `go.mod`, use exact versions without range prefixes in `package.json`, and commit the resulting `bun.lock`. If the Wails CLI is represented as a Go tool dependency, it must use `v2.13.0`. Task 0.5 must install the same Go and Bun versions in CI.
 
@@ -56,6 +57,7 @@ Run from the repository root:
 ```powershell
 mise exec -c "go version"
 mise exec -c "bun --version"
+mise exec -c "node --version"
 mise exec -c "wails version"
 ```
 
@@ -64,6 +66,7 @@ Expected version values are:
 ```text
 go1.26.5
 1.3.14
+v24.20.0
 v2.13.0
 ```
 
