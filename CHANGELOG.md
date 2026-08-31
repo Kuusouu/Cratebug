@@ -13,6 +13,19 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.08.30]
+
+### Making it yours
+
+- Your accent color now runs the whole show: the enable switches and the little X in search dress to match instead of doing their own thing.
+
+### Keeping the crate tidy
+
+- New "Library root" view in the sidebar! See only the mods sitting loose in the main folder, and drag a mod onto it to send it back home.
+- Folders can finally be deleted, with the usual safety net. A moment to think it over, and the whole folder waits in the Recycle Bin until you empty it.
+- Deleting a full folder tells you its contents go with it, and that everything can be restored if you change your mind.
+- Creating a folder keeps you right where you were, so stacking up folders no longer yanks you out of your place.
+
 ## [2026.08.27]
 
 Welcome to Cratebug! First release, and the whole crate is stocked.
