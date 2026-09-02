@@ -1,82 +1,99 @@
 # Cratebug Active Tasks
 
-**Phase:** 12 - Provider-based library auto-detection (post-release)
-**Status:** Complete. Review approved 2026-08-28; see `docs/reviews/phase-12-review.md`.
+**Phase:** 13 - Epic Games library detection
+**Status:** Active
+**Branch:** `feat/epic-gamedetect`
 
-This file contains only the active phase. Replace it when Phase 12 is complete.
+This file contains only the active phase. Replace it when Phase 13 is complete.
 
 ## Phase objective
 
-Let Cratebug find the Marvel Rivals mod library itself instead of requiring a pasted path. The library toolbar gains a detect control showing the active store's logo; detection locates the game installation through a small per-store provider seam and points the library at its `~mods` folder. When the game install is found but `~mods` does not exist, a dialog offers to create it. Steam ships first and is the default provider; Epic Games follows as the second provider once it can be verified against a real Epic installation.
+Let Cratebug detect a Marvel Rivals mod library from the Epic Games launcher the same way it already does for Steam. The Phase 12 provider seam, Wails bindings, create-library confirmation, and Settings selector stay in place. This phase adds the Epic provider, enables the selector option, and verifies detection against a real Epic install.
 
-BentoMod's `find_marvel_rivals`/`get_steam_library_paths`/`get_steam_path_from_registry` (`archive/BentoMod/bentomod/src/utils.rs:385-490`) and `auto_detect_game_path` (`main_tauri.rs:865-897`) are behavioral references for registry resolution, `libraryfolders.vdf` parsing, and install-shape validation. Two deliberate differences: BentoMod has no Epic detection, and its auto-detect silently creates `~mods`; Cratebug requires explicit confirmation for creation. BentoMod also shells out to `reg.exe`; Cratebug reads the registry directly via `golang.org/x/sys/windows/registry`, which is already a direct dependency.
+Live layout verified 2026-09-02 on the maintainer's machine (do not hardcode the install folder name):
 
-## Design decisions (user-approved 2026-08-28)
+* Manifests: `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item`
+* `DisplayName`: `Marvel Rivals`
+* `CatalogNamespace`: `38e211ced4e448a5a653a8d1e13fef18`
+* `InstallLocation`: `C:\Program Files\Epic Games\MarvelRivalsjKtnW` (Epic appends a random suffix)
+* Paks: `{InstallLocation}\MarvelGame\Marvel\Content\Paks`
+* `~mods` was not present; a live detect should return `installFound`
 
-* **Provider seam, Steam first.** `internal/gamedetect` defines a minimal provider interface and a small registry of providers. Steam is the only implementation this phase; the Epic Games provider lands in a follow-up once a real Epic installation is available for path verification and live testing, without changing call sites.
-* **Detection is read-only.** Detecting never writes. The one permitted write outside a configured mod root is creating an empty `~mods` directory inside a provider-verified game installation, and only after the user confirms it in a dialog.
-* **Three-state detection result.** Game install found with an existing `~mods` (library path returned), game install found without `~mods` (install path returned so creation can target it), game install not found. Each state gets its own frontend presentation.
-* **Creation flow.** The dialog reads "No mod library was found for <Steam/Epic>" and offers to create it. `CreateLibrary` re-runs detection server-side rather than accepting a path argument from the frontend, so nothing untrusted crosses the trust boundary and creation can only ever target a provider-verified install.
-* **Applying a detected library.** With no mod root configured, a found library is applied directly. When a root is already configured, applying a different detected path requires confirmation first.
-* **Steam is the default provider.** The persisted setting is empty-means-Steam. The Settings provider selector lists Epic as visible-but-unavailable until its provider ships, and the toolbar copy names Steam until then.
-* **Trademarks.** Steam and Epic logos appear as store indicators; NOTICE.md notes that Valve and Epic own their respective marks.
+Steam's extra `steamapps\common\MarvelRivals\` prefix is not present under Epic. `AppName` is an opaque hash and is not a match key.
+
+## Design decisions (user-approved 2026-09-02)
+
+* **Same seam, second provider.** `internal/gamedetect` already has `Provider`, `Registry`, `DetectLibrary`, `CreateLibrary`, and `Settings.LibraryProvider`. Register `ProviderEpic = "epic"` in `providerNames` and `NewDefaultRegistry` together. No new Wails methods.
+* **Manifests are the source of truth.** Parse launcher `.item` JSON. Custom install paths are already in `InstallLocation`. Do not walk `Program Files` and do not add Steam-style hardcoded fallback roots.
+* **Match rules.** Skip `bIsIncompleteInstall`. Skip DLC (`MainGameAppName` non-empty). Match when `CatalogNamespace` equals the verified constant **or** `DisplayName` equals `Marvel Rivals` (case-insensitive). First matching install whose Paks path is a directory wins, in sorted filename order.
+* **Injectable manifests dir.** Tests write fixture `.item` files under `t.TempDir` and never touch ProgramData or the real game.
+* **Steam remains the default.** Empty `LibraryProvider` still means Steam. Users with only Epic pick it in Settings.
+* **Create-library is unchanged.** `CreateLibrary` already re-detects by provider name and creates only `Paks\~mods`. Do not create `~mods` inside the real Epic Paks without an explicit yes at verification time.
+* **Frontend uses the existing maps.** Add `"epic"` to `libraryProviders` / labels / `providerLogos`. Remove the hardcoded disabled Epic control. `DetectLibraryDialog` must use `providerLogos[provider]` instead of a hardcoded Steam logo.
 
 ## Exit criteria
 
-* A Steam installation with an existing `~mods` is detected and the library scans from it.
-* A Steam installation without `~mods` produces the create-library dialog; confirming creates exactly that folder and nothing else; declining changes nothing.
-* No Steam installation reports clearly and offers no creation.
-* Detection never writes; confirm-to-create is the only write outside a configured mod root.
-* The provider setting persists across restarts and the toolbar control reflects the active store.
-* Provider tests use disposable fixtures with injectable registry and vdf paths, never a real install.
-* `check.ps1` passes; running-app states are screenshotted and reviewed.
+* An Epic installation with an existing `~mods` is detected and the library scans from it.
+* An Epic installation without `~mods` produces the create-library dialog with the Epic logo; confirming creates exactly that folder and nothing else; declining changes nothing.
+* No Epic installation reports clearly and offers no creation.
+* Detection never writes; confirm-to-create remains the only write outside a configured mod root.
+* Settings lists Epic as a selectable provider; the toolbar detect control shows the Epic logo when Epic is active.
+* Provider tests use disposable `.item` fixtures with an injectable manifests dir, never the real ProgramData or game install.
+* `check.ps1` passes; running-app Epic states are screenshotted and reviewed.
 
 ## Out of scope
 
-* Epic Games provider implementation (follow-up, gated on a real Epic installation)
-* BentoMod settings or game-path import (the SPEC section 14 importer remains separate)
-* Silent, automatic, or periodic re-detection; watching the game install for changes
+* Default window size and list-view scrollbar work (remaining-todos TODO 2)
+* Other stores, silent re-detection, BentoMod import
+* Writing into the real Epic `~mods` without a separate yes
 * Anything else in ROADMAP.md's deferred post-release list
 
-## 12.1 Backend: `internal/gamedetect`
+## 13.1 Backend: `EpicProvider`
 
-* Pure Go, independent of Wails and React, following the existing package-boundary pattern.
-* Minimal provider interface (name plus detect) and a small provider registry; no plugin machinery.
-* Steam provider:
-  * Steam root from the registry with ordinary default-path fallbacks, as BentoMod does.
-  * Parse `steamapps/libraryfolders.vdf` `"path"` entries, handling `\\` unescaping.
-  * A library counts when `<lib>\steamapps\common\MarvelRivals\MarvelGame\Marvel\Content\Paks` exists; first match wins in deterministic order.
-* Registry and vdf lookups go through injectable seams so tests fabricate installs under `t.TempDir` with fixture vdf files.
-* Typed three-state result; specific errors, not generic failures.
+* New `internal/gamedetect/epic.go`, independent of Wails and React, following `steam.go`.
+* Production manifests dir: `filepath.Join(os.Getenv("ProgramData"), "Epic", "EpicGamesLauncher", "Data", "Manifests")`.
+* Read `*.item` (case-insensitive), skip unreadable or invalid JSON, process in sorted filename order.
+* Paks relative path: `MarvelGame\Marvel\Content\Paks`.
+* Same three-state `Detection` as Steam. A Paks path that exists as a file is skipped.
+* Injectable `manifestsDir` so tests never touch the real launcher data.
 
-## 12.2 Backend: App bindings and settings
+**Verify:** `go test ./internal/gamedetect/ -count=1` covers the cases in 13.2.
 
-* `DetectLibrary(provider)` returning the three-state result; `CreateLibrary(provider)` re-detecting server-side and creating `~mods` only when the install is verified and the folder is missing.
-* `Settings.LibraryProvider` in the versioned metadata store, empty-means-Steam, additive-field persistence like `LastSeenVersion`.
-* Unit tests for provider dispatch, all three detection outcomes, create/refuse paths (unverified install, folder already present), and setting round-trip.
+## 13.2 Backend: register and tests
 
-## 12.3 Frontend: detect control, settings selector, dialogs
+* Add `ProviderEpic = "epic"` to `providerNames` and `NewDefaultRegistry`.
+* Flip `TestValidProvider`: `"epic"` is now valid.
+* `TestSetLibraryProviderRejectsAnUnknownProvider` currently uses `"epic"` as the unknown. Change it to `"egs"` (same sentinel `app_test.go` already uses). Accept `"epic"` as a registered provider.
+* New fixture tests: library found; install found without `~mods`; not found (empty manifests, wrong game, incomplete, DLC); Paks-as-file; first matching `.item` in sorted filename order; DisplayName match when namespace differs; malformed JSON skipped so a later valid `.item` still counts.
 
-* Library toolbar: detect button beside the mod-root field, labeled around "Automatically detect mods in Steam installation", showing the active store's logo; busy state matches existing conventions.
-* Settings dialog: provider selector section; Epic visible but unavailable until implemented.
-* Dialog flow per detection state: apply or switch confirmation when a root is already configured, the create-library offer when `~mods` is missing, a clear not-found message otherwise. Applying triggers the existing scan flow.
-* Empty mod-root state makes detection the primary affordance; the pasted-path field remains as fallback.
+**Verify:** `go test ./internal/gamedetect/ ./internal/metadata/ -count=1`
 
-## 12.4 Assets and notices
+## 13.3 Frontend: enable Epic in the selector and dialogs
 
-* Steam and Epic SVG logo assets that hold up in light and dark themes.
-* NOTICE.md trademark line for the Valve and Epic marks.
+* `libraryTypes.ts`: add `"epic"` to `libraryProviders` and `libraryProviderLabels`.
+* `StoreLogos.tsx`: `providerLogos.epic = EpicGamesLogo`.
+* `SettingsDialog.tsx`: delete the hardcoded disabled Epic button and the "coming soon" hint.
+* `DetectLibraryDialog.tsx`: render `providerLogos[provider]`, not a hardcoded `SteamLogo`.
+* Toolbar copy in `LibraryScreen.tsx` is already provider-aware; leave it.
 
-## 12.5 Validate and review
+**Verify:** `bun run check` from `frontend/`. Settings shows Epic as selectable. An Epic detect dialog shows the Epic logo.
+
+## 13.4 Docs
+
+* `docs/USER_GUIDE.md`: Epic is selectable, not "coming".
+* `docs/TROUBLESHOOTING.md`: Epic looks at launcher manifests, not Steam libraries. Paste `Paks\~mods` if the launcher has no record.
+
+**Verify:** The two docs name both Steam and Epic, and the paste-path fallback is still documented.
+
+## 13.5 Validate and review
 
 * Run `check.ps1` and the full Go and frontend test suites.
-* Drive the running app: scan behavior against `C:\ModsFixtures`, detection against the real Steam install (read-only), and the create-library dialog. Explicit approval is required at the time before any `~mods` is created inside the real install.
-* Screenshot the toolbar detect control, each dialog state, and the Settings selector; save under `docs/screenshots/phase-12/`.
-* Update `docs/USER_GUIDE.md` and `docs/TROUBLESHOOTING.md` for detection and the create-library prompt.
-* Create `docs/reviews/phase-12-review.md`.
+* Drive the running app with Settings on Epic, detect against the real Epic install (read-only). Expect `installFound` and the create-library dialog. Explicit approval is required at the time before any `~mods` is created inside the real Epic Paks.
+* Screenshot the Settings selector with Epic selected, the toolbar detect control showing the Epic logo, and the Epic create-library dialog; save under `docs/screenshots/phase-13/`.
+* Create `docs/reviews/phase-13-review.md`.
 
-**Verify:** Review approval closes the phase; the Epic Games provider follow-up is then scoped against the installed Epic copy.
+**Verify:** Review approval closes the phase.
 
 ## Follow-up (not this phase)
 
-* Epic Games provider: verify the install layout under a real Epic `InstallLocation`, implement the second provider behind the existing seam, enable the selector option, and test against the live Epic installation.
+* remaining-todos TODO 2: default window size and list-view scrollbar at 1080p / 100% scale

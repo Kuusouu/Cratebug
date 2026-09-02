@@ -307,7 +307,7 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Library toolbar detect control showing the active store's logo, and a provider selector in Settings
 - Store-logo assets and trademark notice
 
-**Excludes:** Epic Games provider implementation (gated on a real Epic installation for path verification and live testing), any other deferred roadmap item.
+**Excludes:** Epic Games provider implementation (Phase 13), any other deferred roadmap item.
 
 **Exit criteria:**
 
@@ -316,6 +316,27 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - The provider setting persists and the toolbar control reflects the active store.
 - The provider seam lets the Epic provider land without changing call sites.
 - Canonical checks pass; running-app states are screenshotted and reviewed.
+
+## Phase 13 - Epic Games library detection
+
+**Outcome:** Cratebug detects a Marvel Rivals mod library from the Epic Games launcher through the Phase 12 provider seam, verified against a real Epic installation.
+
+**Includes:**
+
+- `EpicProvider` in `internal/gamedetect`, reading `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests\*.item`
+- Match Marvel Rivals by verified `CatalogNamespace` or `DisplayName`, skip incomplete installs and DLC, validate `{InstallLocation}\MarvelGame\Marvel\Content\Paks`
+- Register `epic` in the provider registry; enable the Settings selector and detect-dialog logo
+- Disposable `.item` fixture tests; live read-only detect against the maintainer's Epic install
+
+**Excludes:** Other stores, silent re-detection, BentoMod import, and creating `~mods` in the real Epic Paks without an explicit yes at verification time.
+
+**Exit criteria:**
+
+- An Epic install with `~mods` is detected and scanned; without `~mods`, the create-library dialog appears with the Epic logo.
+- No Epic install reports clearly and offers no creation.
+- Detection never writes; confirm-to-create remains the only write outside a configured mod root.
+- Tests use injectable manifests under `t.TempDir`, never ProgramData or the real game.
+- Canonical checks pass; running-app Epic states are screenshotted and reviewed.
 
 ## Deferred post-release work
 
