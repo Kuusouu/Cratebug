@@ -16,7 +16,13 @@ Cratebug installs to `%LOCALAPPDATA%\Programs\Cratebug` for your user account on
 
 ## Auto-detect can't find the game
 
-**Detect Steam library** searches your Steam installation and every Steam library folder for Marvel Rivals. If it reports it couldn't find one: make sure the game is installed through Steam, then try again. If Steam is installed somewhere unusual, detection may still miss it — paste the mod folder path (the game's `Paks\~mods` folder) into the **Mod library folder** box and scan; that always works.
+The **Detect library** button searches the store selected in Settings > **Mod library detection**.
+
+Steam: searches your Steam installation and every Steam library folder for Marvel Rivals.
+
+Epic Games: reads the Epic Games launcher's install records (`%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests`) and looks for Marvel Rivals. The game's folder name often has a random suffix; Cratebug uses the path the launcher recorded, not a hardcoded folder name.
+
+If it still reports it couldn't find one: make sure the game is installed through that store, then try again. You can always paste the mod folder path (the game's `Paks\~mods` folder) into the **Mod library folder** box and scan; that always works.
 
 ## Check for updates says I'm up to date
 

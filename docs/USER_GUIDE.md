@@ -14,11 +14,12 @@ Cratebug isn't code-signed yet, so Windows SmartScreen may show an "unrecognized
 
 On first launch, Cratebug can find your Marvel Rivals mod library for you — no path hunting required.
 
-1. Click **Detect Steam library** in the toolbar at the top (or the same button in the middle of the screen).
-2. If your game is installed through Steam, Cratebug finds it and points your library at its `~mods` folder.
-3. If the game is there but the `~mods` folder doesn't exist yet, Cratebug asks first: **Create library** makes exactly that one empty folder, nothing else.
+1. Open **Settings** (gear icon) and pick **Steam** or **Epic Games** under **Mod library detection**. Steam is the default.
+2. Click **Detect Steam library** or **Detect Epic Games library** in the toolbar at the top (or the same button in the middle of the screen when no library is set).
+3. If the game is installed through that store, Cratebug finds it and points your library at its `~mods` folder.
+4. If the game is there but the `~mods` folder doesn't exist yet, Cratebug asks first: **Create library** makes exactly that one empty folder, nothing else.
 
-The store Cratebug searches is the **Mod library detection** setting (gear icon > Settings). Steam is the default; Epic Games support is coming. You can always paste a folder path into the **Mod library folder** box instead — both paths end at the same scan.
+You can always paste a folder path into the **Mod library folder** box instead — both paths end at the same scan.
 
 ## Updating
 

@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 )
 
-// ProviderSteam names the Steam provider, the default and currently only
-// detection provider.
+// ProviderSteam names the Steam provider, the default detection provider.
 const ProviderSteam = "steam"
+
+// ProviderEpic names the Epic Games launcher provider.
+const ProviderEpic = "epic"
 
 // LibraryDirName is the mod-library folder name inside a Marvel Rivals
 // installation's Paks directory, an Unreal Engine modding convention.
@@ -56,6 +58,7 @@ type Provider interface {
 // new provider is added here and to NewDefaultRegistry together.
 var providerNames = map[string]bool{
 	ProviderSteam: true,
+	ProviderEpic:  true,
 }
 
 // ValidProvider reports whether name names a provider this build can detect
@@ -66,7 +69,7 @@ func ValidProvider(name string) bool {
 
 // Creates the registry production detects through.
 func NewDefaultRegistry() *Registry {
-	return NewRegistry(NewSteamProvider())
+	return NewRegistry(NewSteamProvider(), NewEpicProvider())
 }
 
 // Registry dispatches detection and confirmed library creation to the

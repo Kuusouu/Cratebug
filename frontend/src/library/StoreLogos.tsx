@@ -41,4 +41,5 @@ export function EpicGamesLogo({ className }: StoreLogoProps) {
 // store's logo without knowing which stores exist.
 export const providerLogos: Record<LibraryProvider, typeof SteamLogo> = {
 	steam: SteamLogo,
+	epic: EpicGamesLogo,
 };

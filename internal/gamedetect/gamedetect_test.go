@@ -1,6 +1,7 @@
 package gamedetect
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -279,7 +280,7 @@ func TestRegistryDetectRejectsAnUnknownProvider(t *testing.T) {
 	registry := NewRegistry(stubProvider{name: ProviderSteam})
 
 	// Act
-	_, err := registry.Detect("epic")
+	_, err := registry.Detect("egs")
 
 	// Assert
 	if err == nil {
@@ -386,10 +387,297 @@ func TestValidProvider(t *testing.T) {
 	if !ValidProvider(ProviderSteam) {
 		t.Errorf("ValidProvider(%q) = false, want true", ProviderSteam)
 	}
-	if ValidProvider("epic") {
-		t.Error("ValidProvider(\"epic\") = true, want false while only Steam ships")
+	if !ValidProvider(ProviderEpic) {
+		t.Errorf("ValidProvider(%q) = false, want true", ProviderEpic)
+	}
+	if ValidProvider("egs") {
+		t.Error("ValidProvider(\"egs\") = true, want false")
 	}
 	if ValidProvider("") {
 		t.Error("ValidProvider(\"\") = true, want false")
+	}
+}
+
+func writeEpicItem(t *testing.T, manifestsDir, filename string, item epicItem) {
+	t.Helper()
+	if err := os.MkdirAll(manifestsDir, fixtureDirPerm); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := json.Marshal(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(manifestsDir, filename), payload, fixtureFilePerm); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeEpicMarvelInstall(t *testing.T, installRoot string, withLibrary bool) string {
+	t.Helper()
+	paksPath := filepath.Join(installRoot, "MarvelGame", "Marvel", "Content", "Paks")
+	if err := os.MkdirAll(paksPath, fixtureDirPerm); err != nil {
+		t.Fatal(err)
+	}
+	if withLibrary {
+		if err := os.Mkdir(filepath.Join(paksPath, LibraryDirName), fixtureDirPerm); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return paksPath
+}
+
+func matchingEpicItem(installLocation string) epicItem {
+	return epicItem{
+		DisplayName:      epicMarvelDisplayName,
+		InstallLocation:  installLocation,
+		CatalogNamespace: epicMarvelCatalogNamespace,
+	}
+}
+
+func TestEpicProviderName(t *testing.T) {
+	// Arrange / Act / Assert
+	if name := (EpicProvider{}).Name(); name != ProviderEpic {
+		t.Errorf("Name() = %q, want %q", name, ProviderEpic)
+	}
+}
+
+func TestEpicProviderDetectFindsAnExistingLibrary(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	paksPath := writeEpicMarvelInstall(t, installRoot, true)
+	writeEpicItem(t, manifestsDir, "marvel.item", matchingEpicItem(installRoot))
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateLibraryFound {
+		t.Fatalf("State = %q, want %q", detection.State, StateLibraryFound)
+	}
+	if detection.PaksPath != paksPath {
+		t.Errorf("PaksPath = %q, want %q", detection.PaksPath, paksPath)
+	}
+	if want := filepath.Join(paksPath, LibraryDirName); detection.LibraryPath != want {
+		t.Errorf("LibraryPath = %q, want %q", detection.LibraryPath, want)
+	}
+}
+
+func TestEpicProviderDetectReportsAnInstallWithoutALibrary(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	paksPath := writeEpicMarvelInstall(t, installRoot, false)
+	writeEpicItem(t, manifestsDir, "marvel.item", matchingEpicItem(installRoot))
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateInstallFound {
+		t.Fatalf("State = %q, want %q", detection.State, StateInstallFound)
+	}
+	if detection.PaksPath != paksPath {
+		t.Errorf("PaksPath = %q, want %q", detection.PaksPath, paksPath)
+	}
+	if detection.LibraryPath != "" {
+		t.Errorf("LibraryPath = %q, want empty while the library is missing", detection.LibraryPath)
+	}
+}
+
+func TestEpicProviderDetectReportsNotFoundWithoutManifests(t *testing.T) {
+	// Arrange
+	provider := EpicProvider{manifestsDir: filepath.Join(t.TempDir(), "missing")}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateNotFound {
+		t.Fatalf("State = %q, want %q", detection.State, StateNotFound)
+	}
+	if detection.PaksPath != "" || detection.LibraryPath != "" {
+		t.Errorf("Detection = %+v, want empty paths for a not-found result", detection)
+	}
+}
+
+func TestEpicProviderDetectReportsNotFoundForAWrongGame(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	writeEpicMarvelInstall(t, installRoot, true)
+	writeEpicItem(t, manifestsDir, "other.item", epicItem{
+		DisplayName:      "Fortnite",
+		InstallLocation:  installRoot,
+		CatalogNamespace: "not-marvel-rivals",
+	})
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateNotFound {
+		t.Fatalf("State = %q, want %q", detection.State, StateNotFound)
+	}
+}
+
+func TestEpicProviderDetectSkipsAnIncompleteInstall(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	writeEpicMarvelInstall(t, installRoot, true)
+	item := matchingEpicItem(installRoot)
+	item.IncompleteInstall = true
+	writeEpicItem(t, manifestsDir, "marvel.item", item)
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateNotFound {
+		t.Fatalf("State = %q, want %q for an incomplete install", detection.State, StateNotFound)
+	}
+}
+
+func TestEpicProviderDetectSkipsDLC(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	writeEpicMarvelInstall(t, installRoot, true)
+	item := matchingEpicItem(installRoot)
+	item.MainGameAppName = "parent-game"
+	writeEpicItem(t, manifestsDir, "dlc.item", item)
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateNotFound {
+		t.Fatalf("State = %q, want %q for a DLC item", detection.State, StateNotFound)
+	}
+}
+
+func TestEpicProviderDetectIgnoresAFileShapedLikeThePaksDirectory(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	paksPath := filepath.Join(installRoot, "MarvelGame", "Marvel", "Content", "Paks")
+	if err := os.MkdirAll(filepath.Dir(paksPath), fixtureDirPerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(paksPath, []byte("not a directory"), fixtureFilePerm); err != nil {
+		t.Fatal(err)
+	}
+	writeEpicItem(t, manifestsDir, "marvel.item", matchingEpicItem(installRoot))
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateNotFound {
+		t.Fatalf("State = %q, want %q for a file pretending to be the Paks directory", detection.State, StateNotFound)
+	}
+}
+
+func TestEpicProviderDetectPrefersTheFirstItemInSortedFilenameOrder(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	firstInstall := t.TempDir()
+	secondInstall := t.TempDir()
+	firstPaks := writeEpicMarvelInstall(t, firstInstall, true)
+	writeEpicMarvelInstall(t, secondInstall, true)
+	writeEpicItem(t, manifestsDir, "a.item", matchingEpicItem(firstInstall))
+	writeEpicItem(t, manifestsDir, "z.item", matchingEpicItem(secondInstall))
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.PaksPath != firstPaks {
+		t.Errorf("PaksPath = %q, want the first item's %q", detection.PaksPath, firstPaks)
+	}
+}
+
+func TestEpicProviderDetectMatchesDisplayNameWhenNamespaceDiffers(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	paksPath := writeEpicMarvelInstall(t, installRoot, false)
+	writeEpicItem(t, manifestsDir, "marvel.item", epicItem{
+		DisplayName:      epicMarvelDisplayName,
+		InstallLocation:  installRoot,
+		CatalogNamespace: "a-different-namespace",
+	})
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateInstallFound {
+		t.Fatalf("State = %q, want %q", detection.State, StateInstallFound)
+	}
+	if detection.PaksPath != paksPath {
+		t.Errorf("PaksPath = %q, want %q", detection.PaksPath, paksPath)
+	}
+}
+
+func TestEpicProviderDetectSkipsMalformedJSONAndContinues(t *testing.T) {
+	// Arrange
+	manifestsDir := t.TempDir()
+	installRoot := t.TempDir()
+	paksPath := writeEpicMarvelInstall(t, installRoot, true)
+	if err := os.WriteFile(filepath.Join(manifestsDir, "a.item"), []byte("{"), fixtureFilePerm); err != nil {
+		t.Fatal(err)
+	}
+	writeEpicItem(t, manifestsDir, "z.item", matchingEpicItem(installRoot))
+	provider := EpicProvider{manifestsDir: manifestsDir}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateLibraryFound {
+		t.Fatalf("State = %q, want %q after skipping malformed JSON", detection.State, StateLibraryFound)
+	}
+	if detection.PaksPath != paksPath {
+		t.Errorf("PaksPath = %q, want %q", detection.PaksPath, paksPath)
 	}
 }

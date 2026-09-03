@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { gamedetect } from "../../wailsjs/go/models";
 import { type LibraryProvider, libraryProviderLabels } from "./libraryTypes";
-import { SteamLogo } from "./StoreLogos";
+import { providerLogos } from "./StoreLogos";
 import { focusableSelector, useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type DetectLibraryDialogProps = {
@@ -28,6 +28,7 @@ export function DetectLibraryDialog({
 	onClose,
 }: DetectLibraryDialogProps) {
 	const label = libraryProviderLabels[provider];
+	const Logo = providerLogos[provider];
 	const handleEscape = useCallback(() => {
 		// The Go side is mid-creation; closing now would hide the outcome
 		// without stopping it, the same reason Escape stays closed during an
@@ -74,7 +75,7 @@ export function DetectLibraryDialog({
 			>
 				<div>
 					<p className="eyebrow">
-						<SteamLogo className="detect-dialog-logo" /> {label}
+						<Logo className="detect-dialog-logo" /> {label}
 					</p>
 					{mode === "apply" ? (
 						<>

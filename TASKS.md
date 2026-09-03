@@ -1,10 +1,10 @@
 # Cratebug Active Tasks
 
 **Phase:** 13 - Epic Games library detection
-**Status:** Active
+**Status:** Complete. Review approved 2026-09-02; see `docs/reviews/phase-13-review.md`.
 **Branch:** `feat/epic-gamedetect`
 
-This file contains only the active phase. Replace it when Phase 13 is complete.
+This file contains only the active phase. Replace it when starting the next phase.
 
 ## Phase objective
 
@@ -92,7 +92,7 @@ Steam's extra `steamapps\common\MarvelRivals\` prefix is not present under Epic.
 * Screenshot the Settings selector with Epic selected, the toolbar detect control showing the Epic logo, and the Epic create-library dialog; save under `docs/screenshots/phase-13/`.
 * Create `docs/reviews/phase-13-review.md`.
 
-**Verify:** Review approval closes the phase.
+**Verify:** Review approved 2026-09-02. Phase 13 is complete.
 
 ## Follow-up (not this phase)
 

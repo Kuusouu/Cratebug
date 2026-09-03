@@ -9,7 +9,7 @@ import {
 	themeLabels,
 	themes,
 } from "./libraryTypes";
-import { EpicGamesLogo, providerLogos } from "./StoreLogos";
+import { providerLogos } from "./StoreLogos";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type SettingsDialogProps = {
@@ -190,19 +190,9 @@ export function SettingsDialog({
 								</button>
 							);
 						})}
-						<button
-							type="button"
-							className="provider-option"
-							disabled
-							title="Epic Games support is coming in a future update"
-						>
-							<EpicGamesLogo className="provider-option-logo" />
-							Epic Games
-						</button>
 					</div>
 					<p className="setting-section-hint">
 						Which store's Marvel Rivals installation the library auto-detect searches.
-						Epic Games support is coming soon.
 					</p>
 				</div>
 				<div className="setting-section">

@@ -319,6 +319,8 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 13 - Epic Games library detection
 
+**Status:** Complete. Review approved 2026-09-02; see `docs/reviews/phase-13-review.md`.
+
 **Outcome:** Cratebug detects a Marvel Rivals mod library from the Epic Games launcher through the Phase 12 provider seam, verified against a real Epic installation.
 
 **Includes:**

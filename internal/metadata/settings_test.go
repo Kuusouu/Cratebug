@@ -171,7 +171,7 @@ func TestSetLibraryProviderRejectsAnUnknownProvider(t *testing.T) {
 	var doc Document
 
 	// Act
-	err := doc.SetLibraryProvider("epic")
+	err := doc.SetLibraryProvider("egs")
 
 	// Assert
 	if err == nil {
@@ -192,6 +192,22 @@ func TestSetLibraryProviderAcceptsARegisteredProvider(t *testing.T) {
 	}
 	if doc.Settings.LibraryProvider != "steam" {
 		t.Errorf("Settings.LibraryProvider = %q, want %q", doc.Settings.LibraryProvider, "steam")
+	}
+}
+
+func TestSetLibraryProviderAcceptsTheEpicProvider(t *testing.T) {
+	// Arrange
+	var doc Document
+
+	// Act
+	err := doc.SetLibraryProvider("epic")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetLibraryProvider() = %v, want no error", err)
+	}
+	if doc.Settings.LibraryProvider != "epic" {
+		t.Errorf("Settings.LibraryProvider = %q, want %q", doc.Settings.LibraryProvider, "epic")
 	}
 }
 
