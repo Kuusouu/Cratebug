@@ -17,10 +17,11 @@ Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It trea
 
 ## Features
 
+- **Library auto-detect** - find your Marvel Rivals mod folder from Steam or Epic Games, or paste the path yourself
 - **Whole-library view** - classic and IoStore mods side by side, with hero, skin, category, and portrait detected automatically
 - **Safe enable and disable** - flip mods on and off without breaking their sidecar files
 - **Organization** - rename, set priority, sort into folders, and tag mods; tags and settings survive renames and moves
-- **Recoverable deletion** - mods go to the Recycle Bin, never straight to the void
+- **Recoverable deletion** - mods and folders go to the Recycle Bin, never straight to the void
 - **Archive installs with a preview** - drop in a `.zip`, `.7z`, `.rar`, or bare `.pak` and review exactly what will be installed first
 - **Install from a URL** - paste a direct download link, get the same preview flow
 - **Conflict detection** - find mods stepping on the same assets, with a one-click priority fix
@@ -33,6 +34,10 @@ Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It trea
 3. Launch it from the Start Menu or the desktop shortcut.
 
 Cratebug is not code-signed yet, so Windows SmartScreen may warn on first run. See [troubleshooting](docs/TROUBLESHOOTING.md).
+
+## Finding your library
+
+On first launch, open **Settings**, pick **Steam** or **Epic Games** under **Mod library detection**, and click the detect button in the toolbar. If the game is installed but the mod folder is not there yet, Cratebug asks before creating it. You can always paste a folder path instead. Details in the [user guide](docs/USER_GUIDE.md).
 
 ## Updating
 
@@ -67,7 +72,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for getting st
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md) - installing, updating, and URL installs in detail
+- [User guide](docs/USER_GUIDE.md) - installing, finding your library, updating, and URL installs in detail
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - SmartScreen, WebView2, uninstalling, and other common problems
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md) - what is done and what is next
