@@ -881,6 +881,11 @@ button:disabled {
 
 .mod-grid {
 	display: grid;
+	/* Flex child of .catalog-panel: fill leftover height so overflow-y: auto
+	   is bounded by the panel instead of sizing to the rows. Short lists then
+	   have no scrollbar. */
+	flex: 1;
+	min-height: 0;
 	/* auto-fill/1fr columns already reflow to fit any width, so this never
 	   needs to scroll horizontally -- overflow-x: hidden clips the sub-pixel
 	   overflow that otherwise surfaces as a stray horizontal scrollbar at
@@ -891,7 +896,6 @@ button:disabled {
 	overflow-y: auto;
 	/* Keep cards clear of the scrollbar across Windows scaling settings. */
 	padding-right: 1rem;
-	scrollbar-gutter: stable;
 	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
 	/* max-content, not the auto default: a card's own nested grid (tags row
 	   included) otherwise doesn't reliably contribute its true content

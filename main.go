@@ -24,12 +24,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	window := defaultWindowSize()
 	err = wails.Run(&options.App{
 		Title:     "Cratebug",
-		Width:     1400,
-		Height:    950,
-		MinWidth:  1000,
-		MinHeight: 650,
+		Width:     window.width,
+		Height:    window.height,
+		MinWidth:  window.minWidth,
+		MinHeight: window.minHeight,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
