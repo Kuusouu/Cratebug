@@ -13,6 +13,17 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.09.03]
+
+### Finding your crates
+
+- Epic Games is in! Pick it in Settings and Cratebug will hunt down your Marvel Rivals install from the Epic launcher, same as it already does for Steam. If the mod folder isn't there yet, it asks before creating it.
+
+### Settling in
+
+- The window now opens at a size that actually fits your screen, so a 1080p laptop at 125% scaling no longer has to be maximized just to see the whole crate.
+- List view dropped the leftover scrollbar gutter. A short list stays clean instead of parking an empty bar down the side.
+
 ## [2026.08.30]
 
 ### Making it yours
