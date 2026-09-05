@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 // Records the last call it received and answers with either a canned error
@@ -227,6 +226,135 @@ func TestListIoStoreFilesRejectsEntryWithEmptyPath(t *testing.T) {
 	}
 }
 
+func TestListPakWithKeyIncludesAesKeyWhenSet(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"files":[]}`)}
+
+	// Act
+	if _, err := ListPakWithKey(fake, "mod.pak", MarvelRivalsAESKey); err != nil {
+		t.Fatalf("ListPakWithKey() error = %v, want nil", err)
+	}
+
+	// Assert
+	if fake.params["aes_key"] != MarvelRivalsAESKey {
+		t.Errorf("params[aes_key] = %v, want MarvelRivalsAESKey", fake.params["aes_key"])
+	}
+}
+
+func TestExtractIoStoreRejectsEmptyPaths(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{}
+
+	// Act
+	_, err := ExtractIoStore(fake, "", "out", "")
+
+	// Assert
+	if err == nil {
+		t.Fatal("ExtractIoStore() error = nil, want an error for an empty utoc path")
+	}
+	if fake.action != "" {
+		t.Errorf("ExtractIoStore() called the worker, want no call")
+	}
+}
+
+func TestExtractIoStoreDecodesCount(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"count":3}`)}
+
+	// Act
+	count, err := ExtractIoStore(fake, "mod.utoc", "out", MarvelRivalsAESKey)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ExtractIoStore() error = %v, want nil", err)
+	}
+	if count != 3 {
+		t.Errorf("count = %d, want 3", count)
+	}
+	if fake.action != "extract_iostore" {
+		t.Errorf("action = %q, want extract_iostore", fake.action)
+	}
+	if fake.params["aes_key"] != MarvelRivalsAESKey {
+		t.Errorf("params[aes_key] = %v, want MarvelRivalsAESKey", fake.params["aes_key"])
+	}
+}
+
+func TestExtractPakAllDecodesCount(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"extracted_count":2}`)}
+
+	// Act
+	count, err := ExtractPakAll(fake, "mod.pak", "out", "")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ExtractPakAll() error = %v, want nil", err)
+	}
+	if count != 2 {
+		t.Errorf("count = %d, want 2", count)
+	}
+	if fake.action != "extract_pak_all" {
+		t.Errorf("action = %q, want extract_pak_all", fake.action)
+	}
+}
+
+func TestCreateModIoStoreSendsObfuscate(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"utoc_path":"out.utoc","ucas_path":"out.ucas","pak_path":"out.pak","converted_count":1,"file_count":2}`)}
+
+	// Act
+	result, err := CreateModIoStore(fake, "out", "in", IoStoreCreateOptions{Obfuscate: true, Hybrid: true})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("CreateModIoStore() error = %v, want nil", err)
+	}
+	if fake.action != "create_mod_iostore" {
+		t.Errorf("action = %q, want create_mod_iostore", fake.action)
+	}
+	if fake.params["obfuscate"] != true {
+		t.Errorf("params[obfuscate] = %v, want true", fake.params["obfuscate"])
+	}
+	if fake.params["hybrid"] != true {
+		t.Errorf("params[hybrid] = %v, want true", fake.params["hybrid"])
+	}
+	if result.UTOCPath != "out.utoc" || result.FileCount != 2 {
+		t.Errorf("result = %+v, want utoc out.utoc and file_count 2", result)
+	}
+}
+
+func TestCreateModIoStoreSendsInputPak(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"utoc_path":"out.utoc","ucas_path":"out.ucas","pak_path":"out.pak","converted_count":0,"file_count":1}`)}
+
+	// Act
+	_, err := CreateModIoStore(fake, "out", "", IoStoreCreateOptions{Hybrid: true, InputPak: "in.pak", Obfuscate: true})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("CreateModIoStore() error = %v, want nil", err)
+	}
+	if fake.params["input_pak"] != "in.pak" {
+		t.Errorf("params[input_pak] = %v, want in.pak", fake.params["input_pak"])
+	}
+	if _, ok := fake.params["input_dir"]; ok {
+		t.Errorf("params[input_dir] = %v, want omitted", fake.params["input_dir"])
+	}
+}
+
+func TestCompanionPakHasRawFilesIgnoresMetadata(t *testing.T) {
+	// Arrange
+	entries := []PakEntry{{Path: "chunknames"}, {Path: "patched_files"}}
+
+	// Act / Assert
+	if CompanionPakHasRawFiles(entries) {
+		t.Fatal("CompanionPakHasRawFiles() = true, want false for metadata-only listings")
+	}
+	if !CompanionPakHasRawFiles([]PakEntry{{Path: "Audio/sound.bnk"}}) {
+		t.Fatal("CompanionPakHasRawFiles() = false, want true for a raw file")
+	}
+}
+
 func TestListIoStoreFilesPropagatesCallError(t *testing.T) {
 	// Arrange
 	fake := &fakeCaller{err: &ToolError{Action: "list_iostore_files", Message: "UTOC file not found: mod.utoc"}}
@@ -318,7 +446,7 @@ func TestOperationsAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 	worker, err := NewWorker(WorkerConfig{
 		ExecutablePath:         executablePath,
 		ExpectedSourceRevision: pinnedWorkerSourceRevision,
-		CallTimeout:            30 * time.Second,
+		CallTimeout:            DefaultWriteCallTimeout,
 	})
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
@@ -360,6 +488,81 @@ func TestOperationsAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 		if encrypted {
 			t.Errorf("IsIoStoreEncrypted() = true, want false: fixture was built without obfuscation")
 		}
+	})
+
+	t.Run("iostore obfuscate round trip", func(t *testing.T) {
+		// Arrange
+		inputDir := filepath.Join(dir, "obfuscate-input")
+		if err := os.MkdirAll(inputDir, 0o700); err != nil {
+			t.Fatalf("create obfuscate input dir: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(inputDir, "readme.txt"), []byte("obfuscate fixture"), 0o600); err != nil {
+			t.Fatalf("write obfuscate fixture content: %v", err)
+		}
+		plainBase := filepath.Join(dir, "plain")
+		if _, err := CreateModIoStore(worker, plainBase, inputDir, IoStoreCreateOptions{Hybrid: true}); err != nil {
+			t.Fatalf("CreateModIoStore() plain: %v", err)
+		}
+		plainUTOC := plainBase + ".utoc"
+		if encrypted, err := IsIoStoreEncrypted(worker, plainUTOC); err != nil || encrypted {
+			t.Fatalf("plain IsIoStoreEncrypted() = %v, %v, want false", encrypted, err)
+		}
+
+		extractDir := filepath.Join(dir, "extracted")
+		if err := os.MkdirAll(extractDir, 0o700); err != nil {
+			t.Fatalf("create extract dir: %v", err)
+		}
+		if _, err := ExtractIoStore(worker, plainUTOC, extractDir, ""); err != nil {
+			t.Fatalf("ExtractIoStore() plain: %v", err)
+		}
+		// Hybrid-only fixtures keep loose files in the companion PAK at
+		// leading-slash paths. extract_pak_all drops those on Windows
+		// (extracted_count=0). input_pak is the worker's extract that trims
+		// slashes, so this is still extract → create.
+		encryptedBase := filepath.Join(dir, "encrypted")
+		if _, err := CreateModIoStore(worker, encryptedBase, "", IoStoreCreateOptions{
+			Obfuscate: true,
+			Hybrid:    true,
+			InputPak:  plainBase + ".pak",
+		}); err != nil {
+			t.Fatalf("CreateModIoStore() obfuscate: %v (pinned worker may lack obfuscate; re-pin per 0004)", err)
+		}
+		encryptedUTOC := encryptedBase + ".utoc"
+		encryptedFlag, err := IsIoStoreEncrypted(worker, encryptedUTOC)
+		if err != nil {
+			t.Fatalf("IsIoStoreEncrypted() encrypted: %v", err)
+		}
+		if !encryptedFlag {
+			t.Fatal("IsIoStoreEncrypted() = false after obfuscate, want true")
+		}
+
+		// Act
+		decryptDir := filepath.Join(dir, "decrypted-extract")
+		if err := os.MkdirAll(decryptDir, 0o700); err != nil {
+			t.Fatalf("create decrypt extract dir: %v", err)
+		}
+		if _, err := ExtractIoStore(worker, encryptedUTOC, decryptDir, MarvelRivalsAESKey); err != nil {
+			t.Fatalf("ExtractIoStore() encrypted: %v", err)
+		}
+		decryptedBase := filepath.Join(dir, "decrypted")
+		if _, err := CreateModIoStore(worker, decryptedBase, "", IoStoreCreateOptions{
+			Hybrid:   true,
+			InputPak: encryptedBase + ".pak",
+			AESKey:   MarvelRivalsAESKey,
+		}); err != nil {
+			t.Fatalf("CreateModIoStore() decrypt: %v", err)
+		}
+
+		// Assert
+		decryptedFlag, err := IsIoStoreEncrypted(worker, decryptedBase+".utoc")
+		if err != nil {
+			t.Fatalf("IsIoStoreEncrypted() decrypted: %v", err)
+		}
+		if decryptedFlag {
+			t.Fatal("IsIoStoreEncrypted() = true after decrypt rebuild, want false")
+		}
+		// This fixture is hybrid-only (readme.txt, no meshes). extract→create
+		// did not need a .usmap. Real mesh mods may still need one.
 	})
 
 	t.Run("iostore file listing", func(t *testing.T) {

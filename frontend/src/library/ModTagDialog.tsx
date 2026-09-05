@@ -5,6 +5,7 @@ import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type ModTagDialogProps = {
 	entry: discovery.Entry;
+	batchCount?: number;
 	catalog: metadata.Tag[];
 	assignedTagIDs: ReadonlySet<string>;
 	onClose: () => void;
@@ -12,11 +13,15 @@ type ModTagDialogProps = {
 	onToggle: (tag: metadata.Tag, assign: boolean) => Promise<boolean>;
 };
 
-// Applies each tag toggle and the create-and-assign action immediately
-// rather than staging changes behind a Save button, since every checkbox is
-// already its own independent, atomic backend call.
+/**
+ * Applies each tag toggle and the create-and-assign action immediately
+ * rather than staging changes behind a Save button, since every checkbox is
+ * already its own independent, atomic backend call. batchCount > 1 applies
+ * the same toggle to every checked mod.
+ */
 export function ModTagDialog({
 	entry,
+	batchCount = 1,
 	catalog,
 	assignedTagIDs,
 	onClose,
@@ -77,7 +82,9 @@ export function ModTagDialog({
 				<div>
 					<p className="eyebrow">Mod action</p>
 					<h2 id="tag-dialog-title">Tags</h2>
-					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
+					<p className="mutation-dialog-subtitle">
+						{batchCount > 1 ? `${batchCount} mods` : entry.displayName}
+					</p>
 				</div>
 				{catalog.length > 0 ? (
 					<ul className={styles["tag-checklist"]}>

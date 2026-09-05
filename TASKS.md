@@ -1,97 +1,86 @@
 # Cratebug Active Tasks
 
-**Chore:** Frontend colocation
-**Status:** Active
-**Branch:** `chore/frontend-colocation`
+**Phase:** 14 - Batch actions and in-place encryption
+**Status:** Complete
+**Branch:** `feat/phase-14-batch-encryption`
 
-This file contains only the active work. It is chore work, not a roadmap phase. Do not edit `ROADMAP.md`.
+Review approved 2026-09-05. See `docs/reviews/phase-14-review.md`. Do not start the next phase.
 
 ## Objective
 
-Split the two frontend monoliths without changing behavior. `LibraryScreen.tsx` keeps screen state and wiring. Each exported UI component lives in its own file with a `*.module.css` when it has unique styles. `App.css` keeps only theme tokens and shared primitives.
+Users can check many mods and run the same action on the set from one Actions menu, including encrypting or decrypting complete IoStore bundles in place.
 
 ## Design decisions
 
-* **CSS Modules.** `Component.module.css`, not a second global `Component.css`.
-* **Global CSS stays for shared chrome.** Reset, fonts, `--*` tokens on `.app-shell`, and shared primitives (`.quiet-button`, `.icon-button`, `.destructive-button`, `.mutation-dialog*`, `.eyebrow`, `.visually-hidden`).
-* **`.app-shell` stays global** so theme tokens inherit everywhere.
-* **Scrollbar primitive.** Rules that today list several containers become one global class (`.scroll-y`) applied next to the module class. Do not leave hashed module classes in the old grouped scrollbar selector.
-* **One exported component per file.** Unexported helpers may stay in that file (`ConflictCharacterHeading` stays inside `ConflictDetailsDialog.tsx`).
-* **No extra splits.** No `useLibraryScreen` hook. No header/toolbar extract. No Tailwind, no CSS-in-JS, no visual redesign.
-* **Maintainer verifies the running app.** Agent does not use playwright-cli and does not take screenshots.
-
-## Exit criteria
-
-* `bun run check` from `frontend/` passes.
-* `App.css` no longer holds component-private selectors.
-* `LibraryScreen.tsx` no longer defines the dialog/panel components listed in C.2.
-* Maintainer confirms the UI looks the same.
+* **Two selections.** Viewing (`selectedEntryID`) is the details panel and the single-mod context menu. Checking (`checkedEntryIDs`) is the batch target. Click a card = view it and make it the only checked mod. Click it again = clear both. Ctrl+click toggles check without clearing the rest. Shift+click ranges over the current filtered list.
+* **Actions icon dropdown** in the catalog header, beside Tags. Visible chrome: `N selected`, Select all (visible mods), Clear. Menu: Enable, Disable, Move to..., Tags..., Encrypt/Decrypt, Delete....
+* **Context menu stays single-mod.** Rename / priority / move / tags / delete for the right-clicked row only.
+* **Card Enable switch stays.** Dropdown Enable/Disable is for the checked set.
+* **Encrypt is IoStore-only.** Complete `.pak` + `.utoc` + `.ucas`. Classic, incomplete, orphaned, or non-mod: ineligible.
+* **Uniform encrypt state required.** All encrypted → Decrypt. All unencrypted → Encrypt. Mixed → disabled with a mixed-state reason. Ineligible format uses a different reason.
+* **Lock on every card/row** when `Identity.encrypted` is true. Separate from the category pill.
+* **Batch organize loops existing APIs.** `SetModEnabled`, `MoveMod`, `AssignModTag` / `UnassignModTag`, `DeleteMod`. Skip already-in-state. One summary toast.
+* **Encrypt/decrypt is a new mutation.** Rebuild in temp (`extract_iostore` + `create_mod_iostore` with `obfuscate`), replace, rollback that bundle on failure, `BlockedWhileGameRunning`. Sequential. Install-style progress. Write-op timeout above 30s.
+* **AES key stays in Go.** Marvel Rivals game key, hardcoded. Frontend receives only `encrypted: boolean`.
+* **SelectedModPanel** is a viewed-mod readout only. No Enable, Delete, or Clear on that strip.
 
 ## Out of scope
 
-* `ROADMAP.md`
-* remaining-todos TODO 2: default window size and list-view scrollbar at 1080p / 100% scale
-* Review markdown, screenshot docs
-* Extracting screen state, header/toolbar shells, Tailwind, CSS-in-JS, visual redesign
+* Install-time obfuscation
+* Classic-PAK encryption
+* Converting classic mods to IoStore
+* A persistent Bento-style bulk button row
+* New batch Wails methods for enable/move/tags/delete
+* Exposing the AES key to the frontend
+* VFX, recompress, BentoMod changes
+* `ROADMAP.md` later phases
 
-## C.1 Docs
+## 14.1 Docs
 
-Update `CODING_GUIDELINES.md` only. Short additions, not a new section wall.
+Write the ROADMAP Phase 14 entry, this TASKS file, SPEC additions (checked set, batch partial success, encryption as a library mutation, key stays in Go), `docs/decisions/0005-batch-actions-and-encryption.md`, and a short 0002 addendum that batch actions go in the Actions menu.
 
-Under **TypeScript and React**, add two bullets:
+Do not update USER_GUIDE or TROUBLESHOOTING here. That is 14.7.
 
-* One exported React component per file. Unexported helpers may stay in that file.
-* Colocate component styles as `Component.module.css` next to `Component.tsx`. Skip the module file when the component uses only shared primitives.
+**Verify:** ROADMAP names Phase 14 and no longer lists batch operations under Deferred. SPEC and 0005 state the key stays in Go. 0002 says batch lives in the Actions menu.
 
-Under **CSS**, add two bullets above the existing formatting rules:
+## 14.2 Worker write surface
 
-* `style.css` and `App.css` are global: reset, fonts, theme tokens, shared primitives.
-* Component-specific rules go in that component's `*.module.css`. Import as `styles` and apply with `className={styles["local-name"]}`. Combine with a global primitive when needed (`className={`mutation-dialog ${styles.dialog}`}`).
+Confirm the pinned `v1.5.6` `create_mod_iostore` accepts `obfuscate`. If it does not, re-pin per `docs/decisions/0004-pin-uassettool-worker.md` before any encrypt code.
 
-Keep the existing four CSS formatting bullets.
+Add typed `ExtractIoStore` and `CreateModIoStore` in `internal/uassettool/operations.go` only. Do not mirror the full request struct. Add `MarvelRivalsAESKey`. Add `aes_key` to `ListPak` when hybrid detection needs it. Add `ExtractPakAll` if hybrid rebuild needs companion-PAK files. Add `CallWithTimeout` so write calls can exceed the 30s default.
 
-**Verify:** The guidelines name CSS Modules and one exported component per file, and stay short.
+Prove extract → create with `obfuscate` true/false against a disposable hybrid fixture the worker itself built. Record whether extract→create needs a `.usmap`. If the pinned worker requires one for real meshes, stop and decide. Do not silently ship a broken encrypt.
 
-## C.2 Extract TSX only
+**Verify:** Unit tests cover the new typed ops. The supervised-worker test encrypts then decrypts a disposable fixture and `IsIoStoreEncrypted` matches. `go test ./internal/uassettool/ -count=1` passes.
 
-Move these already-propped functions out of `frontend/src/library/LibraryScreen.tsx` into sibling files. Do not change JSX structure or `className` strings yet.
+## 14.3 Encrypted as a fact
 
-* `MutationToast`
-* `SelectedModPanel`
-* `ModMutationDialog`
-* `FolderMutationDialog`
-* `DeleteConfirmDialog`
-* `FolderDeleteConfirmDialog`
-* `ModTagDialog`
-* `ConflictDetailsDialog` (keep its inner heading/card/row unexported)
+Add `Encrypted bool` to `Identity`. In `ListInternalPaths`, call `IsIoStoreEncrypted`, then `ListIoStoreFiles` with the game key when encrypted. Stop returning `ErrCannotDetermineType` for encryption. Update `determine_test.go` and any conflict test that treated encrypted as unavailable.
 
-Move helpers with their owners: `renameValidationError` / `hasWindowsReservedCharacter` with the mutation dialogs; `maximumPriorityFor` / `basename` with whoever calls them; `groupByCharacter` with `ConflictDetailsDialog`.
+Regenerate Wails bindings so the frontend can read `identity.encrypted`.
 
-Leave in `LibraryScreen.tsx`: all `useState` / Wails handlers, `indexLibrary`, `libraryStatusMessage`, `ViewModeButton` (small, unexported).
+**Verify:** Encrypted IoStore fixtures classify instead of returning `ErrCannotDetermineType`. `Identity.encrypted` is true. `go test ./internal/modtype/ ./internal/conflict/ -count=1` passes.
 
-**Verify:** `bun run check` from `frontend/`.
+## 14.4 Multi-select UI + lock
 
-## C.3 CSS Modules, one component at a time
+`checkedEntryIDs` in `LibraryScreen`. No always-visible checkbox. Click, Ctrl+click, and Shift+click on compact, large, and list. Shift/Ctrl helpers as a unit-tested function over the filtered list. Catalog header: N selected, Select all, Clear. Lock mark when `encrypted`. Remap checked IDs after rename/move/rescan the same way viewing is remapped. Right-click views that row, selects it if it was not already checked, and opens the single-mod menu. Right-clicking an already-checked row keeps the rest of the set.
 
-For each library UI file, cut its private selectors out of `frontend/src/App.css` into `Name.module.css`, switch that file's unique `className="…"` to `styles["…"]`, leave primitive class names as plain strings.
+**Verify:** `bun test` covers the range helper. `bun run check` from `frontend/` passes.
 
-Order (already-split files first, then the new extracts, then the shell):
+## 14.5 Actions dropdown + batch organize
 
-1. `ContextMenu`, `FolderNavigation`, `TagMenu`, `ModCatalog`
-2. `SettingsDialog`, `DetectLibraryDialog`, `UpdateDialog`, `InstallPreviewDialog` (`InstallFromUrlDialog` likely needs no module file)
-3. The C.2 extracts
-4. `LibraryScreen` shell (header, toolbar, layout, drop overlay)
+New `BatchActionsMenu` (one exported component + module CSS). Wire Enable/Disable/Move/Tags/Delete to loop existing handlers. Reuse move, tag, and delete dialogs by passing the checked ID list (or looping from `LibraryScreen`). Skip already-enabled / already-disabled. Summary toast. Batch must own the mutation lock for the whole set. `setModEnabled` today bails if any mutation is in flight.
 
-Keep kebab-case local names so the CSS is a move, not a rename. No Vite `css.modules` config. `vite/client` already types `*.module.css`.
+**Verify:** `bun run check` from `frontend/` passes. Dialogs accept a batch without changing single-mod context-menu behavior.
 
-**Verify:** `bun run check` from `frontend/`.
+## 14.6 Encrypt/decrypt
 
-## C.4 Trim `App.css`
+New `SetModEncryption` in `app.go` + `internal/mutation`: rescan, reject ineligible, reject mixed state server-side, extract to temp, `create_mod_iostore` with `hybrid` if the companion PAK has raw files, write beside the live bundle, replace primary+sidecars, keep folder / priority filename / `.pak_crateoff`. Progress + cancel. Confirm dialog: rebuild warning. Menu item label and disabled reason from a pure helper over the checked identities. After each success, classification cache misses on mtime and the lock updates.
 
-What remains in `App.css`: `.app-shell` token blocks, layout width helpers that wrap header/toolbar/layout, primitive buttons/dialog chrome, `.scroll-y`, `.visually-hidden`, `.spinning-loader`. Delete moved rules. `App.tsx` still imports `./App.css`.
+**Verify:** Go tests cover mixed-state rejection, ineligible format, disabled-primary preservation, and rollback. Frontend helper tests cover Encrypt / Decrypt / mixed / ineligible. `go test ./internal/mutation/ ./internal/uassettool/ -count=1` passes.
 
-**Verify:** `bun run check` from `frontend/`. Stop. Maintainer drives the app.
+## 14.7 Verify and review
 
-## Follow-up (not this chore)
+Run `.\check.ps1`, Go tests, `bun test`, and `wails generate module` if bindings changed. Update `docs/USER_GUIDE.md` and `docs/TROUBLESHOOTING.md`. Capture running-app screenshots under `docs/screenshots/phase-14/`. Stop at the review gate. Do not start the next phase.
 
-* remaining-todos TODO 2: default window size and list-view scrollbar at 1080p / 100% scale
+**Verify:** Canonical checks pass. Screenshots exist for empty check set, N selected, lock mark, mixed-state disabled Encrypt, and a successful encrypt or decrypt on fixtures.

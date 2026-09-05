@@ -16,6 +16,7 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
+	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/update"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -44,6 +45,8 @@ type App struct {
 	tableMu               sync.Mutex
 	characterTable        modtype.CharacterTable
 	tableLoaded           bool
+	encryptMu             sync.Mutex
+	encryptCancel         chan struct{}
 }
 
 // Creates the application binding.
@@ -309,6 +312,58 @@ func (a *App) updateContext() context.Context {
 func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Result, error) {
 	operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
 	return a.mutationExecutor.Execute(operation)
+}
+
+// EncryptionType anchors mutation.EncryptionBatchResult so Wails emits its TypeScript model into models.ts.
+func (a *App) EncryptionType() mutation.EncryptionBatchResult {
+	return mutation.EncryptionBatchResult{}
+}
+
+// Rebuilds each checked complete IoStore bundle with or without obfuscation.
+// The Marvel Rivals AES key stays in Go. The frontend receives only the
+// encrypted flag after the next classify. Emits encrypt:progress events.
+func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) (mutation.EncryptionBatchResult, error) {
+	if a.gameRunningChecker != nil {
+		running, err := a.gameRunningChecker.IsGameRunning()
+		if err != nil {
+			return mutation.EncryptionBatchResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
+		}
+		if running {
+			return mutation.EncryptionBatchResult{}, mutation.ErrGameRunning
+		}
+	}
+
+	worker, err := uassettool.NewWriteWorker(nil)
+	if err != nil {
+		return mutation.EncryptionBatchResult{}, err
+	}
+	defer worker.Close()
+
+	a.encryptMu.Lock()
+	a.encryptCancel = make(chan struct{})
+	cancel := a.encryptCancel
+	a.encryptMu.Unlock()
+	defer func() {
+		a.encryptMu.Lock()
+		a.encryptCancel = nil
+		a.encryptMu.Unlock()
+	}()
+
+	return mutation.SetModEncryption(modRoot, entryIDs, encrypt, worker, func(progress mutation.EncryptionProgress) {
+		if a.ctx != nil {
+			wailsRuntime.EventsEmit(a.ctx, "encrypt:progress", progress)
+		}
+	}, cancel)
+}
+
+// Stops an in-progress SetModEncryption after the current bundle finishes planning.
+func (a *App) CancelEncryption() {
+	a.encryptMu.Lock()
+	defer a.encryptMu.Unlock()
+	if a.encryptCancel != nil {
+		close(a.encryptCancel)
+		a.encryptCancel = nil
+	}
 }
 
 // Renames one current scanner entry without exposing arbitrary filesystem paths.

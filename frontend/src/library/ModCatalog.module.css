@@ -36,6 +36,7 @@
 	   flex-grow on its children puts unclaimed leftover space in one
 	   predictable place: after the last child. */
 	display: flex;
+	position: relative;
 	min-width: 0;
 	min-height: 10.75rem;
 	flex-direction: column;
@@ -44,6 +45,7 @@
 	border: 1px solid var(--line);
 	border-radius: 0.7rem;
 	background: var(--panel-raised);
+	user-select: none;
 }
 
 .mod-card.is-disabled,
@@ -60,6 +62,27 @@
 	border: 2px solid var(--accent);
 	outline: 1px solid color-mix(in srgb, var(--accent), transparent 58%);
 	outline-offset: 1px;
+}
+
+.mod-card.is-checked,
+.list-mod-row.is-checked {
+	background: color-mix(in srgb, var(--accent), var(--panel-raised) 82%);
+}
+
+/* Encrypted wash lives on a pseudo so it can sit on top of the disabled
+   and checked backgrounds without replacing them. */
+.mod-card.is-encrypted::before,
+.list-mod-row.is-encrypted::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	background: radial-gradient(
+		8.5rem 6.5rem at 100% 0%,
+		color-mix(in srgb, var(--accent), transparent 68%),
+		transparent 72%
+	);
 }
 
 .mod-card:hover,
@@ -107,6 +130,39 @@
 	min-width: 0;
 	align-items: center;
 	gap: 0.6rem;
+}
+
+/* One shape, not a band plus an icon: the badge is the corner triangle
+   itself, and the glyph sits at that triangle's centroid (a third of the
+   leg in from each edge) so it stays balanced inside the fold. */
+.mod-lock {
+	--lock-size: 3rem;
+	--lock-glyph: 0.8rem;
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 3;
+	width: var(--lock-size);
+	height: var(--lock-size);
+	border-top-right-radius: inherit;
+	background: var(--accent);
+	clip-path: polygon(0 0, 100% 0, 100% 100%);
+	pointer-events: none;
+	color: var(--page);
+}
+
+.mod-lock svg {
+	position: absolute;
+	top: calc(var(--lock-size) / 3 - var(--lock-glyph) / 2);
+	right: calc(var(--lock-size) / 3 - var(--lock-glyph) / 2);
+	width: var(--lock-glyph);
+	height: var(--lock-glyph);
+	stroke-width: 2.4;
+}
+
+.list-mod-row .mod-lock {
+	--lock-size: 2.3rem;
+	--lock-glyph: 0.64rem;
 }
 
 .mod-card-heading-info {
@@ -386,10 +442,12 @@
 	display: block;
 	min-width: 0;
 	min-height: 3.75rem;
+	position: relative;
 	padding: 0.7rem 1rem;
 	border: 1px solid var(--line);
 	border-radius: 0.7rem;
 	background: var(--panel-raised);
+	user-select: none;
 }
 
 .list-mod-summary {
@@ -414,6 +472,11 @@
 .list-mod-row .mod-card-heading {
 	min-width: 0;
 	flex: 1;
+}
+
+.mod-card.is-encrypted .mod-card-heading,
+.list-mod-row.is-encrypted .mod-card-heading {
+	padding-right: 1.35rem;
 }
 
 .list-mod-row .mod-thumbnail {

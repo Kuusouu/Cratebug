@@ -37,6 +37,10 @@ const (
 	crashDetectionGrace = 2 * time.Second
 )
 
+// Upper bound for extract and create_mod_iostore on a real IoStore bundle.
+// Cheap listing calls stay on the 30s default.
+const DefaultWriteCallTimeout = 10 * time.Minute
+
 // Overridable so tests can substitute a fake worker process without a live
 // UAssetTool.exe; production code always uses the real os/exec functions.
 var (
@@ -129,6 +133,21 @@ func NewPinnedWorker(logger *log.Logger) (*Worker, error) {
 	return NewWorker(WorkerConfig{
 		ExecutablePath:         exePath,
 		ExpectedSourceRevision: PinnedSourceRevision,
+		Logger:                 logger,
+	})
+}
+
+// NewWriteWorker launches the pinned executable with the write-op timeout
+// so extract/create_mod_iostore can finish a real bundle.
+func NewWriteWorker(logger *log.Logger) (*Worker, error) {
+	exePath, err := ResolveExecutablePath()
+	if err != nil {
+		return nil, err
+	}
+	return NewWorker(WorkerConfig{
+		ExecutablePath:         exePath,
+		ExpectedSourceRevision: PinnedSourceRevision,
+		CallTimeout:            DefaultWriteCallTimeout,
 		Logger:                 logger,
 	})
 }
@@ -247,6 +266,15 @@ func verifyWorkerVersion(executablePath, expectedSourceRevision string) error {
 // goroutine (a pool of separate worker processes), not one Worker shared
 // across goroutines.
 func (w *Worker) Call(action string, params map[string]any, result any) error {
+	return w.CallWithTimeout(action, params, result, w.callTimeout)
+}
+
+// Sends one request and waits up to timeout. timeout must be positive.
+func (w *Worker) CallWithTimeout(action string, params map[string]any, result any, timeout time.Duration) error {
+	if timeout <= 0 {
+		timeout = w.callTimeout
+	}
+
 	select {
 	case <-w.exited:
 		return fmt.Errorf("%w: %v", ErrWorkerCrashed, w.exitErr)
@@ -283,10 +311,10 @@ func (w *Worker) Call(action string, params map[string]any, result any) error {
 		}
 	case <-w.exited:
 		return fmt.Errorf("%w: %v", ErrWorkerCrashed, w.exitErr)
-	case <-time.After(w.callTimeout):
+	case <-time.After(timeout):
 		w.kill()
 		<-w.exited
-		return fmt.Errorf("%w: %q did not complete within %s", ErrWorkerTimeout, action, w.callTimeout)
+		return fmt.Errorf("%w: %q did not complete within %s", ErrWorkerTimeout, action, timeout)
 	}
 }
 

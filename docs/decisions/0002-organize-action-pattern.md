@@ -28,8 +28,9 @@ alongside them.
 
 What stays as a persistent, always-visible control:
 
-- Enable and disable, on the selected-mod panel. It is the single most
-  frequent action and deserves a one-click control instead of a menu trip.
+- Enable and disable, as the switch on each card. That is the frequent
+  one-click control. The selected-mod panel used to host it; the card switch
+  and the header Actions menu replaced that.
 - New folder, as one button in the sidebar heading. Unlike rename or move, it
   has no natural single target when nothing is selected, so a context menu
   entry point alone would not cover creating a folder at the library root.
@@ -54,9 +55,13 @@ verified directly in the running app, not just assumed.
   adding more header or panel buttons, unless the action has no single
   target the way New Folder does, or is frequent enough to earn a dedicated
   control the way Enable and Disable are.
-- The selected-mod panel is now a status readout plus Enable and Disable, not
-  a growing action bar. Anything added there should meet the same bar those
-  two actions meet.
+- Batch actions (Phase 14) have no single target. They live in the catalog
+  header Actions menu and operate on the checked set, not the context menu
+  and not a growing selected-mod panel. The context menu stays single-mod.
+- The selected-mod panel is a status readout only. Enable and Disable live on
+  the card switch. Batch Enable, Disable, and Delete live in the header
+  Actions menu. One-mod Delete stays on the context menu. Do not add buttons
+  back to this panel unless they have no other surface.
 - A future action added to the menu without a keyboard-reachable trigger
   element would silently lose keyboard access. The context menu itself does
   not enforce this, so the row or card triggering it must stay a real

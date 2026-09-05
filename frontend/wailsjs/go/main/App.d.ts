@@ -16,6 +16,8 @@ export function ApplyUpdate(arg1:string):Promise<void>;
 
 export function AssignModTag(arg1:string,arg2:string):Promise<void>;
 
+export function CancelEncryption():Promise<void>;
+
 export function CancelInstall(arg1:string):Promise<void>;
 
 export function CheckForUpdate():Promise<main.UpdateCheckResult>;
@@ -45,6 +47,8 @@ export function DetectConflicts(arg1:string,arg2:Array<discovery.Entry>):Promise
 export function DetectLibrary(arg1:string):Promise<gamedetect.Detection>;
 
 export function DownloadUpdate(arg1:update.Release):Promise<string>;
+
+export function EncryptionType():Promise<mutation.EncryptionBatchResult>;
 
 export function GetAppVersion():Promise<string>;
 
@@ -79,6 +83,8 @@ export function SetDefaultViewMode(arg1:string):Promise<void>;
 export function SetLibraryProvider(arg1:string):Promise<void>;
 
 export function SetModEnabled(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
+
+export function SetModEncryption(arg1:string,arg2:Array<string>,arg3:boolean):Promise<mutation.EncryptionBatchResult>;
 
 export function SetModPriority(arg1:string,arg2:string,arg3:number):Promise<mutation.Result>;
 

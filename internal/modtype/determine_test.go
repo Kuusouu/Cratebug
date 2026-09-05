@@ -130,24 +130,54 @@ func TestDetermineClassifiesUnencryptedIoStoreModInOrder(t *testing.T) {
 	}
 }
 
-func TestDetermineReturnsCannotDetermineForEncryptedIoStore(t *testing.T) {
+func TestDetermineListsEncryptedIoStoreWithGameKey(t *testing.T) {
 	// Arrange
 	fake := &fakeCaller{responses: map[string]string{
 		"is_iostore_encrypted": `{"encrypted":true}`,
+		"list_iostore_files":   `{"files":["Characters/SK_Hero"]}`,
 	}}
 	entry := iostoreEntry("Mods/Example.utoc")
 
 	// Act
-	_, err := Determine(fake, "C:/root", entry)
+	category, err := Determine(fake, "C:/root", entry)
 
 	// Assert
-	if !errors.Is(err, ErrCannotDetermineType) {
-		t.Fatalf("Determine() error = %v, want ErrCannotDetermineType", err)
+	if err != nil {
+		t.Fatalf("Determine() error = %v, want nil", err)
 	}
-	for _, action := range fake.actions() {
-		if action == "list_iostore_files" {
-			t.Errorf("Determine() called list_iostore_files for an encrypted container, want it skipped")
-		}
+	if category != CategoryMesh {
+		t.Errorf("Determine() = %q, want %q", category, CategoryMesh)
+	}
+	wantOrder := []string{"is_iostore_encrypted", "list_iostore_files"}
+	gotOrder := fake.actions()
+	if len(gotOrder) != len(wantOrder) || gotOrder[0] != wantOrder[0] || gotOrder[1] != wantOrder[1] {
+		t.Fatalf("call order = %v, want %v", gotOrder, wantOrder)
+	}
+	if fake.calls[1].params["aes_key"] != uassettool.MarvelRivalsAESKey {
+		t.Errorf("list_iostore_files aes_key = %v, want MarvelRivalsAESKey", fake.calls[1].params["aes_key"])
+	}
+}
+
+func TestDetermineIdentityMarksEncryptedIoStore(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{responses: map[string]string{
+		"is_iostore_encrypted": `{"encrypted":true}`,
+		"list_iostore_files":   `{"files":["Characters/SK_Hero"]}`,
+	}}
+	entry := iostoreEntry("Mods/Example.utoc")
+
+	// Act
+	identity, _, err := DetermineIdentity(fake, "C:/root", entry, CharacterTable{})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("DetermineIdentity() error = %v, want nil", err)
+	}
+	if !identity.Encrypted {
+		t.Fatal("identity.Encrypted = false, want true")
+	}
+	if identity.Category != CategoryMesh {
+		t.Errorf("identity.Category = %q, want %q", identity.Category, CategoryMesh)
 	}
 }
 

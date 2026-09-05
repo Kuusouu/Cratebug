@@ -223,6 +223,19 @@
 	gap: 0.6rem;
 }
 
+.batch-chrome {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.batch-count {
+	color: var(--muted);
+	font-size: 0.8rem;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
 .catalog-controls .search-control {
 	flex: 1;
 	min-width: 0;
@@ -302,5 +315,10 @@
 
 	.catalog-controls {
 		align-self: stretch;
+		flex-wrap: wrap;
+	}
+
+	.batch-chrome {
+		flex-wrap: wrap;
 	}
 }

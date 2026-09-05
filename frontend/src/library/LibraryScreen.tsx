@@ -20,6 +20,7 @@ import {
 import {
 	ApplyUpdate,
 	AssignModTag,
+	CancelEncryption,
 	CheckForUpdate,
 	CheckWhatsNew,
 	ClassifyLibrary,
@@ -45,6 +46,7 @@ import {
 	SetDefaultViewMode,
 	SetLibraryProvider,
 	SetModEnabled,
+	SetModEncryption,
 	SetModPriority,
 	SetModRoot,
 	SetTheme,
@@ -61,11 +63,20 @@ import {
 } from "../../wailsjs/go/models";
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
+import { BatchActionsMenu } from "./BatchActionsMenu";
+import {
+	type CheckClickModifiers,
+	nextCheckedIDs,
+	remapCheckedID,
+	retainCheckedIDs,
+} from "./checkedSelection";
 import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
+import { encryptionMenuState } from "./encryptionAction";
+import { EncryptConfirmDialog } from "./EncryptConfirmDialog";
 import { DetectLibraryDialog } from "./DetectLibraryDialog";
-import { canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
+import { canChangeModState, canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
 import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
 import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
@@ -109,7 +120,16 @@ type ViewModeButtonProps = {
 	onSelect: (mode: ViewMode) => void;
 };
 
-type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags";
+type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags" | "encrypt";
+
+type DialogScope = "viewed" | "checked";
+
+type EncryptionProgressEvent = {
+	current: number;
+	total: number;
+	entryID: string;
+	displayName: string;
+};
 
 type FolderDialogMode = "create" | "rename" | "move" | "delete";
 
@@ -185,6 +205,50 @@ function tagIDsForScannerID(
 // helper scans every mod record for one selected entry, which is fine for
 // the single-selection panel but would become O(entries x mods) if reused
 // per card on every render.
+function sharedTagIDsForEntries(
+	document: metadata.Document | null,
+	entryIDs: readonly string[],
+): ReadonlySet<string> {
+	if (entryIDs.length === 0) return new Set();
+	let shared: Set<string> | null = null;
+	for (const id of entryIDs) {
+		const tags = tagIDsForScannerID(document, id);
+		if (shared === null) {
+			shared = new Set(tags);
+			continue;
+		}
+		for (const tagID of [...shared]) {
+			if (!tags.has(tagID)) shared.delete(tagID);
+		}
+	}
+	return shared ?? new Set();
+}
+
+function batchFeedback(
+	verbPast: string,
+	verbInfinitive: string,
+	succeeded: number,
+	failed: number,
+	skipped: number,
+): { kind: MutationFeedback["kind"]; message: string } {
+	if (failed === 0 && skipped === 0) {
+		return {
+			kind: "success",
+			message: `${verbPast} ${succeeded} ${succeeded === 1 ? "mod" : "mods"}.`,
+		};
+	}
+	if (succeeded === 0 && failed > 0 && skipped === 0) {
+		return {
+			kind: "error",
+			message: `Could not ${verbInfinitive} ${failed} ${failed === 1 ? "mod" : "mods"}.`,
+		};
+	}
+	const parts = [`${verbPast} ${succeeded}`];
+	if (failed > 0) parts.push(`failed ${failed}`);
+	if (skipped > 0) parts.push(`skipped ${skipped}`);
+	return { kind: "warning", message: `${parts.join(", ")}.` };
+}
+
 function tagsByEntryID(document: metadata.Document | null): ReadonlyMap<string, metadata.Tag[]> {
 	const map = new Map<string, metadata.Tag[]>();
 	if (!document) return map;
@@ -265,6 +329,10 @@ export function LibraryScreen() {
 	const [search, setSearch] = useState("");
 	const [selectedFolder, setSelectedFolder] = useState("all");
 	const [selectedEntryID, setSelectedEntryID] = useState<string | null>(null);
+	const [checkedEntryIDs, setCheckedEntryIDs] = useState<ReadonlySet<string>>(new Set());
+	const [checkAnchorID, setCheckAnchorID] = useState<string | null>(null);
+	const [dialogScope, setDialogScope] = useState<DialogScope>("viewed");
+	const [encryptProgress, setEncryptProgress] = useState<EncryptionProgressEvent | null>(null);
 	const [activeDialog, setActiveDialog] = useState<MutationDialog | null>(null);
 	const [activeFolderDialog, setActiveFolderDialog] = useState<FolderDialogMode | null>(null);
 	const [folderDialogTarget, setFolderDialogTarget] = useState("");
@@ -376,6 +444,27 @@ export function LibraryScreen() {
 		viewMode,
 	);
 	const selectedEntry = library?.entries.find((entry) => entry.id === selectedEntryID) ?? null;
+	const checkedEntries = useMemo(
+		() => (library?.entries ?? []).filter((entry) => checkedEntryIDs.has(entry.id)),
+		[library, checkedEntryIDs],
+	);
+	const dialogEntries =
+		dialogScope === "checked" ? checkedEntries : selectedEntry ? [selectedEntry] : [];
+	const dialogEntry = dialogEntries[0] ?? null;
+	const assignedTagIDsForDialog = useMemo(
+		() =>
+			dialogScope === "checked"
+				? sharedTagIDsForEntries(
+						metadataDocument,
+						dialogEntries.map((entry) => entry.id),
+					)
+				: assignedTagIDsForSelection,
+		[assignedTagIDsForSelection, dialogEntries, dialogScope, metadataDocument],
+	);
+	const encryptMenu = useMemo(
+		() => encryptionMenuState(checkedEntries, identitiesByEntryID),
+		[checkedEntries, identitiesByEntryID],
+	);
 	const isMutationLocked = mutatingEntryIDs.size > 0 || isFolderMutating;
 	const dismissMutationFeedback = useCallback(() => setMutationFeedback(null), []);
 	const showMutationFeedback = useCallback((kind: MutationFeedback["kind"], message: string) => {
@@ -418,6 +507,12 @@ export function LibraryScreen() {
 	useEffect(() => {
 		return EventsOn("update:downloadProgress", (progress: UpdateDownloadProgress) => {
 			setUpdateDownloadProgress(progress);
+		});
+	}, []);
+
+	useEffect(() => {
+		return EventsOn("encrypt:progress", (progress: EncryptionProgressEvent) => {
+			setEncryptProgress(progress);
 		});
 	}, []);
 
@@ -604,7 +699,9 @@ export function LibraryScreen() {
 				if (!currentLibrary) return currentLibrary;
 
 				const entries = currentLibrary.entries.map((currentEntry) => {
-					if (currentEntry.id !== result.previousID) return currentEntry;
+					if (currentEntry.id !== result.previousID && currentEntry.id !== result.id) {
+						return currentEntry;
+					}
 
 					return new discovery.Entry({
 						...currentEntry,
@@ -669,7 +766,11 @@ export function LibraryScreen() {
 					groups: updatedGroups,
 				});
 			});
-			setSelectedEntryID(result.id);
+			setSelectedEntryID((current) => {
+				if (current === result.previousID || current === result.id) return result.id;
+				return current;
+			});
+			setCheckedEntryIDs((current) => remapCheckedID(current, result.previousID, result.id));
 		},
 		[],
 	);
@@ -686,6 +787,9 @@ export function LibraryScreen() {
 
 			setLibrary(result);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+			setCheckedEntryIDs((current) =>
+				retainCheckedIDs(current, new Set(result.entries.map((entry) => entry.id))),
+			);
 			// The rescanned set of mods may no longer match a conflict report taken
 			// before this mutation (a moved, deleted, or newly-installed mod can
 			// change what overlaps), so a stale report can't be trusted anymore.
@@ -991,6 +1095,359 @@ export function LibraryScreen() {
 		},
 		[libraryRoot, reloadLibrary, showMutationFeedback],
 	);
+
+	// A card click drives both selections. The viewed mod follows the click
+	// unless it emptied the checked set, which is how a reclick clears the
+	// details panel too instead of leaving the card looking selected.
+	const activateEntry = useCallback(
+		(entry: discovery.Entry, modifiers: CheckClickModifiers) => {
+			const visibleIDs = displayedEntries.map((item) => item.id);
+			const result = nextCheckedIDs(
+				checkedEntryIDs,
+				visibleIDs,
+				entry.id,
+				checkAnchorID,
+				modifiers,
+			);
+			setCheckedEntryIDs(result.next);
+			setCheckAnchorID(result.anchorID);
+			setSelectedEntryID(result.next.size === 0 ? null : entry.id);
+		},
+		[checkAnchorID, checkedEntryIDs, displayedEntries],
+	);
+
+	const selectAllVisible = useCallback(() => {
+		setCheckedEntryIDs(new Set(displayedEntries.map((entry) => entry.id)));
+		setCheckAnchorID(displayedEntries[0]?.id ?? null);
+	}, [displayedEntries]);
+
+	const clearChecked = useCallback(() => {
+		setCheckedEntryIDs(new Set());
+		setCheckAnchorID(null);
+		setSelectedEntryID(null);
+	}, []);
+
+	const openCheckedDialog = useCallback((dialog: MutationDialog) => {
+		setDialogScope("checked");
+		setActiveDialog(dialog);
+	}, []);
+
+	const markEntriesBusy = useCallback((ids: readonly string[]) => {
+		for (const id of ids) {
+			mutatingEntryIDsRef.current.add(id);
+		}
+		setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+	}, []);
+
+	const clearEntriesBusy = useCallback((ids: readonly string[]) => {
+		for (const id of ids) {
+			mutatingEntryIDsRef.current.delete(id);
+		}
+		setMutatingEntryIDs(new Set(mutatingEntryIDsRef.current));
+	}, []);
+
+	const setCheckedModsEnabled = useCallback(
+		async (enabled: boolean) => {
+			if (!libraryRoot || isFolderMutatingRef.current) return;
+
+			const skippedAlready = checkedEntries.filter(
+				(entry) =>
+					canChangeModState(entry) &&
+					(enabled ? entry.state === "enabled" : entry.state === "disabled"),
+			).length;
+			const targets = checkedEntries.filter(
+				(entry) =>
+					canChangeModState(entry) &&
+					(enabled ? entry.state !== "enabled" : entry.state !== "disabled"),
+			);
+			const skippedIneligible = checkedEntries.length - targets.length - skippedAlready;
+			if (targets.length === 0) {
+				showMutationFeedback(
+					"warning",
+					enabled
+						? "Every selected mod is already enabled or cannot change state."
+						: "Every selected mod is already disabled or cannot change state.",
+				);
+				return;
+			}
+
+			const requestRoot = libraryRoot;
+			const ids = targets.map((entry) => entry.id);
+			markEntriesBusy(ids);
+			let succeeded = 0;
+			let failed = 0;
+			try {
+				for (const entry of targets) {
+					try {
+						const result = await SetModEnabled(requestRoot, entry.id, enabled);
+						if (activeLibraryRootRef.current !== requestRoot) return;
+						updateMutatedEntry(result, {});
+						succeeded += 1;
+					} catch {
+						failed += 1;
+					}
+				}
+				if (activeLibraryRootRef.current !== requestRoot) return;
+				setConflictResult(null);
+				const feedback = batchFeedback(
+					enabled ? "Enabled" : "Disabled",
+					enabled ? "enable" : "disable",
+					succeeded,
+					failed,
+					skippedAlready + skippedIneligible,
+				);
+				showMutationFeedback(feedback.kind, feedback.message);
+			} finally {
+				clearEntriesBusy(ids);
+			}
+		},
+		[
+			checkedEntries,
+			clearEntriesBusy,
+			libraryRoot,
+			markEntriesBusy,
+			showMutationFeedback,
+			updateMutatedEntry,
+		],
+	);
+
+	const moveCheckedMods = useCallback(
+		async (_entry: discovery.Entry, destinationFolder: string): Promise<boolean> => {
+			if (!libraryRoot || isFolderMutatingRef.current) return false;
+
+			const skippedAlready = checkedEntries.filter(
+				(entry) => canOrganizeMod(entry) && entry.relativeFolder === destinationFolder,
+			).length;
+			const targets = checkedEntries.filter(
+				(entry) => canOrganizeMod(entry) && entry.relativeFolder !== destinationFolder,
+			);
+			if (targets.length === 0) {
+				showMutationFeedback(
+					"warning",
+					"Every selected mod is already in that folder or cannot be moved.",
+				);
+				return false;
+			}
+
+			const ids = targets.map((entry) => entry.id);
+			markEntriesBusy(ids);
+			let succeeded = 0;
+			let failed = 0;
+			const remapped = new Set(checkedEntryIDs);
+			try {
+				for (const entry of targets) {
+					try {
+						const result = await MoveMod(libraryRoot, entry.id, destinationFolder);
+						if (result.previousID) remapped.delete(result.previousID);
+						remapped.delete(entry.id);
+						remapped.add(result.id);
+						succeeded += 1;
+					} catch {
+						failed += 1;
+					}
+				}
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+				const scanned = await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+				await refreshMetadata();
+				if (scanned) {
+					setCheckedEntryIDs(
+						retainCheckedIDs(
+							remapped,
+							new Set(scanned.entries.map((entry) => entry.id)),
+						),
+					);
+				}
+				const feedback = batchFeedback(
+					"Moved",
+					"move",
+					succeeded,
+					failed,
+					skippedAlready + (checkedEntries.length - targets.length - skippedAlready),
+				);
+				showMutationFeedback(feedback.kind, feedback.message);
+				return failed === 0;
+			} finally {
+				clearEntriesBusy(ids);
+			}
+		},
+		[
+			checkedEntries,
+			checkedEntryIDs,
+			clearEntriesBusy,
+			libraryRoot,
+			markEntriesBusy,
+			refreshMetadata,
+			reloadLibrary,
+			showMutationFeedback,
+		],
+	);
+
+	const deleteCheckedMods = useCallback(
+		async (entries: discovery.Entry[]): Promise<boolean> => {
+			if (!libraryRoot || isFolderMutatingRef.current) return false;
+
+			const targets = entries.filter((entry) => canDeleteMod(entry));
+			if (targets.length === 0) {
+				showMutationFeedback("warning", "None of the selected mods can be deleted.");
+				return false;
+			}
+
+			const ids = targets.map((entry) => entry.id);
+			markEntriesBusy(ids);
+			let succeeded = 0;
+			let failed = 0;
+			try {
+				for (const entry of targets) {
+					try {
+						await DeleteMod(libraryRoot, entry.id, true);
+						succeeded += 1;
+					} catch {
+						failed += 1;
+					}
+				}
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+				await reloadLibrary();
+				if (activeLibraryRootRef.current !== libraryRoot) return false;
+				if (selectedEntryID && ids.includes(selectedEntryID)) {
+					setSelectedEntryID(null);
+				}
+				const feedback = batchFeedback(
+					"Sent to the Recycle Bin",
+					"delete",
+					succeeded,
+					failed,
+					entries.length - targets.length,
+				);
+				showMutationFeedback(feedback.kind, feedback.message);
+				return failed === 0;
+			} finally {
+				clearEntriesBusy(ids);
+			}
+		},
+		[
+			clearEntriesBusy,
+			libraryRoot,
+			markEntriesBusy,
+			reloadLibrary,
+			selectedEntryID,
+			showMutationFeedback,
+		],
+	);
+
+	const createAndAssignTagToEntries = useCallback(
+		async (entries: discovery.Entry[], name: string): Promise<boolean> => {
+			try {
+				const tag = await CreateTag(name);
+				let succeeded = 0;
+				let failed = 0;
+				for (const entry of entries) {
+					try {
+						await AssignModTag(entry.id, tag.id);
+						succeeded += 1;
+					} catch {
+						failed += 1;
+					}
+				}
+				await refreshMetadata();
+				const feedback = batchFeedback(
+					`Created "${tag.name}" and assigned`,
+					"assign tag",
+					succeeded,
+					failed,
+					0,
+				);
+				showMutationFeedback(feedback.kind, feedback.message);
+				return failed === 0;
+			} catch (error) {
+				showMutationFeedback("error", `Could not create tag: ${errorMessage(error)}`);
+				return false;
+			}
+		},
+		[refreshMetadata, showMutationFeedback],
+	);
+
+	const toggleModTagOnEntries = useCallback(
+		async (
+			entries: discovery.Entry[],
+			tag: metadata.Tag,
+			assign: boolean,
+		): Promise<boolean> => {
+			let succeeded = 0;
+			let failed = 0;
+			for (const entry of entries) {
+				try {
+					if (assign) {
+						await AssignModTag(entry.id, tag.id);
+					} else {
+						await UnassignModTag(entry.id, tag.id);
+					}
+					succeeded += 1;
+				} catch {
+					failed += 1;
+				}
+			}
+			await refreshMetadata();
+			const feedback = batchFeedback(
+				assign ? `Added "${tag.name}" to` : `Removed "${tag.name}" from`,
+				"update tags",
+				succeeded,
+				failed,
+				0,
+			);
+			showMutationFeedback(feedback.kind, feedback.message);
+			return failed === 0;
+		},
+		[refreshMetadata, showMutationFeedback],
+	);
+
+	const encryptCheckedMods = useCallback(async (): Promise<boolean> => {
+		if (!libraryRoot || isFolderMutatingRef.current) return false;
+		if (encryptMenu.kind !== "encrypt" && encryptMenu.kind !== "decrypt") return false;
+
+		const ids = checkedEntries.map((entry) => entry.id);
+		markEntriesBusy(ids);
+		setEncryptProgress({ current: 0, total: ids.length, entryID: "", displayName: "" });
+		try {
+			const result = await SetModEncryption(libraryRoot, ids, encryptMenu.encrypt);
+			if (activeLibraryRootRef.current !== libraryRoot) return false;
+			await reloadLibrary();
+			const succeeded = result.succeeded?.length ?? 0;
+			const failed = result.failed?.length ?? 0;
+			const feedback = batchFeedback(
+				encryptMenu.encrypt ? "Encrypted" : "Decrypted",
+				encryptMenu.encrypt ? "encrypt" : "decrypt",
+				succeeded,
+				failed,
+				0,
+			);
+			showMutationFeedback(feedback.kind, feedback.message);
+			return failed === 0;
+		} catch (error) {
+			if (activeLibraryRootRef.current === libraryRoot) {
+				// Cancel (and any other thrown error after a started batch)
+				// still leaves earlier successful rewrites on disk. Rescan
+				// before the toast so lock marks and identities match.
+				await reloadLibrary();
+				showMutationFeedback(
+					"error",
+					`Could not ${encryptMenu.encrypt ? "encrypt" : "decrypt"} the selected mods: ${errorMessage(error)}`,
+				);
+			}
+			return false;
+		} finally {
+			clearEntriesBusy(ids);
+			setEncryptProgress(null);
+		}
+	}, [
+		checkedEntries,
+		clearEntriesBusy,
+		encryptMenu,
+		libraryRoot,
+		markEntriesBusy,
+		reloadLibrary,
+		showMutationFeedback,
+	]);
 
 	// Tag requests use their own dialog-local busy state rather than the
 	// mod/folder mutation lock: unlike rename, move, or delete, they never touch
@@ -1334,43 +1791,56 @@ export function LibraryScreen() {
 	}, []);
 
 	// Selects the mod under the pointer so its actions and the panel agree on the target.
-	const openModContextMenu = useCallback((entry: discovery.Entry, event: MouseEvent) => {
-		const organizable = canOrganizeMod(entry);
-		const deletable = canDeleteMod(entry);
-		const taggable = canTagMod(entry);
-		if (!organizable && !deletable && !taggable) return;
+	const openModContextMenu = useCallback(
+		(entry: discovery.Entry, event: MouseEvent) => {
+			const organizable = canOrganizeMod(entry);
+			const deletable = canDeleteMod(entry);
+			const taggable = canTagMod(entry);
+			if (!organizable && !deletable && !taggable) return;
 
-		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
-		if (!container) return;
+			const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
+			if (!container) return;
 
-		const items: ContextMenuItem[] = [];
-		if (organizable) {
-			items.push(
-				{ label: "Rename", onSelect: () => setActiveDialog("rename") },
-				{ label: "Priority", onSelect: () => setActiveDialog("priority") },
-				{ label: "Move to...", onSelect: () => setActiveDialog("move") },
-			);
-		}
-		if (taggable) {
-			items.push({ label: "Tags...", onSelect: () => setActiveDialog("tags") });
-		}
-		if (deletable) {
-			items.push({
-				label: "Delete...",
-				onSelect: () => setActiveDialog("delete"),
-				destructive: true,
+			const items: ContextMenuItem[] = [];
+			if (organizable) {
+				items.push(
+					{ label: "Rename", onSelect: () => setActiveDialog("rename") },
+					{ label: "Priority", onSelect: () => setActiveDialog("priority") },
+					{ label: "Move to...", onSelect: () => setActiveDialog("move") },
+				);
+			}
+			if (taggable) {
+				items.push({ label: "Tags...", onSelect: () => setActiveDialog("tags") });
+			}
+			if (deletable) {
+				items.push({
+					label: "Delete...",
+					onSelect: () => setActiveDialog("delete"),
+					destructive: true,
+				});
+			}
+
+			setDialogScope("viewed");
+			setSelectedEntryID(entry.id);
+			// Right-click used to only set the viewed mod. After click and check
+			// became one selection, that left the header at "0 selected" and the
+			// card without the checked highlight. If this row is not already in
+			// the set, treat the right-click like a plain click so the panel,
+			// count, and card agree. An already-checked row keeps the rest.
+			if (!checkedEntryIDs.has(entry.id)) {
+				setCheckedEntryIDs(new Set([entry.id]));
+				setCheckAnchorID(entry.id);
+			}
+			setContextMenu({
+				x: event.clientX,
+				y: event.clientY,
+				container,
+				title: entry.displayName,
+				items,
 			});
-		}
-
-		setSelectedEntryID(entry.id);
-		setContextMenu({
-			x: event.clientX,
-			y: event.clientY,
-			container,
-			title: entry.displayName,
-			items,
-		});
-	}, []);
+		},
+		[checkedEntryIDs],
+	);
 
 	// Runs one auto-detection attempt against the active provider and routes
 	// its three-state outcome: a found library applies directly when nothing
@@ -1805,6 +2275,38 @@ export function LibraryScreen() {
 									type="search"
 								/>
 							</label>
+							<div className={styles["batch-chrome"]}>
+								<span className={styles["batch-count"]}>
+									{checkedEntryIDs.size} selected
+								</span>
+								<button
+									type="button"
+									className="quiet-button"
+									disabled={displayedEntries.length === 0 || isMutationLocked}
+									onClick={selectAllVisible}
+								>
+									Select all
+								</button>
+								<button
+									type="button"
+									className="quiet-button"
+									disabled={checkedEntryIDs.size === 0 || isMutationLocked}
+									onClick={clearChecked}
+								>
+									Clear
+								</button>
+								<BatchActionsMenu
+									selectedCount={checkedEntryIDs.size}
+									encryption={encryptMenu}
+									isBusy={isMutationLocked}
+									onEnable={() => void setCheckedModsEnabled(true)}
+									onDisable={() => void setCheckedModsEnabled(false)}
+									onMove={() => openCheckedDialog("move")}
+									onTags={() => openCheckedDialog("tags")}
+									onEncrypt={() => openCheckedDialog("encrypt")}
+									onDelete={() => openCheckedDialog("delete")}
+								/>
+							</div>
 							<TagMenu
 								catalog={tagCatalog}
 								filterIDs={tagFilterIDs}
@@ -1831,14 +2333,6 @@ export function LibraryScreen() {
 						identity={selectedEntry ? identitiesByEntryID[selectedEntry.id] : undefined}
 						isClassifying={isClassifying}
 						assignedTags={assignedTagsForSelection}
-						isMutating={selectedEntry ? mutatingEntryIDs.has(selectedEntry.id) : false}
-						isMutationLocked={isMutationLocked}
-						onClear={() => {
-							setSelectedEntryID(null);
-							setActiveDialog(null);
-						}}
-						onSetEnabled={setModEnabled}
-						onDelete={() => setActiveDialog("delete")}
 					/>
 					<ModCatalog
 						entries={displayedEntries}
@@ -1867,15 +2361,12 @@ export function LibraryScreen() {
 						conflictedEntryIDs={conflictedEntryIDs}
 						draggedEntryID={draggedItem?.type === "mod" ? draggedItem.entry.id : null}
 						onSetEnabled={setModEnabled}
-						onSelect={(entry) =>
-							setSelectedEntryID((currentEntryID) =>
-								currentEntryID === entry.id ? null : entry.id,
-							)
-						}
 						onContextMenu={openModContextMenu}
 						onRemoveTag={removeModTagFromCard}
 						onDragStartMod={startDragMod}
 						onDragEndMod={endDrag}
+						onActivate={activateEntry}
+						checkedEntryIDs={checkedEntryIDs}
 						selectedEntryID={selectedEntryID}
 						viewMode={viewMode}
 					/>
@@ -1891,38 +2382,97 @@ export function LibraryScreen() {
 			{activeDialog &&
 				activeDialog !== "delete" &&
 				activeDialog !== "tags" &&
-				selectedEntry && (
+				activeDialog !== "encrypt" &&
+				dialogEntry && (
 					<ModMutationDialog
-						entry={selectedEntry}
+						entry={dialogEntry}
+						batchCount={dialogEntries.length}
 						folders={libraryIndex.folders}
 						isMutating={isMutationLocked}
-						key={`${selectedEntry.id}-${activeDialog}`}
+						key={`${dialogScope}-${dialogEntry.id}-${activeDialog}`}
 						mode={activeDialog}
 						onClose={() => setActiveDialog(null)}
-						onMove={moveModToFolder}
+						onMove={dialogScope === "checked" ? moveCheckedMods : moveModToFolder}
 						onRename={renameMod}
 						onSetPriority={setModPriority}
 					/>
 				)}
-			{activeDialog === "delete" && selectedEntry && (
+			{activeDialog === "delete" && dialogEntries.length > 0 && (
 				<DeleteConfirmDialog
-					entry={selectedEntry}
+					entries={dialogEntries}
 					isMutating={isMutationLocked}
-					key={selectedEntry.id}
+					key={`${dialogScope}-delete-${dialogEntries.map((entry) => entry.id).join(",")}`}
 					onClose={() => setActiveDialog(null)}
-					onConfirm={deleteMod}
+					onConfirm={
+						dialogScope === "checked"
+							? deleteCheckedMods
+							: (entries) => {
+									const first = entries[0];
+									return first ? deleteMod(first) : Promise.resolve(false);
+								}
+					}
 				/>
 			)}
-			{activeDialog === "tags" && selectedEntry && (
+			{activeDialog === "tags" && dialogEntry && (
 				<ModTagDialog
-					entry={selectedEntry}
+					entry={dialogEntry}
+					batchCount={dialogEntries.length}
 					catalog={tagCatalog}
-					assignedTagIDs={assignedTagIDsForSelection}
-					key={selectedEntry.id}
+					assignedTagIDs={assignedTagIDsForDialog}
+					key={`${dialogScope}-tags-${dialogEntry.id}`}
 					onClose={() => setActiveDialog(null)}
-					onCreateAndAssign={(name) => createAndAssignTag(selectedEntry, name)}
-					onToggle={(tag, assign) => toggleModTag(selectedEntry, tag, assign)}
+					onCreateAndAssign={(name) =>
+						dialogScope === "checked"
+							? createAndAssignTagToEntries(dialogEntries, name)
+							: createAndAssignTag(dialogEntry, name)
+					}
+					onToggle={(tag, assign) =>
+						dialogScope === "checked"
+							? toggleModTagOnEntries(dialogEntries, tag, assign)
+							: toggleModTag(dialogEntry, tag, assign)
+					}
 				/>
+			)}
+			{activeDialog === "encrypt" && dialogEntries.length > 0 && !encryptProgress && (
+				<EncryptConfirmDialog
+					encrypt={encryptMenu.encrypt}
+					entries={dialogEntries}
+					isMutating={isMutationLocked}
+					onClose={() => setActiveDialog(null)}
+					onConfirm={encryptCheckedMods}
+				/>
+			)}
+			{encryptProgress && (
+				<div className="mutation-dialog-backdrop">
+					<section
+						className="mutation-dialog"
+						aria-labelledby="encrypt-progress-title"
+						aria-modal="true"
+						role="dialog"
+					>
+						<div>
+							<p className="eyebrow">Mod action</p>
+							<h2 id="encrypt-progress-title">
+								{encryptMenu.encrypt ? "Encrypting" : "Decrypting"}
+							</h2>
+							<p className="mutation-dialog-subtitle">
+								{encryptProgress.displayName || "Preparing..."}
+							</p>
+						</div>
+						<p className="delete-confirm-summary">
+							{encryptProgress.current} of {encryptProgress.total}
+						</p>
+						<div className="mutation-dialog-actions">
+							<button
+								type="button"
+								className="quiet-button"
+								onClick={() => void CancelEncryption()}
+							>
+								Cancel
+							</button>
+						</div>
+					</section>
+				</div>
 			)}
 			{activeFolderDialog && activeFolderDialog !== "delete" && library && (
 				<FolderMutationDialog

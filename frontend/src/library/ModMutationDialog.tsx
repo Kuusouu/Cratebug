@@ -12,6 +12,7 @@ const FOLDER_PICKER_VISIBLE_ROWS = 10;
 
 type ModMutationDialogProps = {
 	entry: discovery.Entry;
+	batchCount?: number;
 	folders: string[];
 	isMutating: boolean;
 	mode: ModMutationMode;
@@ -21,8 +22,10 @@ type ModMutationDialogProps = {
 	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
 };
 
+/** Rename, priority, or move for the viewed mod, or move for a checked set. */
 export function ModMutationDialog({
 	entry,
+	batchCount = 1,
 	folders,
 	isMutating,
 	mode,
@@ -44,7 +47,13 @@ export function ModMutationDialog({
 	const renameMode = mode === "rename";
 	const priorityMode = mode === "priority";
 	const moveMode = mode === "move";
-	const title = renameMode ? "Rename mod" : priorityMode ? "Set priority" : "Move mod";
+	const title = renameMode
+		? "Rename mod"
+		: priorityMode
+			? "Set priority"
+			: batchCount > 1
+				? `Move ${batchCount} mods`
+				: "Move mod";
 
 	useEffect(() => {
 		if (moveMode) {
@@ -72,7 +81,7 @@ export function ModMutationDialog({
 		}
 
 		if (moveMode) {
-			if (destinationFolder === entry.relativeFolder) {
+			if (batchCount === 1 && destinationFolder === entry.relativeFolder) {
 				setValidationError("Choose a different folder.");
 				return;
 			}
@@ -113,7 +122,9 @@ export function ModMutationDialog({
 				<div>
 					<p className="eyebrow">Mod action</p>
 					<h2 id="mutation-dialog-title">{title}</h2>
-					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
+					<p className="mutation-dialog-subtitle">
+						{batchCount > 1 ? `${batchCount} mods` : entry.displayName}
+					</p>
 				</div>
 				<form
 					onSubmit={(event) => {

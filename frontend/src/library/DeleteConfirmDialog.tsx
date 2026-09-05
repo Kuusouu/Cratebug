@@ -4,20 +4,22 @@ import { hasMissingSidecar } from "./entryPresentation";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type DeleteConfirmDialogProps = {
-	entry: discovery.Entry;
+	entries: discovery.Entry[];
 	isMutating: boolean;
 	onClose: () => void;
-	onConfirm: (entry: discovery.Entry) => Promise<boolean>;
+	onConfirm: (entries: discovery.Entry[]) => Promise<boolean>;
 };
 
 // SPEC.md requires a short deliberate delay before destructive confirmation.
 const deleteConfirmDelaySeconds = 3;
 
-// Sends a scanner-recognized bundle to the Recycle Bin after a short delay
-// gates the confirm button, matching SPEC.md's UI safeguard requirement.
-// The backend enforces the actual safety checks; this dialog cannot bypass them.
+/**
+ * Sends one or more scanner-recognized bundles to the Recycle Bin after a
+ * short delay gates the confirm button, matching SPEC.md's UI safeguard.
+ * The backend enforces the actual safety checks. This dialog cannot bypass them.
+ */
 export function DeleteConfirmDialog({
-	entry,
+	entries,
 	isMutating,
 	onClose,
 	onConfirm,
@@ -43,18 +45,24 @@ export function DeleteConfirmDialog({
 		cancelRef.current?.focus();
 	}, []);
 
-	const missingSidecar = hasMissingSidecar(entry);
-	const bundleFiles = [entry.primaryPath, entry.sidecars.utoc, entry.sidecars.ucas]
-		.filter((path): path is string => Boolean(path))
-		.map((path) => path.split("/").pop() ?? path);
+	const entry = entries[0];
+	const missingSidecar = entries.some((item) => hasMissingSidecar(item));
+	const bundleFiles = entries.flatMap((item) =>
+		[item.primaryPath, item.sidecars.utoc, item.sidecars.ucas]
+			.filter((path): path is string => Boolean(path))
+			.map((path) => path.split("/").pop() ?? path),
+	);
+	const names = entries.map((item) => item.displayName);
 	const handleEscape = useCallback(() => {
 		if (!isMutating) onClose();
 	}, [isMutating, onClose]);
 	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	async function handleConfirm() {
-		if (await onConfirm(entry)) onClose();
+		if (await onConfirm(entries)) onClose();
 	}
+
+	if (!entry) return null;
 
 	return (
 		<div className="mutation-dialog-backdrop">
@@ -67,17 +75,22 @@ export function DeleteConfirmDialog({
 			>
 				<div>
 					<p className="eyebrow">Mod action</p>
-					<h2 id="delete-dialog-title">Delete mod</h2>
-					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
+					<h2 id="delete-dialog-title">
+						{entries.length === 1 ? "Delete mod" : `Delete ${entries.length} mods`}
+					</h2>
+					<p className="mutation-dialog-subtitle">
+						{entries.length === 1 ? entry.displayName : names.join(", ")}
+					</p>
 				</div>
 				<p className="delete-confirm-summary">
-					Sends {bundleFiles.join(", ")} to the Recycle Bin. You can restore it from there
-					until the Recycle Bin is emptied.
+					Sends {entries.length === 1 ? bundleFiles.join(", ") : `${entries.length} mods`}{" "}
+					to the Recycle Bin. You can restore {entries.length === 1 ? "it" : "them"} from
+					there until the Recycle Bin is emptied.
 				</p>
 				{missingSidecar && (
 					<p className="delete-confirm-warning" role="alert">
-						This bundle is missing a recognized file. Only the files listed above will
-						be removed.
+						{entries.length === 1 ? "This bundle is" : "One or more bundles are"}{" "}
+						missing a recognized file. Only the files listed above will be removed.
 					</p>
 				)}
 				<div className="mutation-dialog-actions">

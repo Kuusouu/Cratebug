@@ -1,4 +1,4 @@
-import { Package, ShieldAlert, X } from "lucide-react";
+import { Lock, Package, ShieldAlert, X } from "lucide-react";
 import styles from "./ModCatalog.module.css";
 import { type DragEvent, memo, type MouseEvent, type ReactNode } from "react";
 import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
@@ -11,6 +11,7 @@ import {
 	entryCharacterLabel,
 	entryHeroPortraitUrl,
 } from "./entryPresentation";
+import type { CheckClickModifiers } from "./checkedSelection";
 import type { LibraryState, ViewMode } from "./libraryTypes";
 
 // Caps visible chips so a heavily-tagged mod cannot push a card's other
@@ -34,11 +35,14 @@ type ModCatalogProps = {
 	conflictedEntryIDs?: ReadonlySet<string> | undefined;
 	draggedEntryID: string | null;
 	onSetEnabled: (entry: discovery.Entry) => void;
-	onSelect: (entry: discovery.Entry) => void;
 	onContextMenu: (entry: discovery.Entry, event: MouseEvent) => void;
 	onRemoveTag: (entry: discovery.Entry, tagID: string) => void;
 	onDragStartMod: (entry: discovery.Entry) => void;
 	onDragEndMod: () => void;
+	// One callback for a card click: the owner decides both the checked set
+	// and the viewed mod from the same modifiers, so they cannot disagree.
+	onActivate: (entry: discovery.Entry, modifiers: CheckClickModifiers) => void;
+	checkedEntryIDs: ReadonlySet<string>;
 	selectedEntryID: string | null;
 	viewMode: ViewMode;
 };
@@ -59,11 +63,12 @@ type ModCardProps = {
 	hasConflict: boolean;
 	isDragging: boolean;
 	onSetEnabled: ModCatalogProps["onSetEnabled"];
-	onSelect: ModCatalogProps["onSelect"];
 	onContextMenu: ModCatalogProps["onContextMenu"];
 	onRemoveTag: ModCatalogProps["onRemoveTag"];
 	onDragStartMod: ModCatalogProps["onDragStartMod"];
 	onDragEndMod: ModCatalogProps["onDragEndMod"];
+	onActivate: ModCatalogProps["onActivate"];
+	checked: boolean;
 	selected: boolean;
 	viewMode: ModCatalogProps["viewMode"];
 };
@@ -123,7 +128,7 @@ function CatalogState({
 	);
 }
 
-// Renders already-scanned, locally-filtered entries without filesystem access.
+/** Renders already-scanned, locally-filtered entries without filesystem access. */
 export function ModCatalog({
 	entries,
 	state,
@@ -138,11 +143,12 @@ export function ModCatalog({
 	conflictedEntryIDs,
 	draggedEntryID,
 	onSetEnabled,
-	onSelect,
 	onContextMenu,
 	onRemoveTag,
 	onDragStartMod,
 	onDragEndMod,
+	onActivate,
+	checkedEntryIDs,
 	selectedEntryID,
 	viewMode,
 }: ModCatalogProps) {
@@ -182,11 +188,12 @@ export function ModCatalog({
 					hasConflict={conflictedEntryIDs?.has(entry.id) ?? false}
 					isDragging={draggedEntryID === entry.id}
 					onSetEnabled={onSetEnabled}
-					onSelect={onSelect}
 					onContextMenu={onContextMenu}
 					onRemoveTag={onRemoveTag}
 					onDragStartMod={onDragStartMod}
 					onDragEndMod={onDragEndMod}
+					onActivate={onActivate}
+					checked={checkedEntryIDs.has(entry.id)}
 					selected={selectedEntryID === entry.id}
 					viewMode={viewMode}
 				/>
@@ -206,11 +213,12 @@ const ModCard = memo(function ModCard({
 	hasConflict,
 	isDragging,
 	onSetEnabled,
-	onSelect,
 	onContextMenu,
 	onRemoveTag,
 	onDragStartMod,
 	onDragEndMod,
+	onActivate,
+	checked,
 	selected,
 	viewMode,
 }: ModCardProps) {
@@ -225,6 +233,7 @@ const ModCard = memo(function ModCard({
 	}
 	const enabled = entry.state === "enabled";
 	const disabled = entry.state === "disabled";
+	const encrypted = identity?.encrypted === true;
 	const categoryLabel = entryCategoryLabel(identity);
 	const characterLabel = entryCharacterLabel(identity);
 	const heroPortraitUrl = entryHeroPortraitUrl(identity);
@@ -257,6 +266,10 @@ const ModCard = memo(function ModCard({
 			)}
 		</div>
 	);
+	function handleCardActivate(event: MouseEvent<HTMLElement>) {
+		onActivate(entry, event);
+	}
+
 	const heading = (
 		<div className={styles["mod-card-heading"]}>
 			<button
@@ -264,7 +277,7 @@ const ModCard = memo(function ModCard({
 				className={styles["mod-thumbnail"]}
 				onClick={(event) => {
 					event.stopPropagation();
-					onSelect(entry);
+					handleCardActivate(event);
 				}}
 				disabled={isMutationLocked}
 				aria-label={
@@ -337,7 +350,7 @@ const ModCard = memo(function ModCard({
 					className={styles["mod-card-select"]}
 					onClick={(event) => {
 						event.stopPropagation();
-						onSelect(entry);
+						handleCardActivate(event);
 					}}
 					onContextMenu={(event) => {
 						event.preventDefault();
@@ -345,7 +358,11 @@ const ModCard = memo(function ModCard({
 						onContextMenu(entry, event);
 					}}
 				>
-					<span className="visually-hidden">Select {entry.displayName}</span>
+					<span className="visually-hidden">
+						{checked
+							? `${entry.displayName}, in the checked set`
+							: `Select ${entry.displayName}`}
+					</span>
 				</button>
 			</div>
 		);
@@ -372,6 +389,12 @@ const ModCard = memo(function ModCard({
 			<span className={styles["mod-toggle-knob"]} aria-hidden="true" />
 		</button>
 	) : null;
+	const lockMark = encrypted ? (
+		<span className={styles["mod-lock"]} title="Encrypted">
+			<Lock aria-hidden="true" />
+			<span className="visually-hidden">Encrypted</span>
+		</span>
+	) : null;
 	const issues = entry.issues?.length ? (
 		<ul className={styles.issues}>
 			{entry.issues.map((issue) => (
@@ -388,13 +411,15 @@ const ModCard = memo(function ModCard({
 				className={[
 					styles["list-mod-row"],
 					disabled ? styles["is-disabled"] : "",
+					encrypted ? styles["is-encrypted"] : "",
 					selected ? styles["is-selected"] : "",
+					checked ? styles["is-checked"] : "",
 					isDragging ? styles.dragging : "",
 				]
 					.filter(Boolean)
 					.join(" ")}
 				draggable={canDrag}
-				onClick={() => onSelect(entry)}
+				onClick={handleCardActivate}
 				onContextMenu={(event) => {
 					event.preventDefault();
 					onContextMenu(entry, event);
@@ -402,6 +427,7 @@ const ModCard = memo(function ModCard({
 				onDragStart={handleDragStart}
 				onDragEnd={onDragEndMod}
 			>
+				{lockMark}
 				<div className={styles["list-mod-summary"]}>
 					{selectionArea(false)}
 					<div className={styles["list-mod-controls"]}>
@@ -420,13 +446,15 @@ const ModCard = memo(function ModCard({
 			className={[
 				styles["mod-card"],
 				disabled ? styles["is-disabled"] : "",
+				encrypted ? styles["is-encrypted"] : "",
 				selected ? styles["is-selected"] : "",
+				checked ? styles["is-checked"] : "",
 				isDragging ? styles.dragging : "",
 			]
 				.filter(Boolean)
 				.join(" ")}
 			draggable={canDrag}
-			onClick={() => onSelect(entry)}
+			onClick={handleCardActivate}
 			onContextMenu={(event) => {
 				event.preventDefault();
 				onContextMenu(entry, event);
@@ -434,6 +462,7 @@ const ModCard = memo(function ModCard({
 			onDragStart={handleDragStart}
 			onDragEnd={onDragEndMod}
 		>
+			{lockMark}
 			{selectionArea(true)}
 			{tagsRow}
 			{toggleControl}

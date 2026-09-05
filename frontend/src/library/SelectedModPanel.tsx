@@ -1,46 +1,30 @@
 import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
 import styles from "./SelectedModPanel.module.css";
-import {
-	canChangeModState,
-	canDeleteMod,
-	entryCategoryLabel,
-	entryCharacterLabel,
-	entryStateLabel,
-} from "./entryPresentation";
+import { entryCategoryLabel, entryCharacterLabel, entryStateLabel } from "./entryPresentation";
 
 type SelectedModPanelProps = {
 	entry: discovery.Entry | null;
 	identity?: modtype.Identity | undefined;
 	isClassifying?: boolean | undefined;
 	assignedTags: metadata.Tag[];
-	isMutating: boolean;
-	isMutationLocked: boolean;
-	onClear: () => void;
-	onSetEnabled: (entry: discovery.Entry) => void;
-	onDelete: () => void;
 };
 
-// Keeps the current selection and its available actions in one stable location.
+/** Status readout for the viewed mod. Actions live on the card, context menu, and header Actions. */
 export function SelectedModPanel({
 	entry,
 	identity,
 	isClassifying,
 	assignedTags,
-	isMutating,
-	isMutationLocked,
-	onClear,
-	onSetEnabled,
-	onDelete,
 }: SelectedModPanelProps) {
 	if (!entry) {
 		return (
 			<section
 				className={[styles["selected-mod-panel"], styles.empty].join(" ")}
-				aria-label="Mod actions"
+				aria-label="Selected mod"
 			>
 				<div>
-					<p className="eyebrow">Mod actions</p>
-					<p>Select a mod to organize it.</p>
+					<p className="eyebrow">Selected mod</p>
+					<p>Select a mod to inspect it.</p>
 				</div>
 				<p className={styles["selected-mod-hint"]}>
 					Right-click a mod for rename, priority, and move actions.
@@ -49,14 +33,12 @@ export function SelectedModPanel({
 		);
 	}
 
-	const canChangeState = canChangeModState(entry);
-	const enabled = entry.state === "enabled";
 	const stateLabel = entryStateLabel(entry);
 	const categoryLabel = entryCategoryLabel(identity);
 	const characterLabel = entryCharacterLabel(identity);
 
 	return (
-		<section className={styles["selected-mod-panel"]} aria-label="Selected mod actions">
+		<section className={styles["selected-mod-panel"]} aria-label="Selected mod">
 			<div className={styles["selected-mod-details"]}>
 				<p className="eyebrow">Selected mod</p>
 				<h3>{entry.displayName}</h3>
@@ -77,44 +59,6 @@ export function SelectedModPanel({
 						))}
 					</ul>
 				)}
-			</div>
-			<div className={styles["selected-mod-actions"]}>
-				{canChangeState && (
-					<button
-						type="button"
-						className={styles["mod-action"]}
-						disabled={isMutationLocked}
-						onClick={() => onSetEnabled(entry)}
-					>
-						{isMutating
-							? enabled
-								? "Disabling..."
-								: "Enabling..."
-							: isMutationLocked
-								? "Working..."
-								: enabled
-									? "Disable"
-									: "Enable"}
-					</button>
-				)}
-				{canDeleteMod(entry) && (
-					<button
-						type="button"
-						className="destructive-button"
-						disabled={isMutationLocked}
-						onClick={onDelete}
-					>
-						Delete
-					</button>
-				)}
-				<button
-					type="button"
-					className="quiet-button"
-					disabled={isMutationLocked}
-					onClick={onClear}
-				>
-					Clear selection
-				</button>
 			</div>
 		</section>
 	);

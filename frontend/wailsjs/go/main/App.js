@@ -14,6 +14,10 @@ export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
+export function CancelEncryption() {
+  return window['go']['main']['App']['CancelEncryption']();
+}
+
 export function CancelInstall(arg1) {
   return window['go']['main']['App']['CancelInstall'](arg1);
 }
@@ -72,6 +76,10 @@ export function DetectLibrary(arg1) {
 
 export function DownloadUpdate(arg1) {
   return window['go']['main']['App']['DownloadUpdate'](arg1);
+}
+
+export function EncryptionType() {
+  return window['go']['main']['App']['EncryptionType']();
 }
 
 export function GetAppVersion() {
@@ -140,6 +148,10 @@ export function SetLibraryProvider(arg1) {
 
 export function SetModEnabled(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetModEnabled'](arg1, arg2, arg3);
+}
+
+export function SetModEncryption(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SetModEncryption'](arg1, arg2, arg3);
 }
 
 export function SetModPriority(arg1, arg2, arg3) {

@@ -36,6 +36,18 @@ The app reports download and install failures as toasts - note the message, then
 
 The link must be the direct download - the URL the browser actually saves the file from - and it must start with `https://`. A link to a mod *page* (where you click a Download button) won't work; copy the file's direct link instead. Supported targets are `.zip`, `.7z`, `.rar` archives and bare `.pak`/`.utoc`/`.ucas` files.
 
+## Encrypt or Decrypt is greyed out
+
+The Actions menu only encrypts complete IoStore mods (`.pak` + `.utoc` + `.ucas`). Classic PAK mods, incomplete bundles, and orphaned sidecars are ineligible. If the checked set mixes encrypted and unencrypted IoStore mods, the action stays disabled until you check only one kind.
+
+## Encrypt or Decrypt says the game is running
+
+Cratebug will not rebuild a live bundle while Marvel Rivals is running. Close the game, then try again.
+
+## An encrypt or decrypt failed partway through
+
+Each mod is rebuilt on its own. A failure leaves that mod as it was. Mods that already finished stay encrypted or decrypted. Read the toast, then retry the ones that failed. If a hybrid mod (audio or other raw files next to Unreal assets) fails with a message about raw files that could not be extracted, stop and report it rather than retrying blindly.
+
 ## Something else
 
 Open an issue on the [issue tracker](https://github.com/Kuusouu/Cratebug/issues) with what you did, what you expected, and what happened.

@@ -9,10 +9,9 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 )
 
-// Reported when a mod's type cannot be resolved without a capability
-// Cratebug does not have yet. Currently this is only an encrypted IoStore
-// container: Cratebug does not manage AES keys for encrypted mods, so its
-// contents cannot be listed.
+// Reported when a mod's type cannot be resolved because it has no listable
+// content (missing .utoc, unrecognized format). Encrypted IoStore containers
+// are listed with the Marvel Rivals AES key and no longer return this error.
 var ErrCannotDetermineType = errors.New("modtype: cannot determine type")
 
 // Sends one worker request and decodes its data payload into result.
@@ -28,8 +27,8 @@ type caller interface {
 // entry's paths are relative to.
 //
 // Determine returns ErrCannotDetermineType, not a lower-level error, when
-// the mod is an encrypted IoStore container or otherwise has no listable
-// content; callers should treat that as "unknown for now", not a failure.
+// the mod has no listable content. Callers should treat that as
+// "unknown for now", not a failure.
 //
 // This package ships no pooling of its own: run Determine sequentially
 // against one reused worker for routine per-mod use. A caller classifying
@@ -53,41 +52,53 @@ func Determine(c caller, root string, entry discovery.Entry) (Category, error) {
 // can resolve its paths directly instead of duplicating the per-format
 // listing logic below.
 func ListInternalPaths(c caller, root string, entry discovery.Entry) ([]string, error) {
+	paths, _, err := ListInternal(c, root, entry)
+	return paths, err
+}
+
+// Resolves entry's internal asset paths and whether its IoStore container is
+// AES-encrypted. Classic PAKs always report encrypted=false. Encrypted
+// IoStore listings use the Marvel Rivals game key.
+func ListInternal(c caller, root string, entry discovery.Entry) ([]string, bool, error) {
 	if entry.Kind != discovery.EntryMod {
-		return nil, fmt.Errorf("modtype: entry %q is not a mod", entry.ID)
+		return nil, false, fmt.Errorf("modtype: entry %q is not a mod", entry.ID)
 	}
 
 	switch entry.BundleFormat {
 	case discovery.BundleFormatClassic:
 		listing, err := uassettool.ListPak(c, absPath(root, entry.PrimaryPath))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		paths := make([]string, len(listing))
 		for i, file := range listing {
 			paths[i] = file.Path
 		}
-		return paths, nil
+		return paths, false, nil
 
 	case discovery.BundleFormatIoStore:
 		if entry.Sidecars.UTOC == "" {
-			return nil, fmt.Errorf("%w: %q has no .utoc sidecar to list", ErrCannotDetermineType, entry.ID)
+			return nil, false, fmt.Errorf("%w: %q has no .utoc sidecar to list", ErrCannotDetermineType, entry.ID)
 		}
 
 		utocPath := absPath(root, entry.Sidecars.UTOC)
 		encrypted, err := uassettool.IsIoStoreEncrypted(c, utocPath)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		aesKey := ""
 		if encrypted {
-			return nil, fmt.Errorf("%w: %q is an encrypted IoStore container", ErrCannotDetermineType, entry.ID)
+			aesKey = uassettool.MarvelRivalsAESKey
 		}
-
-		return uassettool.ListIoStoreFiles(c, utocPath, "")
+		paths, err := uassettool.ListIoStoreFiles(c, utocPath, aesKey)
+		if err != nil {
+			return nil, encrypted, err
+		}
+		return paths, encrypted, nil
 
 	default:
-		return nil, fmt.Errorf("%w: %q has no recognized bundle format", ErrCannotDetermineType, entry.ID)
+		return nil, false, fmt.Errorf("%w: %q has no recognized bundle format", ErrCannotDetermineType, entry.ID)
 	}
 }
 

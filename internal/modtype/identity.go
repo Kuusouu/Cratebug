@@ -5,12 +5,15 @@ import "github.com/Kuusouu/Cratebug/internal/discovery"
 // Extends Determine's category with a resolved hero ID, hero name, skin ID, and skin name,
 // where the same internal path listing makes one determinable. CharacterID, CharacterName,
 // SkinID, and SkinName are empty when unresolved: absence of a hero name is not an error.
+// Encrypted is true when the IoStore container is AES-obfuscated with the
+// Marvel Rivals game key. Classic PAKs are always false.
 type Identity struct {
 	Category      Category `json:"category"`
 	CharacterID   string   `json:"characterID"`
 	CharacterName string   `json:"characterName"`
 	SkinID        string   `json:"skinID"`
 	SkinName      string   `json:"skinName"`
+	Encrypted     bool     `json:"encrypted"`
 }
 
 // Resolves entry's category and, where possible, its hero ID, hero name, skin ID, and skin name,
@@ -30,7 +33,7 @@ type Identity struct {
 // alongside Identity so a later asset conflict scan (Phase 9) can reuse it
 // instead of listing the same mod's contents a second time.
 func DetermineIdentity(c caller, root string, entry discovery.Entry, table CharacterTable) (Identity, []string, error) {
-	paths, err := ListInternalPaths(c, root, entry)
+	paths, encrypted, err := ListInternal(c, root, entry)
 	if err != nil {
 		return Identity{}, nil, err
 	}
@@ -42,5 +45,6 @@ func DetermineIdentity(c caller, root string, entry discovery.Entry, table Chara
 		CharacterName: characterName,
 		SkinID:        skinID,
 		SkinName:      skinName,
+		Encrypted:     encrypted,
 	}, paths, nil
 }

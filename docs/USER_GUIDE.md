@@ -1,6 +1,6 @@
 # Cratebug user guide
 
-This covers installing Cratebug, keeping it updated, and installing mods from a URL. For everyday library management (enabling mods, organizing folders, tags, conflict checking), the app itself is the reference — this guide only covers the parts that happen outside normal day-to-day use. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
+This covers installing Cratebug, keeping it updated, installing mods from a URL, and acting on several mods at once (including encrypting complete IoStore bundles). For other everyday library management, the app itself is the reference. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
 
 ## Installing
 
@@ -43,4 +43,24 @@ If you have a direct download link to a mod archive (a `.zip`, `.7z`, `.rar`, or
 
 Cratebug downloads the file and takes you straight to the same install preview you'd get from picking a local file — same collision checks, same hero/skin detection, same control over the destination folder and mod name before anything is actually installed.
 
-A link that requires clicking through a webpage (like a mod page's "Download" button that lands on another page) won't work directly — you need the URL the browser actually downloads from, not the page that links to it.
+A link that requires clicking through a webpage (like a mod page's "Download" button that lands on another page) won't work directly. You need the URL the browser actually downloads from, not the page that links to it.
+
+## Checking several mods at once
+
+Clicking a card opens it in the details panel and makes it the only checked mod. Click that same card again to deselect it.
+
+- Hold Ctrl and click another card to add or remove it without clearing the rest.
+- Shift+click selects every visible mod from the last checked one to the one you clicked. Shift+Ctrl+click removes that range.
+- **Select all** checks every mod in the current folder and search filter. **Clear** empties the set and deselects the viewed card.
+
+The catalog header shows how many mods are checked. The **Actions** menu (three-dot button next to Tags) runs Enable, Disable, Move, Tags, Encrypt/Decrypt, or Delete on that set. Right-click selects that card if it was not already checked, then offers rename, priority, move, tags, and delete for that one row.
+
+A batch that only partly succeeds says so. It does not call the whole run a success.
+
+## Encrypting or decrypting IoStore mods
+
+Encrypt and Decrypt live only in the Actions menu. They rebuild each complete IoStore bundle (`.pak` + `.utoc` + `.ucas`) so the Marvel Rivals game key wraps the container. Classic PAK mods cannot be encrypted. A mix of encrypted and unencrypted IoStore mods disables the action until the set is uniform.
+
+Encryption is a rebuild, not a bit-flip. Large mods can take several minutes. Close Marvel Rivals first. A failed rebuild leaves that one mod as it was. Mods that already finished in the same batch stay changed.
+
+A lock mark on a card means that IoStore bundle is encrypted. The category pill (Mesh, UI, and so on) does not change.

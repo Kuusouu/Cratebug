@@ -340,8 +340,37 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Tests use injectable manifests under `t.TempDir`, never ProgramData or the real game.
 - Canonical checks pass; running-app Epic states are screenshotted and reviewed.
 
+## Phase 14 - Batch actions and in-place encryption
+
+**Status:** Complete. Review approved 2026-09-05; see `docs/reviews/phase-14-review.md`.
+
+**Outcome:** Users can check many mods and run the same action on the set from one Actions menu, including encrypting or decrypting complete IoStore bundles in place.
+
+**Includes:**
+
+- Viewing vs checked selection, Ctrl/Shift range, Select all / Clear
+- Catalog-header Actions dropdown (Enable, Disable, Move, Tags, Encrypt/Decrypt, Delete)
+- Batch organize by looping current one-mod mutations, with partial-success reporting
+- Hardcoded Marvel Rivals AES key in Go, `Identity.encrypted`, and listing encrypted IoStore with that key
+- In-place IoStore encrypt/decrypt through UAssetToolRivals (`extract_iostore` + `create_mod_iostore` `obfuscate`) and a lock mark on cards
+- Mixed-state and ineligible-format disable rules, plus confirm copy that encryption is a rebuild
+- Game-running lock, temp+replace+rollback, progress, and cancellation
+- Decision 0005 for the key, the write-surface expansion, and the selection/menu pattern
+
+**Excludes:** Install-time obfuscation, classic-PAK encryption, converting classic mods to IoStore, a cluttered persistent Bento toolbar, new batch Wails methods for enable/move/tags/delete, exposing the AES key to the frontend, VFX/recompress, and BentoMod changes.
+
+**Exit criteria:**
+
+- Click, Ctrl+click, Shift-range, Select all, and Clear work in compact, large, and list.
+- The Actions menu operates on the checked set. An empty set disables it.
+- Batch enable/disable/move/tags/delete report partial success and never claim full success on a mixed result.
+- Encrypted IoStore mods classify (not Unknown) and show a lock.
+- Encrypt and Decrypt succeed on disposable IoStore fixtures. Mixed or classic selections stay disabled.
+- Failed or cancelled encrypt leaves no partial bundle presented as the new mod.
+- Canonical checks pass. Running-app states are screenshotted and reviewed.
+
 ## Deferred post-release work
 
-Potential later work includes BentoMod/Repak-X state migration, batch operations, filesystem watching, full backup and restore, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
+Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, filesystem watching, full backup and restore, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
 
 These require separate specification and roadmap decisions.

@@ -129,6 +129,8 @@ Cratebug should eventually allow users to:
 - Attach and preserve metadata such as tags.
 - Refresh after external filesystem changes.
 - View clear progress and failures for long-running operations.
+- Check more than one mod and run the same organize or encryption action on the checked set.
+- Encrypt or decrypt a complete IoStore bundle already in the library.
 
 The roadmap determines implementation order.
 
@@ -136,9 +138,13 @@ The roadmap determines implementation order.
 
 Cratebug must treat a primary file and its recognized sidecars as one logical bundle during controlled operations.
 
-Rename, move, priority, deletion, and installation operations must be planned against the complete recognized bundle before mutation begins.
+Rename, move, priority, deletion, installation, and encryption operations must be planned against the complete recognized bundle before mutation begins.
+
+A checked set is a batch target distinct from the currently viewed mod. Clicking a card views that mod and makes it the only checked member. Clicking it again clears both. Ctrl+click toggles membership without clearing the rest. Shift+click ranges over the current filtered list. There is no always-visible checkbox on the card. Batch organize actions apply the existing one-mod operation to each checked member. Encryption of several mods is one library mutation that still plans and replaces each bundle on its own.
 
 Cratebug must not silently modify only part of a bundle and then report success.
+
+A batch that succeeds for some members and fails for others must report a partial result. It must not claim full success.
 
 After an operation, Cratebug must inspect affected paths and reconcile its displayed state with the filesystem.
 
@@ -210,6 +216,7 @@ Mutating operations are blocked by default while the game process is running, in
 - Move
 - Delete
 - Installation or replacement
+- Encrypt or decrypt
 
 An advanced override is deferred and must never be enabled by default.
 
@@ -270,6 +277,10 @@ Cratebug must access it through a narrow boundary so that:
 The integration uses a supervised helper process speaking newline-delimited JSON over stdin/stdout, not NativeAOT FFI. This was decided after a focused review and prototype; see `docs/decisions/0003-uassettoolrivals-boundary.md` for the evidence and the concrete reasons FFI was not selected.
 
 Only required operations should be integrated.
+
+Cratebug may encrypt or decrypt a complete IoStore bundle already in the library by asking UAssetToolRivals to extract it and recreate it with or without obfuscation. That is a rebuild, not a bit-flip of the existing files. Classic PAK encryption and install-time obfuscation are out of scope until a later phase.
+
+The Marvel Rivals AES key used to read and write obfuscated IoStore containers stays in the Go backend. The frontend may receive an `encrypted` boolean. It must not receive the key.
 
 ## 16. User interface direction
 
