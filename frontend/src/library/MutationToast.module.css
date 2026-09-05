@@ -1,0 +1,100 @@
+.mutation-toast {
+	display: flex;
+	position: fixed;
+	/* Above dialog backdrops (z-index 30) and the drop overlay (z-index 40) so
+	   a toast fired while a dialog is open (e.g. "Check for updates" finishing
+	   before Settings closes) isn't blurred and dimmed into unreadability by
+	   the backdrop sitting on top of it. */
+	z-index: 45;
+	bottom: 1.5rem;
+	left: 50%;
+	width: min(24rem, calc(100vw - 2.5rem));
+	padding: 0.75rem 0.8rem;
+	align-items: start;
+	gap: 0.65rem;
+	border: 1px solid var(--line);
+	border-radius: 0.7rem;
+	background: color-mix(in srgb, var(--panel-raised), transparent 18%);
+	box-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.24);
+	backdrop-filter: blur(1rem) saturate(1.1);
+	-webkit-backdrop-filter: blur(1rem) saturate(1.1);
+	animation: toast-enter 160ms ease-out;
+	transform: translateX(-50%);
+}
+
+.mutation-toast.success {
+	border-color: color-mix(in srgb, var(--good), transparent 42%);
+}
+
+.mutation-toast.error {
+	border-color: color-mix(in srgb, var(--bad), transparent 38%);
+}
+
+.mutation-toast.warning {
+	border-color: color-mix(in srgb, var(--accent), transparent 38%);
+}
+
+.mutation-toast > svg {
+	width: 1.1rem;
+	height: 1.1rem;
+	margin-top: 0.05rem;
+	flex: 0 0 auto;
+}
+
+.mutation-toast.success > svg {
+	color: var(--good);
+}
+
+.mutation-toast.error > svg {
+	color: var(--bad);
+}
+
+.mutation-toast.warning > svg {
+	color: var(--accent);
+}
+
+.mutation-toast p {
+	min-width: 0;
+	margin: 0;
+	flex: 1;
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+
+.mutation-toast-close {
+	display: grid;
+	width: 1.65rem;
+	height: 1.65rem;
+	place-items: center;
+	padding: 0;
+	border: 1px solid transparent;
+	border-radius: 0.4rem;
+	background: transparent;
+	color: var(--muted);
+}
+
+.mutation-toast-close:hover:not(:disabled) {
+	border-color: var(--line);
+	background: color-mix(in srgb, var(--muted), transparent 90%);
+	color: var(--text);
+	filter: none;
+}
+
+.mutation-toast-close svg {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+@keyframes toast-enter {
+	from {
+		opacity: 0;
+		transform: translate(-50%, 0.5rem);
+	}
+
+	to {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+}

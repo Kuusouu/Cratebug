@@ -1,4 +1,5 @@
 import { Package, ShieldAlert, X } from "lucide-react";
+import styles from "./ModCatalog.module.css";
 import { type DragEvent, memo, type MouseEvent, type ReactNode } from "react";
 import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
 import {
@@ -110,7 +111,11 @@ function CatalogState({
 	children,
 }: CatalogMessage & { children?: ReactNode }) {
 	return (
-		<div className={`catalog-state${isError ? " error" : ""}`}>
+		<div
+			className={[styles["catalog-state"], isError ? styles.error : ""]
+				.filter(Boolean)
+				.join(" ")}
+		>
 			<h3>{heading}</h3>
 			<p>{message}</p>
 			{children}
@@ -160,7 +165,11 @@ export function ModCatalog({
 	}
 
 	return (
-		<div className={`mod-grid view-${viewMode}`}>
+		<div
+			className={[styles["mod-grid"], styles[`view-${viewMode}`], "scroll-y"]
+				.filter(Boolean)
+				.join(" ")}
+		>
 			{entries.map((entry) => (
 				<ModCard
 					entry={entry}
@@ -221,10 +230,14 @@ const ModCard = memo(function ModCard({
 	const heroPortraitUrl = entryHeroPortraitUrl(identity);
 	const isOrphaned = entry.kind === "orphaned_sidecar";
 	const facts = (
-		<div className="mod-facts">
+		<div className={styles["mod-facts"]}>
 			{isOrphaned && <span>Orphaned sidecar</span>}
 			{entry.bundleFormat && (
-				<span className={`bundle-format-badge ${entry.bundleFormat}`}>
+				<span
+					className={[styles["bundle-format-badge"], styles[entry.bundleFormat]]
+						.filter(Boolean)
+						.join(" ")}
+				>
 					{entry.bundleFormat === "iostore" ? "IoStore" : "Classic"}
 				</span>
 			)}
@@ -237,7 +250,7 @@ const ModCard = memo(function ModCard({
 			) : null}
 			<span>Priority {entry.priority.value}</span>
 			{hasConflict && (
-				<span className="mod-conflict-badge">
+				<span className={styles["mod-conflict-badge"]}>
 					<ShieldAlert aria-hidden="true" />
 					Conflict
 				</span>
@@ -245,10 +258,10 @@ const ModCard = memo(function ModCard({
 		</div>
 	);
 	const heading = (
-		<div className="mod-card-heading">
+		<div className={styles["mod-card-heading"]}>
 			<button
 				type="button"
-				className="mod-thumbnail"
+				className={styles["mod-thumbnail"]}
 				onClick={(event) => {
 					event.stopPropagation();
 					onSelect(entry);
@@ -264,12 +277,12 @@ const ModCard = memo(function ModCard({
 					<Package aria-hidden="true" />
 				)}
 				{characterLabel && (
-					<span className="mod-thumbnail-tooltip" role="tooltip">
+					<span className={styles["mod-thumbnail-tooltip"]} role="tooltip">
 						{characterLabel}
 					</span>
 				)}
 			</button>
-			<div className="mod-card-heading-info">
+			<div className={styles["mod-card-heading-info"]}>
 				<h3>{entry.displayName}</h3>
 				<p>{entry.relativeFolder || "Library root"}</p>
 			</div>
@@ -283,7 +296,7 @@ const ModCard = memo(function ModCard({
 	// pointer events meant for a remove chip nested underneath it.
 	const tagsRow =
 		canTagMod(entry) && tags.length > 0 ? (
-			<ul className="mod-card-tags" aria-label="Tags">
+			<ul className={styles["mod-card-tags"]} aria-label="Tags">
 				{visibleTags.map((tag) => (
 					<li key={tag.id}>
 						<span>{tag.name}</span>
@@ -301,7 +314,7 @@ const ModCard = memo(function ModCard({
 				))}
 				{overflowTags.length > 0 && (
 					<li
-						className="mod-card-tags-overflow"
+						className={styles["mod-card-tags-overflow"]}
 						title={overflowTags.map((tag) => tag.name).join(", ")}
 					>
 						+{overflowTags.length}
@@ -315,13 +328,13 @@ const ModCard = memo(function ModCard({
 	// covers the same area and carries the keyboard/click target instead.
 	function selectionArea(includeFacts: boolean) {
 		return (
-			<div className="mod-card-select-area">
+			<div className={styles["mod-card-select-area"]}>
 				{heading}
 				{includeFacts && facts}
 				<button
 					type="button"
 					aria-pressed={selected}
-					className="mod-card-select"
+					className={styles["mod-card-select"]}
 					onClick={(event) => {
 						event.stopPropagation();
 						onSelect(entry);
@@ -349,18 +362,18 @@ const ModCard = memo(function ModCard({
 			aria-checked={enabled}
 			aria-busy={isMutating}
 			aria-label={`${enabled ? "Disable" : "Enable"} ${entry.displayName}`}
-			className="mod-toggle"
+			className={styles["mod-toggle"]}
 			disabled={isMutationLocked}
 			onClick={(event) => {
 				event.stopPropagation();
 				onSetEnabled(entry);
 			}}
 		>
-			<span className="mod-toggle-knob" aria-hidden="true" />
+			<span className={styles["mod-toggle-knob"]} aria-hidden="true" />
 		</button>
 	) : null;
 	const issues = entry.issues?.length ? (
-		<ul className="issues">
+		<ul className={styles.issues}>
 			{entry.issues.map((issue) => (
 				<li key={issue.code}>{issue.message}</li>
 			))}
@@ -372,7 +385,14 @@ const ModCard = memo(function ModCard({
 			// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the row click only extends selection to its empty pointer area.
 			<article
 				aria-busy={isMutating}
-				className={`list-mod-row${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}${isDragging ? " dragging" : ""}`}
+				className={[
+					styles["list-mod-row"],
+					disabled ? styles["is-disabled"] : "",
+					selected ? styles["is-selected"] : "",
+					isDragging ? styles.dragging : "",
+				]
+					.filter(Boolean)
+					.join(" ")}
 				draggable={canDrag}
 				onClick={() => onSelect(entry)}
 				onContextMenu={(event) => {
@@ -382,9 +402,9 @@ const ModCard = memo(function ModCard({
 				onDragStart={handleDragStart}
 				onDragEnd={onDragEndMod}
 			>
-				<div className="list-mod-summary">
+				<div className={styles["list-mod-summary"]}>
 					{selectionArea(false)}
-					<div className="list-mod-controls">
+					<div className={styles["list-mod-controls"]}>
 						{facts}
 						{toggleControl}
 					</div>
@@ -397,7 +417,14 @@ const ModCard = memo(function ModCard({
 		// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
 		<article
 			aria-busy={isMutating}
-			className={`mod-card${disabled ? " is-disabled" : ""}${selected ? " is-selected" : ""}${isDragging ? " dragging" : ""}`}
+			className={[
+				styles["mod-card"],
+				disabled ? styles["is-disabled"] : "",
+				selected ? styles["is-selected"] : "",
+				isDragging ? styles.dragging : "",
+			]
+				.filter(Boolean)
+				.join(" ")}
 			draggable={canDrag}
 			onClick={() => onSelect(entry)}
 			onContextMenu={(event) => {

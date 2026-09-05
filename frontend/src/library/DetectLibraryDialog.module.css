@@ -1,0 +1,19 @@
+.detect-dialog-logo {
+	width: 1rem;
+	height: 1rem;
+	flex: 0 0 auto;
+	vertical-align: -0.15em;
+}
+
+.detect-dialog-path {
+	display: block;
+	max-width: 100%;
+	margin: 0.35rem 0;
+	padding: 0.45rem 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: var(--panel-raised);
+	font-size: 0.8rem;
+	overflow-wrap: anywhere;
+	text-align: left;
+}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import styles from "./DetectLibraryDialog.module.css";
 import type { gamedetect } from "../../wailsjs/go/models";
 import { type LibraryProvider, libraryProviderLabels } from "./libraryTypes";
 import { providerLogos } from "./StoreLogos";
@@ -75,7 +76,7 @@ export function DetectLibraryDialog({
 			>
 				<div>
 					<p className="eyebrow">
-						<Logo className="detect-dialog-logo" /> {label}
+						<Logo className={styles["detect-dialog-logo"] ?? ""} /> {label}
 					</p>
 					{mode === "apply" ? (
 						<>
@@ -84,7 +85,9 @@ export function DetectLibraryDialog({
 							</h2>
 							<p>
 								Your {label} library already exists at{" "}
-								<code className="detect-dialog-path">{detection.libraryPath}</code>
+								<code className={styles["detect-dialog-path"]}>
+									{detection.libraryPath}
+								</code>
 							</p>
 							<p>Use it as your mod library?</p>
 						</>
@@ -95,7 +98,9 @@ export function DetectLibraryDialog({
 							</h2>
 							<p>
 								Cratebug found Marvel Rivals in your {label} installation at{" "}
-								<code className="detect-dialog-path">{detection.paksPath}</code>
+								<code className={styles["detect-dialog-path"]}>
+									{detection.paksPath}
+								</code>
 							</p>
 							<p>
 								The <code>~mods</code> folder it loads mods from does not exist yet.

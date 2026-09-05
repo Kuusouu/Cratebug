@@ -1,18 +1,13 @@
 import {
-	ChevronRight,
-	CircleAlert,
-	CircleCheckBig,
 	Grid2X2,
 	Link,
 	List,
-	Package,
 	PanelsTopLeft,
 	PackagePlus,
 	Settings as SettingsIcon,
 	ShieldAlert,
-	TriangleAlert,
-	X,
 } from "lucide-react";
+import styles from "./LibraryScreen.module.css";
 import {
 	useCallback,
 	type CSSProperties,
@@ -38,7 +33,6 @@ import {
 	DetectLibrary,
 	DownloadUpdate,
 	GetAppVersion,
-	IsFolderEmpty,
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
@@ -67,19 +61,13 @@ import {
 } from "../../wailsjs/go/models";
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
+import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
 import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
+import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { DetectLibraryDialog } from "./DetectLibraryDialog";
-import {
-	canChangeModState,
-	canDeleteMod,
-	canOrganizeMod,
-	canTagMod,
-	characterHeroPortraitUrl,
-	entryCategoryLabel,
-	entryCharacterLabel,
-	entryStateLabel,
-	hasMissingSidecar,
-} from "./entryPresentation";
+import { canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
+import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
+import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
 import { InstallFromUrlDialog } from "./InstallFromUrlDialog";
 import { type InstallSource, InstallPreviewDialog } from "./InstallPreviewDialog";
@@ -99,11 +87,14 @@ import {
 	viewModes,
 } from "./libraryTypes";
 import { ModCatalog } from "./ModCatalog";
+import { ModMutationDialog } from "./ModMutationDialog";
+import { ModTagDialog } from "./ModTagDialog";
+import { type MutationFeedback, MutationToast } from "./MutationToast";
+import { SelectedModPanel } from "./SelectedModPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { providerLogos } from "./StoreLogos";
 import { TagMenu } from "./TagMenu";
 import { type UpdateDownloadProgress, UpdateDialog } from "./UpdateDialog";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type LibraryIndex = {
 	folders: string[];
@@ -118,103 +109,15 @@ type ViewModeButtonProps = {
 	onSelect: (mode: ViewMode) => void;
 };
 
-type SelectedModPanelProps = {
-	entry: discovery.Entry | null;
-	identity?: modtype.Identity | undefined;
-	isClassifying?: boolean | undefined;
-	assignedTags: metadata.Tag[];
-	isMutating: boolean;
-	isMutationLocked: boolean;
-	onClear: () => void;
-	onSetEnabled: (entry: discovery.Entry) => void;
-	onDelete: () => void;
-};
-
 type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags";
 
-type ModMutationDialogProps = {
-	entry: discovery.Entry;
-	folders: string[];
-	isMutating: boolean;
-	mode: MutationDialog;
-	onClose: () => void;
-	onMove: (entry: discovery.Entry, destinationFolder: string) => Promise<boolean>;
-	onRename: (entry: discovery.Entry, name: string) => Promise<boolean>;
-	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
-};
-
 type FolderDialogMode = "create" | "rename" | "move" | "delete";
-
-type FolderMutationDialogProps = {
-	folders: string[];
-	isMutating: boolean;
-	mode: FolderDialogMode;
-	targetFolder: string;
-	onClose: () => void;
-	onCreate: (parentFolder: string, name: string) => Promise<boolean>;
-	onMove: (folder: string, destinationParent: string) => Promise<boolean>;
-	onRename: (folder: string, name: string) => Promise<boolean>;
-};
-
-type DeleteConfirmDialogProps = {
-	entry: discovery.Entry;
-	isMutating: boolean;
-	onClose: () => void;
-	onConfirm: (entry: discovery.Entry) => Promise<boolean>;
-};
-
-type FolderDeleteConfirmDialogProps = {
-	folder: string;
-	libraryRoot: string;
-	isMutating: boolean;
-	onClose: () => void;
-	onConfirm: (folder: string) => Promise<boolean>;
-};
-
-type ModTagDialogProps = {
-	entry: discovery.Entry;
-	catalog: metadata.Tag[];
-	assignedTagIDs: ReadonlySet<string>;
-	onClose: () => void;
-	onCreateAndAssign: (name: string) => Promise<boolean>;
-	onToggle: (tag: metadata.Tag, assign: boolean) => Promise<boolean>;
-};
-
-type MutationFeedback = {
-	id: number;
-	kind: "error" | "success" | "warning";
-	message: string;
-};
-
-type MutationToastProps = {
-	feedback: MutationFeedback;
-	onDismiss: () => void;
-};
-
-type ConflictDetailsDialogProps = {
-	result: conflict.Result;
-	entries: readonly discovery.Entry[];
-	identitiesByEntryID: Record<string, modtype.Identity>;
-	isMutationLocked: boolean;
-	onClose: () => void;
-	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
-};
 
 const viewModeIcons = {
 	compact: Grid2X2,
 	large: PanelsTopLeft,
 	list: List,
 } satisfies Record<ViewMode, typeof Grid2X2>;
-
-const successToastDurationMilliseconds = 5000;
-// Errors stay visible longer so people can read and dismiss actionable recovery guidance.
-const errorToastDurationMilliseconds = 8000;
-// Mirrors internal/mutation's Windows filename component limit (see maximumFileNameUTF16CodeUnits).
-const maximumFileNameUTF16CodeUnits = 255;
-// Mirrors discovery.MinimumTrailingNines, the shortest trailing-nine priority form.
-const minimumTrailingNines = 7;
-// SPEC.md requires a short deliberate delay before destructive confirmation.
-const deleteConfirmDelaySeconds = 3;
 
 // Build subtree lookups once per scan so folder navigation does not repeatedly scan the library.
 // Starts from the scanner's complete folder list, not just folders containing mods, so an empty
@@ -318,11 +221,6 @@ function orphanedTaggedModCount(
 		}
 	}
 	return count;
-}
-
-function folderParent(folder: string): string {
-	const separatorIndex = folder.lastIndexOf("/");
-	return separatorIndex === -1 ? "" : folder.slice(0, separatorIndex);
 }
 
 // Keeps live announcements concise when the catalog changes.
@@ -1699,8 +1597,8 @@ export function LibraryScreen() {
 			}
 		>
 			<header className="app-header">
-				<div className="brand">
-					<div className="brand-mark" aria-hidden="true">
+				<div className={styles.brand}>
+					<div className={styles["brand-mark"]} aria-hidden="true">
 						<svg
 							aria-hidden="true"
 							viewBox="0 0 24 24"
@@ -1717,11 +1615,11 @@ export function LibraryScreen() {
 						</svg>
 					</div>
 					<div>
-						<p className="brand-kicker">Marvel Rivals mod manager</p>
-						<h1 className="wordmark">Cratebug</h1>
+						<p className={styles["brand-kicker"]}>Marvel Rivals mod manager</p>
+						<h1 className={styles.wordmark}>Cratebug</h1>
 					</div>
 				</div>
-				<div className="header-controls">
+				<div className={styles["header-controls"]}>
 					<button
 						type="button"
 						className="icon-button"
@@ -1790,7 +1688,7 @@ export function LibraryScreen() {
 
 			<section className="library-toolbar" aria-label="Library scan controls">
 				<form
-					className="root-form"
+					className={styles["root-form"]}
 					onSubmit={(event) => {
 						event.preventDefault();
 						void scan();
@@ -1842,15 +1740,20 @@ export function LibraryScreen() {
 						Updating mod state.
 					</p>
 				)}
-				<aside className="library-sidebar" aria-label="Library folders">
-					<div className="sidebar-heading">
+				<aside
+					className={[styles["library-sidebar"], "scroll-y"].join(" ")}
+					aria-label="Library folders"
+				>
+					<div className={styles["sidebar-heading"]}>
 						<span>Folders</span>
 						{library && (
-							<div className="sidebar-heading-actions">
-								<span>{library.entries?.length ?? 0}</span>
+							<div className={styles["sidebar-heading-actions"]}>
 								<button
 									type="button"
-									className="quiet-button sidebar-heading-action"
+									className={[
+										"quiet-button",
+										styles["sidebar-heading-action"],
+									].join(" ")}
 									disabled={isMutationLocked}
 									onClick={() => {
 										setFolderDialogTarget(
@@ -1880,8 +1783,8 @@ export function LibraryScreen() {
 					/>
 				</aside>
 
-				<section className="catalog-panel" aria-label="Discovered mods">
-					<div className="catalog-header">
+				<section className={styles["catalog-panel"]} aria-label="Discovered mods">
+					<div className={styles["catalog-header"]}>
 						<div>
 							<p className="eyebrow">Mod library</p>
 							<h2>
@@ -1892,8 +1795,8 @@ export function LibraryScreen() {
 										: selectedFolder}
 							</h2>
 						</div>
-						<div className="catalog-controls">
-							<label className="search-control">
+						<div className={styles["catalog-controls"]}>
+							<label className={styles["search-control"]}>
 								<span className="visually-hidden">Search mods</span>
 								<input
 									value={search}
@@ -1911,7 +1814,7 @@ export function LibraryScreen() {
 								onDeleteTag={deleteTag}
 							/>
 						</div>
-						<fieldset className="view-mode-controls">
+						<fieldset className={styles["view-mode-controls"]}>
 							<legend className="visually-hidden">Catalog view</legend>
 							{viewModes.map((mode) => (
 								<ViewModeButton
@@ -2147,864 +2050,14 @@ export function LibraryScreen() {
 				!installFromUrlOpen &&
 				!detectionDialog &&
 				!installSource && (
-					<div className="drop-overlay" aria-hidden="true">
-						<div className="drop-overlay-card">
+					<div className={styles["drop-overlay"]} aria-hidden="true">
+						<div className={styles["drop-overlay-card"]}>
 							<PackagePlus aria-hidden="true" />
 							<p>Drop mod files or archives to install</p>
 						</div>
 					</div>
 				)}
 		</main>
-	);
-}
-
-// Keeps mutation feedback out of the catalog layout while still allowing it to be dismissed.
-function MutationToast({ feedback, onDismiss }: MutationToastProps) {
-	const duration =
-		feedback.kind === "success"
-			? successToastDurationMilliseconds
-			: errorToastDurationMilliseconds;
-	const Icon =
-		feedback.kind === "success"
-			? CircleCheckBig
-			: feedback.kind === "warning"
-				? TriangleAlert
-				: CircleAlert;
-
-	useEffect(() => {
-		const timeout = window.setTimeout(onDismiss, duration);
-		return () => window.clearTimeout(timeout);
-	}, [duration, onDismiss]);
-
-	return (
-		<div
-			className={`mutation-toast ${feedback.kind}`}
-			role={feedback.kind === "success" ? "status" : "alert"}
-		>
-			<Icon aria-hidden="true" />
-			<p>{feedback.message}</p>
-			<button
-				type="button"
-				className="mutation-toast-close"
-				onClick={onDismiss}
-				aria-label="Dismiss"
-			>
-				<X aria-hidden="true" />
-			</button>
-		</div>
-	);
-}
-
-function ModMutationDialog({
-	entry,
-	folders,
-	isMutating,
-	mode,
-	onClose,
-	onMove,
-	onRename,
-	onSetPriority,
-}: ModMutationDialogProps) {
-	const inputRef = useRef<HTMLInputElement>(null);
-	const selectRef = useRef<HTMLSelectElement>(null);
-	const [name, setName] = useState(entry.displayName);
-	const [priority, setPriority] = useState(String(entry.priority.value));
-	const [destinationFolder, setDestinationFolder] = useState(entry.relativeFolder);
-	const [validationError, setValidationError] = useState("");
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-	const renameMode = mode === "rename";
-	const priorityMode = mode === "priority";
-	const moveMode = mode === "move";
-	const title = renameMode ? "Rename mod" : priorityMode ? "Set priority" : "Move mod";
-
-	useEffect(() => {
-		if (moveMode) {
-			selectRef.current?.focus();
-		} else {
-			inputRef.current?.focus();
-		}
-	}, [moveMode]);
-
-	async function submit() {
-		if (renameMode) {
-			const error = renameValidationError(name);
-			if (error) {
-				setValidationError(error);
-				return;
-			}
-
-			if (name === entry.displayName) {
-				setValidationError("Enter a different mod name.");
-				return;
-			}
-
-			if (await onRename(entry, name)) onClose();
-			return;
-		}
-
-		if (moveMode) {
-			if (destinationFolder === entry.relativeFolder) {
-				setValidationError("Choose a different folder.");
-				return;
-			}
-
-			if (await onMove(entry, destinationFolder)) onClose();
-			return;
-		}
-
-		if (priority.trim() === "") {
-			setValidationError("Enter a priority.");
-			return;
-		}
-
-		const value = Number(priority);
-		const maximumPriority = maximumPriorityFor(entry);
-		if (!Number.isSafeInteger(value) || value < 0 || value > maximumPriority) {
-			setValidationError(`Priority must be a whole number from 0 to ${maximumPriority}.`);
-			return;
-		}
-
-		if (value === entry.priority.value) {
-			setValidationError("Choose a different priority.");
-			return;
-		}
-
-		if (await onSetPriority(entry, value)) onClose();
-	}
-
-	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="mutation-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Mod action</p>
-					<h2 id="mutation-dialog-title">{title}</h2>
-					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
-				</div>
-				<form
-					onSubmit={(event) => {
-						event.preventDefault();
-						void submit();
-					}}
-				>
-					{renameMode ? (
-						<label className="mutation-dialog-field" htmlFor="rename-mod-name">
-							<span>New name</span>
-							<input
-								id="rename-mod-name"
-								ref={inputRef}
-								value={name}
-								onChange={(event) => {
-									setName(event.target.value);
-									setValidationError("");
-								}}
-							/>
-						</label>
-					) : moveMode ? (
-						<label className="mutation-dialog-field" htmlFor="move-mod-folder">
-							<span>Destination folder</span>
-							<select
-								id="move-mod-folder"
-								ref={selectRef}
-								value={destinationFolder}
-								onChange={(event) => {
-									setDestinationFolder(event.target.value);
-									setValidationError("");
-								}}
-							>
-								<option value="">Library root</option>
-								{folders.map((folder) => (
-									<option key={folder} value={folder}>
-										{folder}
-									</option>
-								))}
-							</select>
-						</label>
-					) : (
-						<label className="mutation-dialog-field" htmlFor="set-mod-priority">
-							<span>Priority</span>
-							<input
-								id="set-mod-priority"
-								inputMode="numeric"
-								min="0"
-								ref={inputRef}
-								step="1"
-								type="number"
-								value={priority}
-								onChange={(event) => {
-									setPriority(event.target.value);
-									setValidationError("");
-								}}
-							/>
-						</label>
-					)}
-					{validationError && (
-						<p className="mutation-dialog-error" role="alert">
-							{validationError}
-						</p>
-					)}
-					<div className="mutation-dialog-actions">
-						<button
-							type="button"
-							className="quiet-button"
-							disabled={isMutating}
-							onClick={onClose}
-						>
-							Cancel
-						</button>
-						<button type="submit" disabled={isMutating}>
-							{isMutating
-								? "Saving..."
-								: renameMode
-									? "Rename"
-									: priorityMode
-										? "Set priority"
-										: "Move"}
-						</button>
-					</div>
-				</form>
-			</section>
-		</div>
-	);
-}
-
-function FolderMutationDialog({
-	folders,
-	isMutating,
-	mode,
-	targetFolder,
-	onClose,
-	onCreate,
-	onMove,
-	onRename,
-}: FolderMutationDialogProps) {
-	const inputRef = useRef<HTMLInputElement>(null);
-	const selectRef = useRef<HTMLSelectElement>(null);
-	const createMode = mode === "create";
-	const renameMode = mode === "rename";
-	const moveMode = mode === "move";
-	const currentName = targetFolder.split("/").at(-1) ?? targetFolder;
-	const currentParent = folderParent(targetFolder);
-	const [name, setName] = useState(renameMode ? currentName : "");
-	const [destinationParent, setDestinationParent] = useState(currentParent);
-	const [validationError, setValidationError] = useState("");
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-	const title = createMode ? "New folder" : renameMode ? "Rename folder" : "Move folder";
-	const subtitle = createMode
-		? targetFolder
-			? `Inside ${targetFolder}`
-			: "Inside the library root"
-		: targetFolder;
-
-	useEffect(() => {
-		if (moveMode) {
-			selectRef.current?.focus();
-		} else {
-			inputRef.current?.focus();
-		}
-	}, [moveMode]);
-
-	// Excludes the folder itself and its descendants: a folder cannot move into itself or a child.
-	const moveDestinations = useMemo(
-		() =>
-			folders.filter(
-				(folder) => folder !== targetFolder && !folder.startsWith(`${targetFolder}/`),
-			),
-		[folders, targetFolder],
-	);
-
-	async function submit() {
-		if (moveMode) {
-			if (destinationParent === currentParent) {
-				setValidationError("Choose a different folder.");
-				return;
-			}
-
-			if (await onMove(targetFolder, destinationParent)) onClose();
-			return;
-		}
-
-		const error = renameValidationError(name, "folder");
-		if (error) {
-			setValidationError(error);
-			return;
-		}
-
-		if (createMode) {
-			if (await onCreate(targetFolder, name)) onClose();
-			return;
-		}
-
-		if (name === currentName) {
-			setValidationError("Enter a different folder name.");
-			return;
-		}
-
-		if (await onRename(targetFolder, name)) onClose();
-	}
-
-	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="folder-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Folder action</p>
-					<h2 id="folder-dialog-title">{title}</h2>
-					<p className="mutation-dialog-subtitle">{subtitle}</p>
-				</div>
-				<form
-					onSubmit={(event) => {
-						event.preventDefault();
-						void submit();
-					}}
-				>
-					{moveMode ? (
-						<label className="mutation-dialog-field" htmlFor="move-folder-destination">
-							<span>Destination folder</span>
-							<select
-								id="move-folder-destination"
-								ref={selectRef}
-								value={destinationParent}
-								onChange={(event) => {
-									setDestinationParent(event.target.value);
-									setValidationError("");
-								}}
-							>
-								<option value="">Library root</option>
-								{moveDestinations.map((folder) => (
-									<option key={folder} value={folder}>
-										{folder}
-									</option>
-								))}
-							</select>
-						</label>
-					) : (
-						<label className="mutation-dialog-field" htmlFor="folder-name">
-							<span>{createMode ? "Folder name" : "New name"}</span>
-							<input
-								id="folder-name"
-								ref={inputRef}
-								value={name}
-								onChange={(event) => {
-									setName(event.target.value);
-									setValidationError("");
-								}}
-							/>
-						</label>
-					)}
-					{validationError && (
-						<p className="mutation-dialog-error" role="alert">
-							{validationError}
-						</p>
-					)}
-					<div className="mutation-dialog-actions">
-						<button
-							type="button"
-							className="quiet-button"
-							disabled={isMutating}
-							onClick={onClose}
-						>
-							Cancel
-						</button>
-						<button type="submit" disabled={isMutating}>
-							{isMutating
-								? "Saving..."
-								: createMode
-									? "Create"
-									: renameMode
-										? "Rename"
-										: "Move"}
-						</button>
-					</div>
-				</form>
-			</section>
-		</div>
-	);
-}
-
-// Sends a scanner-recognized bundle to the Recycle Bin after a short delay
-// gates the confirm button, matching SPEC.md's UI safeguard requirement.
-// The backend enforces the actual safety checks; this dialog cannot bypass them.
-function DeleteConfirmDialog({ entry, isMutating, onClose, onConfirm }: DeleteConfirmDialogProps) {
-	const [secondsRemaining, setSecondsRemaining] = useState(deleteConfirmDelaySeconds);
-	const ready = secondsRemaining <= 0;
-	const cancelRef = useRef<HTMLButtonElement>(null);
-
-	useEffect(() => {
-		if (secondsRemaining <= 0) return;
-		const timeout = window.setTimeout(
-			() => setSecondsRemaining((current) => current - 1),
-			1000,
-		);
-		return () => window.clearTimeout(timeout);
-	}, [secondsRemaining]);
-
-	// Cancel, not the destructive action, gets initial focus. This also puts
-	// focus inside the dialog so the shared focus trap's Escape/Tab handling
-	// (which listens on the dialog element and relies on the keydown bubbling
-	// from whatever currently has focus) actually has something to bubble from.
-	useEffect(() => {
-		cancelRef.current?.focus();
-	}, []);
-
-	const missingSidecar = hasMissingSidecar(entry);
-	const bundleFiles = [entry.primaryPath, entry.sidecars.utoc, entry.sidecars.ucas]
-		.filter((path): path is string => Boolean(path))
-		.map((path) => path.split("/").pop() ?? path);
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
-	async function handleConfirm() {
-		if (await onConfirm(entry)) onClose();
-	}
-
-	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="delete-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Mod action</p>
-					<h2 id="delete-dialog-title">Delete mod</h2>
-					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
-				</div>
-				<p className="delete-confirm-summary">
-					Sends {bundleFiles.join(", ")} to the Recycle Bin. You can restore it from there
-					until the Recycle Bin is emptied.
-				</p>
-				{missingSidecar && (
-					<p className="delete-confirm-warning" role="alert">
-						This bundle is missing a recognized file. Only the files listed above will
-						be removed.
-					</p>
-				)}
-				<div className="mutation-dialog-actions">
-					<button
-						ref={cancelRef}
-						type="button"
-						className="quiet-button"
-						disabled={isMutating}
-						onClick={onClose}
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						className="destructive-button"
-						disabled={!ready || isMutating}
-						onClick={() => void handleConfirm()}
-					>
-						{isMutating
-							? "Deleting..."
-							: ready
-								? "Delete"
-								: `Delete (${secondsRemaining})`}
-					</button>
-				</div>
-			</section>
-		</div>
-	);
-}
-
-// Mirrors the mod delete dialog's deliberate delay. The emptiness check runs
-// against the real directory listing, not the mod index, so files the scanner
-// does not model still trigger the contents warning.
-function FolderDeleteConfirmDialog({
-	folder,
-	libraryRoot,
-	isMutating,
-	onClose,
-	onConfirm,
-}: FolderDeleteConfirmDialogProps) {
-	const [secondsRemaining, setSecondsRemaining] = useState(deleteConfirmDelaySeconds);
-	const [isEmpty, setIsEmpty] = useState<boolean | null>(null);
-	const ready = secondsRemaining <= 0 && isEmpty !== null;
-	const cancelRef = useRef<HTMLButtonElement>(null);
-
-	useEffect(() => {
-		if (secondsRemaining <= 0) return;
-		const timeout = window.setTimeout(
-			() => setSecondsRemaining((current) => current - 1),
-			1000,
-		);
-		return () => window.clearTimeout(timeout);
-	}, [secondsRemaining]);
-
-	// Cancel, not the destructive action, gets initial focus. This also puts
-	// focus inside the dialog so the shared focus trap's Escape/Tab handling
-	// (which listens on the dialog element and relies on the keydown bubbling
-	// from whatever currently has focus) actually has something to bubble from.
-	useEffect(() => {
-		cancelRef.current?.focus();
-	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-		IsFolderEmpty(libraryRoot, folder)
-			.then((empty) => {
-				if (!cancelled) setIsEmpty(empty);
-			})
-			.catch(() => {
-				// A failed check never unlocks the weaker empty-folder wording.
-				if (!cancelled) setIsEmpty(false);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [folder, libraryRoot]);
-
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
-	const folderName = folder.split("/").at(-1) ?? folder;
-
-	async function handleConfirm() {
-		if (await onConfirm(folder)) onClose();
-	}
-
-	const summary =
-		isEmpty === null
-			? "Checking the folder's contents..."
-			: isEmpty
-				? `Sends the empty folder ${folderName} to the Recycle Bin. You can restore it from there until the Recycle Bin is emptied.`
-				: `The folder ${folderName} is not empty. All of its contents will be deleted with it. The entire folder can be restored from the Recycle Bin until it is emptied.`;
-
-	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="folder-delete-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Folder action</p>
-					<h2 id="folder-delete-dialog-title">Delete folder</h2>
-					<p className="mutation-dialog-subtitle">{folder}</p>
-				</div>
-				<p
-					className={
-						isEmpty === false ? "delete-confirm-warning" : "delete-confirm-summary"
-					}
-					role={isEmpty === false ? "alert" : undefined}
-				>
-					{summary}
-				</p>
-				<div className="mutation-dialog-actions">
-					<button
-						ref={cancelRef}
-						type="button"
-						className="quiet-button"
-						disabled={isMutating}
-						onClick={onClose}
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						className="destructive-button"
-						disabled={!ready || isMutating}
-						onClick={() => void handleConfirm()}
-					>
-						{isMutating
-							? "Deleting..."
-							: isEmpty === null
-								? "Delete..."
-								: ready
-									? "Delete"
-									: `Delete (${secondsRemaining})`}
-					</button>
-				</div>
-			</section>
-		</div>
-	);
-}
-
-// Applies each tag toggle and the create-and-assign action immediately
-// rather than staging changes behind a Save button, since every checkbox is
-// already its own independent, atomic backend call.
-function ModTagDialog({
-	entry,
-	catalog,
-	assignedTagIDs,
-	onClose,
-	onCreateAndAssign,
-	onToggle,
-}: ModTagDialogProps) {
-	const inputRef = useRef<HTMLInputElement>(null);
-	const [newTagName, setNewTagName] = useState("");
-	const [validationError, setValidationError] = useState("");
-	const [togglingTagID, setTogglingTagID] = useState<string | null>(null);
-	const [isCreating, setIsCreating] = useState(false);
-	const isBusy = isCreating || togglingTagID !== null;
-	const handleEscape = useCallback(() => {
-		if (!isBusy) onClose();
-	}, [isBusy, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
-	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
-
-	async function handleToggle(tag: metadata.Tag, assign: boolean) {
-		setTogglingTagID(tag.id);
-		try {
-			await onToggle(tag, assign);
-		} finally {
-			setTogglingTagID(null);
-		}
-	}
-
-	async function submitNewTag() {
-		const name = newTagName.trim();
-		if (name === "") {
-			setValidationError("Enter a tag name.");
-			return;
-		}
-
-		setIsCreating(true);
-		try {
-			if (await onCreateAndAssign(name)) {
-				setNewTagName("");
-				setValidationError("");
-			}
-		} finally {
-			setIsCreating(false);
-		}
-	}
-
-	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="tag-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Mod action</p>
-					<h2 id="tag-dialog-title">Tags</h2>
-					<p className="mutation-dialog-subtitle">{entry.displayName}</p>
-				</div>
-				{catalog.length > 0 ? (
-					<ul className="tag-checklist">
-						{catalog.map((tag) => {
-							const assigned = assignedTagIDs.has(tag.id);
-							return (
-								<li key={tag.id}>
-									<label>
-										<input
-											type="checkbox"
-											checked={assigned}
-											disabled={isBusy}
-											onChange={() => void handleToggle(tag, !assigned)}
-										/>
-										<span>{tag.name}</span>
-									</label>
-								</li>
-							);
-						})}
-					</ul>
-				) : (
-					<p className="mutation-dialog-subtitle">No tags yet. Create one below.</p>
-				)}
-				<form
-					onSubmit={(event) => {
-						event.preventDefault();
-						void submitNewTag();
-					}}
-				>
-					<label className="mutation-dialog-field" htmlFor="new-tag-name">
-						<span>New tag</span>
-						<input
-							id="new-tag-name"
-							ref={inputRef}
-							value={newTagName}
-							disabled={isBusy}
-							onChange={(event) => {
-								setNewTagName(event.target.value);
-								setValidationError("");
-							}}
-						/>
-					</label>
-					{validationError && (
-						<p className="mutation-dialog-error" role="alert">
-							{validationError}
-						</p>
-					)}
-					<div className="mutation-dialog-actions">
-						<button
-							type="button"
-							className="quiet-button"
-							disabled={isBusy}
-							onClick={onClose}
-						>
-							Close
-						</button>
-						<button type="submit" disabled={isBusy}>
-							{isCreating ? "Adding..." : "Add tag"}
-						</button>
-					</div>
-				</form>
-			</section>
-		</div>
-	);
-}
-
-function renameValidationError(name: string, subject: "mod" | "folder" = "mod"): string | null {
-	if (name.trim() === "") return `Enter a ${subject} name.`;
-	if (name.endsWith(" ") || name.endsWith("."))
-		return `A ${subject} name cannot end with a space or period.`;
-	if (hasWindowsReservedCharacter(name))
-		return `A ${subject} name contains a Windows-reserved character.`;
-
-	return null;
-}
-
-function hasWindowsReservedCharacter(name: string): boolean {
-	return /[<>:"/\\|?*]/.test(name) || [...name].some((character) => character.charCodeAt(0) < 32);
-}
-
-// The trailing-nine priority filename grows with the priority value itself
-// (more nines), so the true ceiling depends on the mod's own name length and
-// its longest present file suffix, not a single constant shared by every mod.
-function maximumPriorityFor(entry: discovery.Entry): number {
-	const currentStemLength = entry.priority.raw.length;
-	const suffixLengths = [entry.primaryPath, entry.sidecars.utoc, entry.sidecars.ucas]
-		.filter((path): path is string => path !== undefined)
-		.map((path) => basename(path).length - currentStemLength);
-	const longestSuffixLength = Math.max(0, ...suffixLengths);
-
-	// Stem length for a positive priority is name + "_" + nines + "_P".
-	const fixedStemOverhead = entry.displayName.length + 1 + (minimumTrailingNines - 1) + 2;
-	const ceiling = maximumFileNameUTF16CodeUnits - longestSuffixLength - fixedStemOverhead;
-	return Math.max(0, Math.min(maximumFileNameUTF16CodeUnits, ceiling));
-}
-
-function basename(path: string): string {
-	return path.split(/[/\\]/).pop() ?? path;
-}
-
-// Keeps the current selection and its available actions in one stable location.
-function SelectedModPanel({
-	entry,
-	identity,
-	isClassifying,
-	assignedTags,
-	isMutating,
-	isMutationLocked,
-	onClear,
-	onSetEnabled,
-	onDelete,
-}: SelectedModPanelProps) {
-	if (!entry) {
-		return (
-			<section className="selected-mod-panel empty" aria-label="Mod actions">
-				<div>
-					<p className="eyebrow">Mod actions</p>
-					<p>Select a mod to organize it.</p>
-				</div>
-				<p className="selected-mod-hint">
-					Right-click a mod for rename, priority, and move actions.
-				</p>
-			</section>
-		);
-	}
-
-	const canChangeState = canChangeModState(entry);
-	const enabled = entry.state === "enabled";
-	const stateLabel = entryStateLabel(entry);
-	const categoryLabel = entryCategoryLabel(identity);
-	const characterLabel = entryCharacterLabel(identity);
-
-	return (
-		<section className="selected-mod-panel" aria-label="Selected mod actions">
-			<div className="selected-mod-details">
-				<p className="eyebrow">Selected mod</p>
-				<h3>{entry.displayName}</h3>
-				<p>
-					{entry.relativeFolder || "Library root"} · {stateLabel}
-					{categoryLabel
-						? ` · ${categoryLabel}`
-						: isClassifying
-							? " · Classifying..."
-							: ""}
-					{characterLabel ? ` · ${characterLabel}` : ""}
-					{" · "}Priority {entry.priority.value}
-				</p>
-				{assignedTags.length > 0 && (
-					<ul className="selected-mod-tags" aria-label="Tags">
-						{assignedTags.map((tag) => (
-							<li key={tag.id}>{tag.name}</li>
-						))}
-					</ul>
-				)}
-			</div>
-			<div className="selected-mod-actions">
-				{canChangeState && (
-					<button
-						type="button"
-						className="mod-action"
-						disabled={isMutationLocked}
-						onClick={() => onSetEnabled(entry)}
-					>
-						{isMutating
-							? enabled
-								? "Disabling..."
-								: "Enabling..."
-							: isMutationLocked
-								? "Working..."
-								: enabled
-									? "Disable"
-									: "Enable"}
-					</button>
-				)}
-				{canDeleteMod(entry) && (
-					<button
-						type="button"
-						className="destructive-button"
-						disabled={isMutationLocked}
-						onClick={onDelete}
-					>
-						Delete
-					</button>
-				)}
-				<button
-					type="button"
-					className="quiet-button"
-					disabled={isMutationLocked}
-					onClick={onClear}
-				>
-					Clear selection
-				</button>
-			</div>
-		</section>
 	);
 }
 
@@ -3017,343 +2070,12 @@ function ViewModeButton({ active, mode, onSelect }: ViewModeButtonProps) {
 		<button
 			type="button"
 			aria-pressed={active}
-			className={active ? "selected" : ""}
+			className={active ? styles.selected : undefined}
 			onClick={() => onSelect(mode)}
 			title={`${label} view`}
 		>
 			<span className="visually-hidden">{label} view</span>
 			<Icon aria-hidden="true" />
 		</button>
-	);
-}
-
-// Groups each conflict.Group by the character identity shared among its participants.
-// When all participants resolve to the same characterID, the group is filed under that
-// character. Mixed-character groups fall back to a "Multiple characters" bucket so no
-// group is silently lost.
-type CharacterBucket = {
-	characterID: string;
-	characterName: string;
-	groups: conflict.Group[];
-};
-
-function groupByCharacter(
-	groups: conflict.Group[],
-	identitiesByEntryID: Record<string, modtype.Identity>,
-): CharacterBucket[] {
-	const buckets = new Map<string, CharacterBucket>();
-
-	for (const group of groups ?? []) {
-		const participants = group.participants ?? [];
-		const characterIDs = participants.map(
-			(p) => identitiesByEntryID[p.entryID]?.characterID ?? "",
-		);
-
-		// Every participant must resolve to the same non-empty character before this
-		// group is filed under it; an unresolved participant (identity not loaded yet,
-		// or no hero association at all) must not be silently dropped from the check,
-		// or a group could be mislabeled under just one participant's character.
-		const uniqueCharacters = [...new Set(characterIDs)];
-		const bucketKey =
-			characterIDs.every(Boolean) && uniqueCharacters.length === 1 && uniqueCharacters[0]
-				? uniqueCharacters[0]
-				: "__mixed__";
-
-		const firstCharacterID = uniqueCharacters[0] ?? "";
-		const repParticipantID =
-			participants.find(
-				(p) => identitiesByEntryID[p.entryID]?.characterID === firstCharacterID,
-			)?.entryID ?? "";
-		const characterName =
-			bucketKey === "__mixed__"
-				? "Multiple characters"
-				: identitiesByEntryID[repParticipantID]?.characterName ||
-					firstCharacterID ||
-					"Unknown";
-
-		if (!buckets.has(bucketKey)) {
-			buckets.set(bucketKey, { characterID: bucketKey, characterName, groups: [] });
-		}
-		buckets.get(bucketKey)?.groups.push(group);
-	}
-
-	return [...buckets.values()].sort((a, b) => {
-		if (a.characterID === "__mixed__") return 1;
-		if (b.characterID === "__mixed__") return -1;
-		return a.characterName.localeCompare(b.characterName);
-	});
-}
-
-// Presents conflict scan results grouped by resolved character, with hero thumbnails,
-// relationship labels, overlapping path counts, and per-participant priority switchers
-// so users can adjust load order without leaving the view.
-function ConflictDetailsDialog({
-	result,
-	entries,
-	identitiesByEntryID,
-	isMutationLocked,
-	onClose,
-	onSetPriority,
-}: ConflictDetailsDialogProps) {
-	const closeButtonRef = useRef<HTMLButtonElement>(null);
-	const handleEscape = useCallback(() => onClose(), [onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
-	useEffect(() => {
-		closeButtonRef.current?.focus();
-	}, []);
-
-	const entriesByID = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
-	const groups = result.groups ?? [];
-	const unavailable = result.unavailable ?? [];
-
-	const characterBuckets = useMemo(
-		() => groupByCharacter(groups, identitiesByEntryID),
-		[groups, identitiesByEntryID],
-	);
-
-	const samePriorityCount = groups.filter((g) => g.relationship === "same_priority").length;
-	const crossPriorityCount = groups.length - samePriorityCount;
-
-	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog conflict-details-dialog"
-				aria-labelledby="conflict-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div className="conflict-dialog-header">
-					<div>
-						<p className="eyebrow">Conflict report</p>
-						<h2 id="conflict-dialog-title">Asset conflicts</h2>
-						<p className="mutation-dialog-subtitle conflict-summary-pills">
-							{samePriorityCount > 0 && (
-								<span className="conflict-summary-pill same-priority">
-									{samePriorityCount} duplicate priority
-								</span>
-							)}
-							{crossPriorityCount > 0 && (
-								<span className="conflict-summary-pill cross-priority">
-									{crossPriorityCount} cross-priority
-								</span>
-							)}
-							{unavailable.length > 0 && (
-								<span className="conflict-summary-pill unavailable">
-									{unavailable.length} unavailable
-								</span>
-							)}
-						</p>
-					</div>
-					<button
-						ref={closeButtonRef}
-						type="button"
-						className="icon-button conflict-dialog-close"
-						onClick={onClose}
-						aria-label="Close conflict details"
-					>
-						<X aria-hidden="true" />
-					</button>
-				</div>
-
-				{unavailable.length > 0 && (
-					<p className="conflict-unavailable-notice" role="note">
-						{unavailable.length === 1
-							? "1 enabled mod could not be scanned (encrypted or unreadable) and is excluded from these results."
-							: `${unavailable.length} enabled mods could not be scanned (encrypted or unreadable) and are excluded from these results.`}
-					</p>
-				)}
-
-				<div className="conflict-groups-list">
-					{characterBuckets.map((bucket) => (
-						<section key={bucket.characterID} className="conflict-character-section">
-							<ConflictCharacterHeading
-								characterID={bucket.characterID}
-								characterName={bucket.characterName}
-							/>
-							{bucket.groups.map((group) => (
-								<ConflictGroupCard
-									key={(group.participants ?? []).map((p) => p.entryID).join(",")}
-									group={group}
-									entriesByID={entriesByID}
-									isMutationLocked={isMutationLocked}
-									onSetPriority={onSetPriority}
-								/>
-							))}
-						</section>
-					))}
-				</div>
-
-				<div className="mutation-dialog-actions">
-					<button type="button" className="quiet-button" onClick={onClose}>
-						Close
-					</button>
-				</div>
-			</section>
-		</div>
-	);
-}
-
-type ConflictCharacterHeadingProps = {
-	characterID: string;
-	characterName: string;
-};
-
-// Renders a character section heading with default hero avatar when available.
-function ConflictCharacterHeading({ characterID, characterName }: ConflictCharacterHeadingProps) {
-	const portraitUrl = characterHeroPortraitUrl(characterID);
-
-	return (
-		<div className="conflict-character-heading">
-			<div className="conflict-character-thumbnail">
-				{portraitUrl ? (
-					<img src={portraitUrl} alt="" className="mod-thumbnail-hero" />
-				) : (
-					<Package aria-hidden="true" />
-				)}
-			</div>
-			<h3>{characterName}</h3>
-		</div>
-	);
-}
-
-type ConflictGroupCardProps = {
-	group: conflict.Group;
-	entriesByID: ReadonlyMap<string, discovery.Entry>;
-	isMutationLocked: boolean;
-	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
-};
-
-// One conflict group: relationship label, total overlapping path count, and each
-// participant with its priority switcher and the specific paths it contributes.
-function ConflictGroupCard({
-	group,
-	entriesByID,
-	isMutationLocked,
-	onSetPriority,
-}: ConflictGroupCardProps) {
-	const isSamePriority = group.relationship === "same_priority";
-	return (
-		<div
-			className={`conflict-group-card${isSamePriority ? " same-priority" : " cross-priority"}`}
-		>
-			<div className="conflict-group-meta">
-				<span
-					className={`conflict-relationship-badge${isSamePriority ? " same-priority" : " cross-priority"}`}
-				>
-					{isSamePriority ? "Duplicate priority" : "Cross-priority"}
-				</span>
-				<span className="conflict-path-count">
-					{group.pathCount} overlapping {group.pathCount === 1 ? "path" : "paths"}
-				</span>
-			</div>
-			<ul className="conflict-participants">
-				{(group.participants ?? []).map((participant) => {
-					const entry = entriesByID.get(participant.entryID) ?? null;
-					return (
-						<ConflictParticipantRow
-							key={participant.entryID}
-							participant={participant}
-							entry={entry}
-							isMutationLocked={isMutationLocked}
-							onSetPriority={onSetPriority}
-						/>
-					);
-				})}
-			</ul>
-		</div>
-	);
-}
-
-type ConflictParticipantRowProps = {
-	participant: conflict.Participant;
-	entry: discovery.Entry | null;
-	isMutationLocked: boolean;
-	onSetPriority: (entry: discovery.Entry, priority: number) => Promise<boolean>;
-};
-
-// One participant within a conflict group: mod name, priority value with +/- buttons
-// to adjust load order in place, and the specific overlapping paths it contributes.
-function ConflictParticipantRow({
-	participant,
-	entry,
-	isMutationLocked,
-	onSetPriority,
-}: ConflictParticipantRowProps) {
-	const [isBusy, setIsBusy] = useState(false);
-	const [pathsExpanded, setPathsExpanded] = useState(false);
-	const canAdjust = entry !== null && canOrganizeMod(entry) && !isMutationLocked && !isBusy;
-	const maxPriority = entry ? maximumPriorityFor(entry) : 0;
-	const currentPriority = entry?.priority?.value ?? participant.priority.value;
-	const overlappingPaths = participant.overlappingPaths ?? [];
-
-	async function adjustPriority(delta: number) {
-		if (!entry || !canAdjust) return;
-		const next = Math.max(0, Math.min(maxPriority, currentPriority + delta));
-		if (next === currentPriority) return;
-		setIsBusy(true);
-		try {
-			await onSetPriority(entry, next);
-		} finally {
-			setIsBusy(false);
-		}
-	}
-
-	return (
-		<li className="conflict-participant">
-			<div className="conflict-participant-header">
-				<span className="conflict-participant-name">{participant.displayName}</span>
-				<div className="conflict-priority-control">
-					<button
-						type="button"
-						className="conflict-priority-step"
-						aria-label={`Decrease priority of ${participant.displayName}`}
-						disabled={!canAdjust || currentPriority <= 0}
-						onClick={() => void adjustPriority(-1)}
-					>
-						−
-					</button>
-					<span className="conflict-priority-value" aria-hidden="true">
-						{currentPriority}
-					</span>
-					<button
-						type="button"
-						className="conflict-priority-step"
-						aria-label={`Increase priority of ${participant.displayName}`}
-						disabled={!canAdjust || currentPriority >= maxPriority}
-						onClick={() => void adjustPriority(1)}
-					>
-						+
-					</button>
-				</div>
-			</div>
-			{overlappingPaths.length > 0 && (
-				<>
-					<button
-						type="button"
-						className="conflict-paths-toggle"
-						aria-expanded={pathsExpanded}
-						onClick={() => setPathsExpanded((expanded) => !expanded)}
-					>
-						<ChevronRight
-							aria-hidden="true"
-							className={`chevron-icon${pathsExpanded ? " expanded" : ""}`}
-						/>
-						{overlappingPaths.length} overlapping{" "}
-						{overlappingPaths.length === 1 ? "file" : "files"}
-					</button>
-					{pathsExpanded && (
-						<ul className="conflict-paths">
-							{overlappingPaths.map((path) => (
-								<li key={path} className="conflict-path" title={path}>
-									{path.split("/").pop() ?? path}
-								</li>
-							))}
-						</ul>
-					)}
-				</>
-			)}
-		</li>
 	);
 }

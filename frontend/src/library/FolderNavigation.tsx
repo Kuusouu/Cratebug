@@ -1,4 +1,5 @@
 import { ChevronRight, Folder, FolderRoot, LibraryBig } from "lucide-react";
+import styles from "./FolderNavigation.module.css";
 import { memo, type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { type DraggedItem, isValidDropTarget } from "./libraryTypes";
@@ -154,12 +155,20 @@ export const FolderNavigation = memo(function FolderNavigation({
 	}, [hideTooltip, tooltip]);
 
 	return (
-		<nav className="folder-navigation">
+		<nav className={styles["folder-navigation"]}>
 			{/* Both rows drop onto the root folder, but they track drag-over under
 			    different keys ("all" vs "") so only the hovered row highlights. */}
 			<button
 				type="button"
-				className={`folder-row${selectedFolder === "all" ? " selected" : ""}${isValidDropTarget(draggedItem, "") && dragOverFolder === "all" ? " drag-over" : ""}`}
+				className={[
+					styles["folder-row"],
+					selectedFolder === "all" ? styles.selected : "",
+					isValidDropTarget(draggedItem, "") && dragOverFolder === "all"
+						? styles["drag-over"]
+						: "",
+				]
+					.filter(Boolean)
+					.join(" ")}
 				onClick={() => onSelect("all")}
 				onContextMenu={(event) => {
 					event.preventDefault();
@@ -176,13 +185,21 @@ export const FolderNavigation = memo(function FolderNavigation({
 					handleDrop("");
 				}}
 			>
-				<LibraryBig aria-hidden="true" className="folder-icon" />
-				<span className="folder-name">All mods</span>
-				<span className="folder-count">{entryCount}</span>
+				<LibraryBig aria-hidden="true" className={styles["folder-icon"]} />
+				<span className={styles["folder-name"]}>All mods</span>
+				<span className={styles["folder-count"]}>{entryCount}</span>
 			</button>
 			<button
 				type="button"
-				className={`folder-row${selectedFolder === "" ? " selected" : ""}${isValidDropTarget(draggedItem, "") && dragOverFolder === "" ? " drag-over" : ""}`}
+				className={[
+					styles["folder-row"],
+					selectedFolder === "" ? styles.selected : "",
+					isValidDropTarget(draggedItem, "") && dragOverFolder === ""
+						? styles["drag-over"]
+						: "",
+				]
+					.filter(Boolean)
+					.join(" ")}
 				onClick={() => onSelect("")}
 				onContextMenu={(event) => {
 					event.preventDefault();
@@ -199,9 +216,9 @@ export const FolderNavigation = memo(function FolderNavigation({
 					handleDrop("");
 				}}
 			>
-				<FolderRoot aria-hidden="true" className="folder-icon" />
-				<span className="folder-name">Library root</span>
-				<span className="folder-count">{rootEntryCount}</span>
+				<FolderRoot aria-hidden="true" className={styles["folder-icon"]} />
+				<span className={styles["folder-name"]}>Library root</span>
+				<span className={styles["folder-count"]}>{rootEntryCount}</span>
 			</button>
 			{tree.map((node) => (
 				<FolderTreeItem
@@ -228,7 +245,7 @@ export const FolderNavigation = memo(function FolderNavigation({
 				createPortal(
 					<div
 						aria-hidden="true"
-						className="app-tooltip"
+						className={styles["app-tooltip"]}
 						style={{ left: tooltip.x, top: tooltip.y }}
 					>
 						{tooltip.content}
@@ -350,15 +367,22 @@ const FolderTreeItem = memo(function FolderTreeItem({
 	const isDragOver = canDropHere && dragOverFolder === node.path;
 
 	return (
-		<div className="folder-tree-item">
+		<div className={styles["folder-tree-item"]}>
 			<div
-				className={`folder-row${selectedFolder === node.path ? " selected" : ""}${isDragging ? " dragging" : ""}${isDragOver ? " drag-over" : ""}`}
+				className={[
+					styles["folder-row"],
+					selectedFolder === node.path ? styles.selected : "",
+					isDragging ? styles.dragging : "",
+					isDragOver ? styles["drag-over"] : "",
+				]
+					.filter(Boolean)
+					.join(" ")}
 			>
 				{hasChildren ? (
 					<button
 						aria-expanded={expanded}
 						aria-label={`${expanded ? "Collapse" : "Expand"} ${node.name}`}
-						className="folder-toggle"
+						className={styles["folder-toggle"]}
 						type="button"
 						onClick={() => onToggle(node.path)}
 					>
@@ -368,10 +392,10 @@ const FolderTreeItem = memo(function FolderTreeItem({
 						/>
 					</button>
 				) : (
-					<span className="folder-toggle-placeholder" aria-hidden="true" />
+					<span className={styles["folder-toggle-placeholder"]} aria-hidden="true" />
 				)}
 				<button
-					className="folder-select"
+					className={styles["folder-select"]}
 					type="button"
 					draggable={!dragDisabled}
 					onBlur={onHideTooltip}
@@ -401,13 +425,15 @@ const FolderTreeItem = memo(function FolderTreeItem({
 						onDropOnFolder(node.path);
 					}}
 				>
-					<Folder aria-hidden="true" className="folder-icon" />
-					<span className="folder-name">{node.name}</span>
-					<span className="folder-count">{entryCounts.get(node.path) ?? 0}</span>
+					<Folder aria-hidden="true" className={styles["folder-icon"]} />
+					<span className={styles["folder-name"]}>{node.name}</span>
+					<span className={styles["folder-count"]}>
+						{entryCounts.get(node.path) ?? 0}
+					</span>
 				</button>
 			</div>
 			{hasChildren && expanded && (
-				<div className="folder-children">
+				<div className={styles["folder-children"]}>
 					{node.children.map((child) => (
 						<FolderTreeItem
 							entryCounts={entryCounts}

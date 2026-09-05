@@ -8,6 +8,7 @@ import {
 	TriangleAlert,
 	X,
 } from "lucide-react";
+import styles from "./InstallPreviewDialog.module.css";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
 	ApplyInstall,
@@ -255,12 +256,12 @@ export function InstallPreviewDialog({
 		<div className="mutation-dialog-backdrop">
 			<section
 				ref={dialogRef}
-				className="mutation-dialog install-preview-dialog"
+				className={["mutation-dialog", styles["install-preview-dialog"]].join(" ")}
 				aria-labelledby={titleId}
 				aria-modal="true"
 				role="dialog"
 			>
-				<div className="install-preview-header">
+				<div className={styles["install-preview-header"]}>
 					<div>
 						<p className="eyebrow">Mod installation</p>
 						<h2 id={titleId}>
@@ -286,7 +287,7 @@ export function InstallPreviewDialog({
 				</div>
 
 				{phase === "preparing" && (
-					<div className="install-preview-status-state">
+					<div className={styles["install-preview-status-state"]}>
 						<Loader2 className="spinning-loader" aria-hidden="true" />
 						<p>
 							{source.kind === "url"
@@ -297,7 +298,9 @@ export function InstallPreviewDialog({
 				)}
 
 				{phase === "error" && (
-					<div className="install-preview-status-state error">
+					<div
+						className={[styles["install-preview-status-state"], styles.error].join(" ")}
+					>
 						<CircleAlert aria-hidden="true" />
 						<p>{errorMessage || "An error occurred during installation."}</p>
 						<div className="mutation-dialog-actions">
@@ -313,7 +316,7 @@ export function InstallPreviewDialog({
 				)}
 
 				{(phase === "ready" || phase === "applying") && items.length === 0 && (
-					<div className="install-preview-status-state">
+					<div className={styles["install-preview-status-state"]}>
 						<Package aria-hidden="true" />
 						<p>No installable mod files were found in the selected files.</p>
 						<div className="mutation-dialog-actions">
@@ -330,7 +333,7 @@ export function InstallPreviewDialog({
 
 				{(phase === "ready" || phase === "applying") && items.length > 0 && (
 					<>
-						<div className="install-preview-list">
+						<div className={[styles["install-preview-list"], "scroll-y"].join(" ")}>
 							{sortedItems.map((item) => {
 								const config = configs[item.id] ?? defaultModConfig(item);
 								const isSelected = config.selected;
@@ -350,12 +353,21 @@ export function InstallPreviewDialog({
 								return (
 									<div
 										key={item.id}
-										className={`install-mod-card ${!isSelected ? "unselected" : ""}`}
+										className={[
+											styles["install-mod-card"],
+											!isSelected ? styles.unselected : "",
+										]
+											.filter(Boolean)
+											.join(" ")}
 									>
-										<div className="install-mod-card-header">
-											<div className="install-mod-info">
-												<div className="install-mod-select-hero">
-													<label className="install-mod-select-label">
+										<div className={styles["install-mod-card-header"]}>
+											<div className={styles["install-mod-info"]}>
+												<div className={styles["install-mod-select-hero"]}>
+													<label
+														className={
+															styles["install-mod-select-label"]
+														}
+													>
 														<input
 															type="checkbox"
 															checked={isSelected}
@@ -366,7 +378,11 @@ export function InstallPreviewDialog({
 																})
 															}
 														/>
-														<span className="install-mod-select-text">
+														<span
+															className={
+																styles["install-mod-select-text"]
+															}
+														>
 															{isSelected
 																? "Include in install"
 																: "Excluded"}
@@ -375,10 +391,14 @@ export function InstallPreviewDialog({
 
 													{characterLabel && (
 														<div
-															className="install-hero-pill"
+															className={styles["install-hero-pill"]}
 															title={characterLabel}
 														>
-															<div className="install-hero-thumbnail">
+															<div
+																className={
+																	styles["install-hero-thumbnail"]
+																}
+															>
 																{heroPortraitUrl ? (
 																	<img
 																		src={heroPortraitUrl}
@@ -389,14 +409,18 @@ export function InstallPreviewDialog({
 																	<Package aria-hidden="true" />
 																)}
 															</div>
-															<span className="install-hero-name">
+															<span
+																className={
+																	styles["install-hero-name"]
+																}
+															>
 																{characterLabel}
 															</span>
 														</div>
 													)}
 												</div>
 
-												<div className="install-mod-badges">
+												<div className={styles["install-mod-badges"]}>
 													{categoryLabel ? (
 														<span
 															className={`mod-category-badge category-${categorySlug(categoryLabel)}`}
@@ -405,18 +429,23 @@ export function InstallPreviewDialog({
 														</span>
 													) : null}
 													<span
-														className={`install-format-badge ${isIoStore ? "iostore" : "classic"}`}
+														className={[
+															styles["install-format-badge"],
+															isIoStore
+																? styles.iostore
+																: styles.classic,
+														].join(" ")}
 													>
 														{isIoStore ? "IoStore" : "Classic"}
 													</span>
-													<span className="install-size-badge">
+													<span className={styles["install-size-badge"]}>
 														{formatBytes(item.totalSizeBytes)}
 													</span>
 												</div>
 											</div>
 										</div>
 
-										<div className="install-mod-fields">
+										<div className={styles["install-mod-fields"]}>
 											<label
 												className="mutation-dialog-field"
 												htmlFor={`mod-name-${item.id}`}
@@ -467,9 +496,14 @@ export function InstallPreviewDialog({
 										)}
 
 										{isSelected && item.issues && item.issues.length > 0 && (
-											<div className="install-collision-banner" role="alert">
+											<div
+												className={styles["install-collision-banner"]}
+												role="alert"
+											>
 												<TriangleAlert aria-hidden="true" />
-												<div className="install-collision-content">
+												<div
+													className={styles["install-collision-content"]}
+												>
 													{item.issues.map((issue) => (
 														<p key={issue.code}>{issue.message}</p>
 													))}
@@ -483,9 +517,14 @@ export function InstallPreviewDialog({
 										)}
 
 										{hasCollision && (
-											<div className="install-collision-banner" role="alert">
+											<div
+												className={styles["install-collision-banner"]}
+												role="alert"
+											>
 												<TriangleAlert aria-hidden="true" />
-												<div className="install-collision-content">
+												<div
+													className={styles["install-collision-content"]}
+												>
 													<p>
 														{liveCollision.description ||
 															item.collision?.description ||
@@ -493,7 +532,11 @@ export function InstallPreviewDialog({
 														Change the mod name above to install
 														alongside it instead.
 													</p>
-													<label className="install-overwrite-checkbox">
+													<label
+														className={
+															styles["install-overwrite-checkbox"]
+														}
+													>
 														<input
 															type="checkbox"
 															checked={config.overwrite}
@@ -513,18 +556,23 @@ export function InstallPreviewDialog({
 										)}
 
 										{batchCollisions[item.id] && isSelected && (
-											<div className="install-collision-banner" role="alert">
+											<div
+												className={styles["install-collision-banner"]}
+												role="alert"
+											>
 												<TriangleAlert aria-hidden="true" />
-												<div className="install-collision-content">
+												<div
+													className={styles["install-collision-content"]}
+												>
 													<p>{batchCollisions[item.id]}</p>
 												</div>
 											</div>
 										)}
 
-										<div className="install-files-collapsible">
+										<div className={styles["install-files-collapsible"]}>
 											<button
 												type="button"
-												className="install-files-toggle"
+												className={styles["install-files-toggle"]}
 												onClick={() => toggleFileExpansion(item.id)}
 												aria-expanded={isExpanded}
 											>
@@ -541,7 +589,12 @@ export function InstallPreviewDialog({
 											</button>
 
 											{isExpanded && (
-												<ul className="install-files-list">
+												<ul
+													className={[
+														styles["install-files-list"],
+														"scroll-y",
+													].join(" ")}
+												>
 													{item.files.map((file) => (
 														<li
 															key={file}
@@ -558,25 +611,25 @@ export function InstallPreviewDialog({
 							})}
 						</div>
 
-						<div className="install-preview-footer">
+						<div className={styles["install-preview-footer"]}>
 							{blockingIssues && (
-								<p className="install-footer-warning" role="alert">
+								<p className={styles["install-footer-warning"]} role="alert">
 									Exclude any mod with a staging issue before installing.
 								</p>
 							)}
 							{hasBatchCollisions && (
-								<p className="install-footer-warning" role="alert">
+								<p className={styles["install-footer-warning"]} role="alert">
 									Multiple selected mods target the same name and destination
 									folder.
 								</p>
 							)}
 							{unresolvedCollisions && (
-								<p className="install-footer-warning" role="alert">
+								<p className={styles["install-footer-warning"]} role="alert">
 									Resolve all collisions before installing.
 								</p>
 							)}
 							{selectedItems.length === 0 && (
-								<p className="install-footer-warning" role="alert">
+								<p className={styles["install-footer-warning"]} role="alert">
 									Select at least 1 mod to install.
 								</p>
 							)}

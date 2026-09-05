@@ -1,0 +1,141 @@
+.folder-navigation {
+	display: grid;
+	gap: 0.2rem;
+}
+
+.folder-tree-item {
+	min-width: 0;
+}
+
+.folder-row,
+.folder-select {
+	display: flex;
+	min-width: 0;
+	width: 100%;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	border-radius: 0.45rem;
+	background: transparent;
+	color: var(--text);
+	text-align: left;
+	font-size: 0.88rem;
+	font-weight: 650;
+}
+
+.folder-row {
+	padding: 0.1rem 0.25rem;
+}
+
+.folder-navigation > .folder-row {
+	padding: 0.5rem 0.6rem;
+}
+
+.folder-select {
+	padding: 0.4rem 0.35rem;
+}
+
+.folder-navigation > .folder-row:hover:not(:disabled),
+.folder-select:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 91%);
+	filter: none;
+}
+
+.folder-navigation > .folder-row.selected,
+.folder-row.selected .folder-select {
+	background: color-mix(in srgb, var(--accent), transparent 84%);
+	color: var(--accent);
+}
+
+.folder-navigation > .folder-row.selected:hover:not(:disabled),
+.folder-row.selected .folder-select:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 78%);
+}
+
+.folder-select {
+	cursor: grab;
+}
+
+.folder-row.dragging .folder-select {
+	cursor: grabbing;
+	opacity: 0.45;
+}
+
+.folder-navigation > .folder-row.drag-over,
+.folder-row.drag-over .folder-select {
+	background: color-mix(in srgb, var(--accent), transparent 70%);
+	outline: 2px dashed color-mix(in srgb, var(--accent), transparent 30%);
+	outline-offset: -2px;
+	color: var(--accent);
+}
+
+.folder-toggle,
+.folder-toggle-placeholder {
+	display: grid;
+	width: 1.25rem;
+	height: 1.25rem;
+	flex: 0 0 1.25rem;
+	place-items: center;
+}
+
+.folder-toggle {
+	padding: 0;
+	border-radius: 0.3rem;
+	background: transparent;
+	color: var(--muted);
+}
+
+.folder-toggle:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	filter: none;
+}
+
+.folder-icon {
+	fill: none;
+	stroke: currentcolor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.75;
+	width: 1.2rem;
+	height: 1.2rem;
+	flex: 0 0 1.2rem;
+	color: var(--accent);
+}
+
+.folder-name {
+	min-width: 0;
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.folder-count {
+	flex: 0 0 auto;
+	color: var(--muted);
+	font-size: 0.75rem;
+}
+
+.folder-children {
+	margin-left: 0.65rem;
+	border-left: 1px solid color-mix(in srgb, var(--line), transparent 35%);
+	padding-left: 0.25rem;
+}
+
+.app-tooltip {
+	position: fixed;
+	z-index: 10;
+	max-width: min(28rem, calc(100vw - 1rem));
+	margin-left: 0.5rem;
+	padding: 0.4rem 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: color-mix(in srgb, var(--panel-raised), var(--page) 18%);
+	box-shadow: 0 0.5rem 1.25rem rgba(0, 0, 0, 0.24);
+	color: var(--text);
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.25;
+	pointer-events: none;
+	transform: translateY(-50%);
+}

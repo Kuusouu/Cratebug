@@ -1,4 +1,5 @@
 import { Check, ChevronDown, Pencil, Plus, Trash2, X } from "lucide-react";
+import styles from "./TagMenu.module.css";
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { metadata } from "../../wailsjs/go/models";
@@ -109,7 +110,9 @@ export function TagMenu({
 			<button
 				type="button"
 				ref={triggerRef}
-				className={`tag-menu-trigger${filterIDs.size > 0 ? " active" : ""}`}
+				className={[styles["tag-menu-trigger"], filterIDs.size > 0 ? styles.active : ""]
+					.filter(Boolean)
+					.join(" ")}
 				aria-haspopup="true"
 				aria-expanded={open}
 				onClick={toggleOpen}
@@ -122,7 +125,7 @@ export function TagMenu({
 				createPortal(
 					<div
 						ref={popoverRef}
-						className="tag-menu-popover"
+						className={styles["tag-menu-popover"]}
 						role="menu"
 						aria-label="Filter by tag"
 						style={{
@@ -132,15 +135,15 @@ export function TagMenu({
 						}}
 					>
 						{catalog.length > 0 ? (
-							<ul className="tag-menu-list">
+							<ul className={styles["tag-menu-list"]}>
 								{catalog.map((tag) => {
 									const selected = filterIDs.has(tag.id);
 									const isEditing = editing?.tagID === tag.id;
 									return (
-										<li key={tag.id} className="tag-menu-row">
+										<li key={tag.id} className={styles["tag-menu-row"]}>
 											{isEditing ? (
 												<form
-													className="tag-menu-edit-form"
+													className={styles["tag-menu-edit-form"]}
 													onSubmit={(event) => {
 														event.preventDefault();
 														void submitRename(tag);
@@ -166,7 +169,7 @@ export function TagMenu({
 													/>
 													<button
 														type="submit"
-														className="tag-menu-icon-action"
+														className={styles["tag-menu-icon-action"]}
 														aria-label="Save tag name"
 														disabled={isBusy}
 													>
@@ -174,7 +177,7 @@ export function TagMenu({
 													</button>
 													<button
 														type="button"
-														className="tag-menu-icon-action"
+														className={styles["tag-menu-icon-action"]}
 														aria-label="Cancel rename"
 														disabled={isBusy}
 														onClick={() => setEditing(null)}
@@ -186,7 +189,7 @@ export function TagMenu({
 												<>
 													<button
 														type="button"
-														className="tag-menu-toggle"
+														className={styles["tag-menu-toggle"]}
 														aria-pressed={selected}
 														disabled={isBusy}
 														onClick={() => onToggleFilter(tag.id)}
@@ -194,10 +197,12 @@ export function TagMenu({
 														{selected && <Check aria-hidden="true" />}
 														<span>{tag.name}</span>
 													</button>
-													<div className="tag-menu-row-actions">
+													<div className={styles["tag-menu-row-actions"]}>
 														<button
 															type="button"
-															className="tag-menu-icon-action"
+															className={
+																styles["tag-menu-icon-action"]
+															}
 															aria-label={`Rename ${tag.name}`}
 															disabled={isBusy}
 															onClick={() =>
@@ -211,7 +216,10 @@ export function TagMenu({
 														</button>
 														<button
 															type="button"
-															className="tag-menu-icon-action destructive"
+															className={[
+																styles["tag-menu-icon-action"],
+																styles.destructive,
+															].join(" ")}
 															aria-label={`Delete ${tag.name}`}
 															disabled={isBusy}
 															onClick={() => void handleDelete(tag)}
@@ -226,10 +234,10 @@ export function TagMenu({
 								})}
 							</ul>
 						) : (
-							<p className="tag-menu-empty">No tags yet.</p>
+							<p className={styles["tag-menu-empty"]}>No tags yet.</p>
 						)}
 						<form
-							className="tag-menu-create-form"
+							className={styles["tag-menu-create-form"]}
 							onSubmit={(event) => {
 								event.preventDefault();
 								void submitNewTag();
@@ -254,7 +262,7 @@ export function TagMenu({
 							</button>
 						</form>
 						{validationError && (
-							<p className="tag-menu-error" role="alert">
+							<p className={styles["tag-menu-error"]} role="alert">
 								{validationError}
 							</p>
 						)}

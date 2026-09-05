@@ -1,0 +1,482 @@
+.mod-grid {
+	display: grid;
+	/* Flex child of .catalog-panel: fill leftover height so overflow-y: auto
+	   is bounded by the panel instead of sizing to the rows. Short lists then
+	   have no scrollbar. */
+	flex: 1;
+	min-height: 0;
+	/* auto-fill/1fr columns already reflow to fit any width, so this never
+	   needs to scroll horizontally -- overflow-x: hidden clips the sub-pixel
+	   overflow that otherwise surfaces as a stray horizontal scrollbar at
+	   some Windows display-scaling factors, instead of the plain `overflow:
+	   auto` shorthand enabling scroll on an axis that was never intended to
+	   scroll. */
+	overflow-x: hidden;
+	overflow-y: auto;
+	/* Keep cards clear of the scrollbar across Windows scaling settings. */
+	padding-right: 1rem;
+	grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+	/* max-content, not the auto default: a card's own nested grid (tags row
+	   included) otherwise doesn't reliably contribute its true content
+	   height back into this row's auto-sizing under stretch, and the row
+	   settles under min-height, letting tall cards' content spill past
+	   their own border into the row below. Matches the same fix view-list
+	   already applies below for the same underlying reason. */
+	grid-auto-rows: max-content;
+	gap: 0.75rem;
+	padding-top: 1rem;
+}
+
+.mod-card {
+	/* flex column, not grid: when the outer .mod-grid row stretches every
+	   card in it to match its tallest sibling (e.g. one card carrying tags),
+	   a grid container's own leftover vertical space gets distributed
+	   across its row tracks in ways that pushed content like the toggle
+	   away from its neighbors with an ugly gap. A flex column with no
+	   flex-grow on its children puts unclaimed leftover space in one
+	   predictable place: after the last child. */
+	display: flex;
+	min-width: 0;
+	min-height: 10.75rem;
+	flex-direction: column;
+	gap: 0.85rem;
+	padding: 1rem;
+	border: 1px solid var(--line);
+	border-radius: 0.7rem;
+	background: var(--panel-raised);
+}
+
+.mod-card.is-disabled,
+.list-mod-row.is-disabled {
+	border-color: color-mix(in srgb, var(--muted), transparent 48%);
+	background:
+		linear-gradient(90deg, color-mix(in srgb, var(--muted), transparent 78%), transparent 28%),
+		color-mix(in srgb, var(--panel), var(--muted) 12%);
+	box-shadow: inset 0.25rem 0 color-mix(in srgb, var(--muted), transparent 20%);
+}
+
+.mod-card.is-selected,
+.list-mod-row.is-selected {
+	border: 2px solid var(--accent);
+	outline: 1px solid color-mix(in srgb, var(--accent), transparent 58%);
+	outline-offset: 1px;
+}
+
+.mod-card:hover,
+.list-mod-row:hover {
+	z-index: 10;
+}
+
+.mod-card[draggable="true"],
+.list-mod-row[draggable="true"] {
+	cursor: grab;
+}
+
+.mod-card.dragging,
+.list-mod-row.dragging {
+	cursor: grabbing;
+	opacity: 0.45;
+}
+
+.mod-card-select-area {
+	position: relative;
+	display: grid;
+	min-width: 0;
+	gap: 0.85rem;
+}
+
+.mod-card-select {
+	position: absolute;
+	inset: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0.4rem;
+	background: transparent;
+}
+
+.mod-card-select:hover:not(:disabled) {
+	filter: none;
+}
+
+.mod-card-select:focus-visible {
+	outline-offset: 0.3rem;
+}
+
+.mod-card-heading {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.6rem;
+}
+
+.mod-card-heading-info {
+	min-width: 0;
+}
+
+.mod-thumbnail {
+	position: relative;
+	z-index: 2;
+	display: grid;
+	width: 2.75rem;
+	height: 2.75rem;
+	flex: 0 0 auto;
+	place-items: center;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 0.55rem;
+	background: color-mix(in srgb, var(--panel), var(--muted) 8%);
+	color: var(--muted);
+	font: inherit;
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		background 0.15s ease,
+		color 0.15s ease;
+}
+
+.mod-thumbnail:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--accent), transparent 30%);
+	background: color-mix(in srgb, var(--panel), var(--accent) 15%);
+	color: var(--text);
+	filter: none;
+}
+
+.mod-thumbnail-tooltip {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	padding: 0.25rem 0.55rem;
+	border-radius: 0.35rem;
+	background: var(--panel, #15171b);
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 40%);
+	color: var(--text);
+	font-size: 0.72rem;
+	font-weight: 600;
+	white-space: nowrap;
+	pointer-events: none;
+	opacity: 0;
+	visibility: hidden;
+	transition:
+		opacity 0.15s ease,
+		transform 0.15s ease;
+	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+	z-index: 100;
+}
+
+.mod-thumbnail:hover .mod-thumbnail-tooltip,
+.mod-thumbnail:focus-visible .mod-thumbnail-tooltip {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(2px);
+}
+
+.mod-thumbnail svg {
+	width: 1.3rem;
+	height: 1.3rem;
+}
+
+.mod-card-heading h3 {
+	display: -webkit-box;
+	overflow: hidden;
+	margin: 0 0 0.25rem;
+	font-size: 0.95rem;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+.mod-card.is-disabled .mod-card-heading h3,
+.list-mod-row.is-disabled .mod-card-heading h3 {
+	color: color-mix(in srgb, var(--text), var(--muted) 48%);
+}
+
+.mod-card-heading p {
+	display: -webkit-box;
+	overflow: hidden;
+	margin-bottom: 0;
+	color: var(--muted);
+	font-size: 0.75rem;
+	overflow-wrap: anywhere;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+.mod-facts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.mod-facts span {
+	padding: 0.2rem 0.4rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+/* IoStore ties to the app's own accent (it's the newer, currently-shipping
+   format); Classic gets a fixed slate tone so the pair always contrasts
+   regardless of which accent color is active. */
+.bundle-format-badge.iostore {
+	border-color: color-mix(in srgb, var(--accent), transparent 50%);
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: color-mix(in srgb, var(--accent), var(--text) 25%);
+}
+
+.bundle-format-badge.classic {
+	border-color: color-mix(in srgb, #5b8dae, transparent 50%);
+	background: color-mix(in srgb, #5b8dae, transparent 88%);
+	color: color-mix(in srgb, #5b8dae, var(--text) 25%);
+}
+
+.mod-conflict-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	border-color: color-mix(in srgb, var(--bad), transparent 40%);
+	background: color-mix(in srgb, var(--bad), transparent 85%);
+	color: color-mix(in srgb, var(--bad), var(--text) 15%);
+}
+
+.mod-conflict-badge svg {
+	width: 0.85rem;
+	height: 0.85rem;
+}
+
+.mod-card-tags {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	gap: 0.35rem;
+	list-style: none;
+}
+
+.mod-card-tags li {
+	display: flex;
+	max-width: 100%;
+	padding: 0.2rem 0.2rem 0.2rem 0.5rem;
+	align-items: center;
+	gap: 0.25rem;
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 50%);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+.mod-card-tags li span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mod-card-tags button {
+	display: grid;
+	width: 1.15rem;
+	height: 1.15rem;
+	flex-shrink: 0;
+	place-items: center;
+	padding: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: color-mix(in srgb, var(--accent), var(--text) 30%);
+}
+
+.mod-card-tags button:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 65%);
+	color: var(--text);
+	filter: none;
+}
+
+.mod-card-tags button svg {
+	width: 0.7rem;
+	height: 0.7rem;
+}
+
+.mod-card-tags-overflow {
+	padding: 0.2rem 0.55rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	color: var(--muted);
+}
+
+.mod-action {
+	align-self: start;
+	padding: 0.45rem 0.65rem;
+	font-size: 0.78rem;
+}
+
+.mod-toggle {
+	position: relative;
+	display: inline-flex;
+	width: 2.5rem;
+	height: 1.4rem;
+	flex: 0 0 auto;
+	align-items: center;
+	padding: 0.15rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel);
+}
+
+.mod-toggle:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--muted), var(--line) 40%);
+	filter: none;
+}
+
+.mod-toggle[aria-checked="true"] {
+	border-color: color-mix(in srgb, var(--accent), transparent 40%);
+	background: var(--accent);
+}
+
+.mod-toggle[aria-busy="true"] {
+	opacity: 0.7;
+}
+
+/* align-self, not justify-self: .mod-card is a flex column, so cross-axis
+   alignment (this card's horizontal axis) is align-self, not the grid
+   property. Harmless no-op in the list row's flex layout, which already
+   right-aligns the toggle via DOM order instead. */
+.mod-card > .mod-toggle {
+	align-self: flex-end;
+}
+
+.mod-toggle-knob {
+	width: 1.05rem;
+	height: 1.05rem;
+	border-radius: 50%;
+	background: var(--page);
+	box-shadow: 0 0.05rem 0.15rem rgba(0, 0, 0, 0.35);
+	transition: transform 0.15s ease;
+}
+
+.mod-toggle[aria-checked="true"] .mod-toggle-knob {
+	transform: translateX(1.05rem);
+}
+
+.issues {
+	margin: -0.25rem 0 0;
+	padding-left: 1.05rem;
+	color: var(--bad);
+	font-size: 0.72rem;
+	line-height: 1.35;
+}
+
+.mod-grid.view-large {
+	grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr));
+}
+
+.mod-grid.view-large .mod-card {
+	min-height: 13.5rem;
+	padding: 1.25rem;
+}
+
+.mod-grid.view-list {
+	grid-template-columns: 1fr;
+	/* Diagnostics extend a row; implicit tracks must grow with that content. */
+	grid-auto-rows: max-content;
+	align-content: start;
+}
+
+.list-mod-row {
+	display: block;
+	min-width: 0;
+	min-height: 3.75rem;
+	padding: 0.7rem 1rem;
+	border: 1px solid var(--line);
+	border-radius: 0.7rem;
+	background: var(--panel-raised);
+}
+
+.list-mod-summary {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.list-mod-row .mod-facts {
+	margin-top: 0;
+	justify-content: end;
+}
+
+.list-mod-controls {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 0.65rem;
+}
+
+.list-mod-row .mod-card-heading {
+	min-width: 0;
+	flex: 1;
+}
+
+.list-mod-row .mod-thumbnail {
+	width: 2.1rem;
+	height: 2.1rem;
+}
+
+.list-mod-row .mod-thumbnail svg {
+	width: 1rem;
+	height: 1rem;
+}
+
+.list-mod-row .mod-card-select-area {
+	min-width: 0;
+	flex: 1;
+}
+
+.list-mod-row .mod-card-tags {
+	margin: 0.5rem 0 0;
+}
+
+.list-mod-row .issues {
+	margin: 0.45rem 0 0;
+}
+
+.catalog-state {
+	display: grid;
+	min-height: 22rem;
+	place-content: center;
+	padding: 2rem;
+	text-align: center;
+}
+
+.catalog-state h3 {
+	margin-bottom: 0.4rem;
+	font-size: 1.15rem;
+}
+
+.catalog-state p {
+	max-width: 28rem;
+	margin-bottom: 0;
+	color: var(--muted);
+	line-height: 1.55;
+}
+
+.catalog-state.error h3,
+.catalog-state.error p {
+	color: var(--bad);
+}
+
+@media (max-width: 760px) {
+	.list-mod-summary {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.list-mod-controls {
+		align-items: center;
+		justify-content: space-between;
+	}
+}
+
+.catalog-state :global(.detect-button) {
+	justify-self: center;
+	margin-top: 0.6rem;
+}

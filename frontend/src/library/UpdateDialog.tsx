@@ -1,4 +1,5 @@
 import { Download, Heart, X } from "lucide-react";
+import styles from "./UpdateDialog.module.css";
 import { useCallback, useEffect, useRef } from "react";
 import type { update } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
@@ -70,7 +71,11 @@ function renderInlineFormatting(text: string): React.ReactNode[] {
 function ChangelogBody({ notes }: { notes: string }) {
 	const blocks = parseChangelog(notes);
 	if (blocks.length === 0) {
-		return <p className="update-changelog-empty">No changelog details for this release.</p>;
+		return (
+			<p className={styles["update-changelog-empty"]}>
+				No changelog details for this release.
+			</p>
+		);
 	}
 
 	const rendered: React.ReactNode[] = [];
@@ -80,7 +85,7 @@ function ChangelogBody({ notes }: { notes: string }) {
 		const firstItem = pendingItems[0];
 		if (!firstItem) return;
 		rendered.push(
-			<ul key={`list-${firstItem.key}`} className="update-changelog-list">
+			<ul key={`list-${firstItem.key}`} className={styles["update-changelog-list"]}>
 				{pendingItems.map((item) => (
 					<li key={item.key}>{renderInlineFormatting(item.text)}</li>
 				))}
@@ -105,7 +110,7 @@ function ChangelogBody({ notes }: { notes: string }) {
 	}
 	flushItems();
 
-	return <div className="update-changelog">{rendered}</div>;
+	return <div className={styles["update-changelog"]}>{rendered}</div>;
 }
 
 export function UpdateDialog({
@@ -142,7 +147,7 @@ export function UpdateDialog({
 		<div className="mutation-dialog-backdrop">
 			<section
 				ref={dialogRef}
-				className="mutation-dialog update-dialog"
+				className={["mutation-dialog", styles["update-dialog"]].join(" ")}
 				aria-labelledby="update-dialog-title"
 				aria-modal="true"
 				role="dialog"
@@ -155,7 +160,9 @@ export function UpdateDialog({
 								? "What new crates are there?"
 								: "What's new in this crate"}
 						</h2>
-						<p className="update-dialog-version">Version {release.version.tag}</p>
+						<p className={styles["update-dialog-version"]}>
+							Version {release.version.tag}
+						</p>
 					</div>
 					{!isDownloading && (
 						<button
@@ -170,18 +177,18 @@ export function UpdateDialog({
 					)}
 				</div>
 
-				<div className="update-dialog-body">
+				<div className={[styles["update-dialog-body"], "scroll-y"].join(" ")}>
 					{!isDownloading && <ChangelogBody notes={release.notes} />}
 
 					{isDownloading && (
-						<div className="update-download-progress">
-							<div className="progress-bar">
+						<div className={styles["update-download-progress"]}>
+							<div className={styles["progress-bar"]}>
 								<div
-									className="progress-fill"
+									className={styles["progress-fill"]}
 									style={{ width: percent !== null ? `${percent}%` : "100%" }}
 								/>
 							</div>
-							<span className="update-download-progress-text">
+							<span className={styles["update-download-progress-text"]}>
 								{downloadProgress && percent !== null
 									? `${percent}% (${formatMegabytes(downloadProgress.downloaded)} / ${formatMegabytes(downloadProgress.total)})`
 									: downloadProgress
@@ -192,7 +199,7 @@ export function UpdateDialog({
 					)}
 
 					{isReady && !isDownloading && (
-						<p className="update-ready-notice">
+						<p className={styles["update-ready-notice"]}>
 							Downloaded and ready to install. Cratebug will restart.
 						</p>
 					)}
@@ -224,8 +231,9 @@ export function UpdateDialog({
 					</div>
 				)}
 
-				<p className="update-dialog-footer">
-					Brought to you with <Heart className="update-heart" aria-hidden="true" /> by the
+				<p className={styles["update-dialog-footer"]}>
+					Brought to you with{" "}
+					<Heart className={styles["update-heart"]} aria-hidden="true" /> by the
 					maintainer(s) of Cratebug
 				</p>
 			</section>

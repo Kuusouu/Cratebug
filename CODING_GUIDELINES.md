@@ -35,9 +35,13 @@ These guidelines define the shared readability and maintainability standards for
 - Use `camelCase` for variables, functions, and non-component filenames. Use `PascalCase` for React components, their filenames, and types. Use `UPPER_SNAKE_CASE` for environment variables and regular-expression patterns.
 - Keep React components focused on rendering and interaction. Filesystem policy and mutations belong in Go.
 - Use Biome for formatting and linting; do not manually fight its output.
+- One exported React component per file. Unexported helpers may stay in that file.
+- Colocate component styles as `Component.module.css` next to `Component.tsx`. Skip the module file when the component uses only shared primitives.
 
 ## CSS
 
+- `style.css` and `App.css` are global: reset, fonts, theme tokens, shared primitives.
+- Component-specific rules go in that component's `*.module.css`. Import as `styles` and apply with `className={styles["local-name"]}`. Combine with a global primitive when needed (`className={`mutation-dialog ${styles.dialog}`}`).
 - Keep one declaration per line and group related selectors together.
 - Use custom properties for repeated visual values within a component or theme.
 - Keep comments limited to non-obvious layout, browser, accessibility, or scaling constraints.

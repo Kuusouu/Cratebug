@@ -1,0 +1,24 @@
+.tag-checklist {
+	display: grid;
+	max-height: 14rem;
+	margin: 1rem 0 0;
+	padding: 0;
+	gap: 0.35rem;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.tag-checklist label {
+	display: flex;
+	padding: 0.5rem 0.6rem;
+	align-items: center;
+	gap: 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	font-size: 0.85rem;
+	font-weight: 650;
+}
+
+.tag-checklist input {
+	width: auto;
+}

@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import styles from "./ContextMenu.module.css";
 import { usePositionedPopover } from "./usePositionedPopover";
 
 export type ContextMenuItem = {
@@ -32,7 +33,7 @@ export function ContextMenu({ state, onClose }: ContextMenuProps) {
 
 	return createPortal(
 		<div
-			className="context-menu"
+			className={styles["context-menu"]}
 			ref={popoverRef}
 			role="menu"
 			aria-label={state.title}
@@ -42,11 +43,16 @@ export function ContextMenu({ state, onClose }: ContextMenuProps) {
 				visibility: position.ready ? "visible" : "hidden",
 			}}
 		>
-			<p className="context-menu-title">{state.title}</p>
+			<p className={styles["context-menu-title"]}>{state.title}</p>
 			{state.items.map((item) => (
 				<button
 					type="button"
-					className={`context-menu-item${item.destructive ? " destructive" : ""}`}
+					className={[
+						styles["context-menu-item"],
+						item.destructive ? styles.destructive : "",
+					]
+						.filter(Boolean)
+						.join(" ")}
 					disabled={item.disabled}
 					key={item.label}
 					role="menuitem"

@@ -1,0 +1,254 @@
+:global(.mutation-dialog).conflict-details-dialog {
+	width: min(calc(100vw - 3rem), 44rem);
+	max-height: min(calc(100vh - 3.5rem), 56rem);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.conflict-summary-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin: 0;
+}
+
+.conflict-summary-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.2rem 0.55rem;
+	border-radius: 0.35rem;
+	border: 1px solid transparent;
+	font-size: 0.72rem;
+	font-weight: 700;
+}
+
+.conflict-summary-pill.same-priority {
+	border-color: color-mix(in srgb, var(--bad), transparent 40%);
+	background: color-mix(in srgb, var(--bad), transparent 85%);
+	color: color-mix(in srgb, var(--bad), var(--text) 15%);
+}
+
+.conflict-summary-pill.cross-priority {
+	border-color: color-mix(in srgb, var(--muted), transparent 55%);
+	background: color-mix(in srgb, var(--muted), transparent 88%);
+	color: var(--text);
+}
+
+.conflict-summary-pill.unavailable {
+	border-color: color-mix(in srgb, var(--muted), transparent 55%);
+	background: color-mix(in srgb, var(--muted), transparent 88%);
+	color: var(--muted);
+}
+
+.conflict-unavailable-notice {
+	margin: 0 0 0.85rem;
+	padding: 0.6rem 0.85rem;
+	border-radius: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--muted), transparent 60%);
+	background: color-mix(in srgb, var(--muted), transparent 90%);
+	color: var(--muted);
+	font-size: 0.8rem;
+}
+
+.conflict-groups-list {
+	flex: 1;
+	min-height: 0;
+	overflow-x: hidden;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	padding-right: 0.25rem;
+}
+
+.conflict-character-section {
+	margin-bottom: 1.25rem;
+}
+
+.conflict-character-heading {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.6rem;
+}
+
+.conflict-character-heading h3 {
+	margin: 0;
+	font-size: 0.95rem;
+	font-weight: 700;
+}
+
+.conflict-character-thumbnail {
+	display: grid;
+	width: 2.4rem;
+	height: 2.4rem;
+	flex-shrink: 0;
+	place-items: center;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--panel), var(--muted) 8%);
+	color: var(--muted);
+	overflow: hidden;
+}
+
+.conflict-character-thumbnail svg {
+	width: 1.15rem;
+	height: 1.15rem;
+}
+
+.conflict-group-card {
+	padding: 0.75rem 0.9rem;
+	margin-bottom: 0.6rem;
+	border: 1px solid var(--line);
+	border-radius: 0.6rem;
+	background: color-mix(in srgb, var(--panel-raised), transparent 20%);
+}
+
+.conflict-group-card.same-priority {
+	border-color: color-mix(in srgb, var(--bad), transparent 60%);
+	background: color-mix(in srgb, var(--bad), transparent 94%);
+}
+
+.conflict-group-meta {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	margin-bottom: 0.65rem;
+}
+
+.conflict-relationship-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.15rem 0.5rem;
+	border-radius: 0.3rem;
+	border: 1px solid transparent;
+	font-size: 0.7rem;
+	font-weight: 750;
+	letter-spacing: 0.03em;
+}
+
+.conflict-relationship-badge.same-priority {
+	border-color: color-mix(in srgb, var(--bad), transparent 40%);
+	background: color-mix(in srgb, var(--bad), transparent 80%);
+	color: color-mix(in srgb, var(--bad), var(--text) 10%);
+}
+
+.conflict-relationship-badge.cross-priority {
+	border-color: color-mix(in srgb, var(--muted), transparent 55%);
+	background: color-mix(in srgb, var(--muted), transparent 88%);
+	color: var(--muted);
+}
+
+.conflict-path-count {
+	font-size: 0.76rem;
+	color: var(--muted);
+}
+
+.conflict-participants {
+	display: grid;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.conflict-participant {
+	padding: 0.6rem 0.75rem;
+	border: 1px solid var(--line);
+	border-radius: 0.45rem;
+	background: color-mix(in srgb, var(--panel), transparent 30%);
+}
+
+.conflict-participant-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.conflict-participant-name {
+	flex: 1;
+	min-width: 0;
+	font-size: 0.82rem;
+	font-weight: 650;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.conflict-priority-control {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	flex-shrink: 0;
+}
+
+.conflict-priority-step {
+	display: grid;
+	width: 1.7rem;
+	height: 1.7rem;
+	place-items: center;
+	padding: 0;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	background: var(--panel-raised);
+	color: var(--muted);
+	font-size: 1rem;
+	line-height: 1;
+}
+
+.conflict-priority-step:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--accent), transparent 40%);
+	background: color-mix(in srgb, var(--accent), transparent 85%);
+	color: var(--text);
+	filter: none;
+}
+
+.conflict-priority-value {
+	min-width: 2rem;
+	text-align: center;
+	font-size: 0.82rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	color: var(--text);
+}
+
+.conflict-paths-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	margin-top: 0.45rem;
+	padding: 0.1rem 0.3rem 0.1rem 0.15rem;
+	border-radius: 0.3rem;
+	background: transparent;
+	color: var(--muted);
+	font-size: 0.76rem;
+}
+
+.conflict-paths-toggle:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	filter: none;
+}
+
+.conflict-paths {
+	margin: 0.45rem 0 0;
+	padding: 0;
+	list-style: none;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+}
+
+.conflict-path {
+	padding: 0.1rem 0.45rem;
+	border-radius: 0.25rem;
+	border: 1px solid var(--line);
+	background: color-mix(in srgb, var(--panel-raised), transparent 30%);
+	font-size: 0.7rem;
+	font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+	color: var(--muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 24rem;
+}

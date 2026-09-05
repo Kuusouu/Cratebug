@@ -1,4 +1,5 @@
 import { Check, Moon, Monitor, RefreshCw, RotateCcw, Sun } from "lucide-react";
+import styles from "./SettingsDialog.module.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { accentPresets, isValidHexColor } from "./accentColor";
 import {
@@ -82,9 +83,9 @@ export function SettingsDialog({
 					<p className="eyebrow">Cratebug</p>
 					<h2 id="settings-dialog-title">Settings</h2>
 				</div>
-				<div className="setting-section">
+				<div className={styles["setting-section"]}>
 					<h3>Appearance</h3>
-					<div className="theme-picker" role="radiogroup" aria-label="Theme">
+					<div className={styles["theme-picker"]} role="radiogroup" aria-label="Theme">
 						{themes.map((option) => {
 							const Icon = themeIcons[option];
 							const selected = theme === option;
@@ -92,14 +93,22 @@ export function SettingsDialog({
 								<button
 									key={option}
 									type="button"
-									className={selected ? "theme-option selected" : "theme-option"}
+									className={[
+										styles["theme-option"],
+										selected ? styles.selected : "",
+									]
+										.filter(Boolean)
+										.join(" ")}
 									aria-pressed={selected}
 									onClick={() => onSelectTheme(option)}
 									title={themeLabels[option]}
 								>
 									<Icon aria-hidden="true" />
 									{selected && (
-										<Check className="theme-option-check" aria-hidden="true" />
+										<Check
+											className={styles["theme-option-check"]}
+											aria-hidden="true"
+										/>
 									)}
 									<span className="visually-hidden">{themeLabels[option]}</span>
 								</button>
@@ -107,12 +116,18 @@ export function SettingsDialog({
 						})}
 					</div>
 				</div>
-				<div className="setting-section">
+				<div className={styles["setting-section"]}>
 					<h3>Accent color</h3>
-					<div className="accent-picker">
+					<div className={styles["accent-picker"]}>
 						<button
 							type="button"
-							className={`accent-swatch reset${accentColor === "" ? " selected" : ""}`}
+							className={[
+								styles["accent-swatch"],
+								styles.reset,
+								accentColor === "" ? styles.selected : "",
+							]
+								.filter(Boolean)
+								.join(" ")}
 							aria-pressed={accentColor === ""}
 							onClick={() => onSelectAccentColor("")}
 							title="Default"
@@ -126,9 +141,12 @@ export function SettingsDialog({
 								<button
 									key={preset.hex}
 									type="button"
-									className={
-										selected ? "accent-swatch selected" : "accent-swatch"
-									}
+									className={[
+										styles["accent-swatch"],
+										selected ? styles.selected : "",
+									]
+										.filter(Boolean)
+										.join(" ")}
 									aria-pressed={selected}
 									style={{ background: preset.hex }}
 									onClick={() => onSelectAccentColor(preset.hex)}
@@ -139,10 +157,10 @@ export function SettingsDialog({
 								</button>
 							);
 						})}
-						<label className="accent-hex-field">
+						<label className={styles["accent-hex-field"]}>
 							<span className="visually-hidden">Custom hex color</span>
 							<span
-								className="accent-hex-preview"
+								className={styles["accent-hex-preview"]}
 								style={{
 									background: isValidHexColor(hexDraft)
 										? hexDraft
@@ -161,10 +179,10 @@ export function SettingsDialog({
 						</label>
 					</div>
 				</div>
-				<div className="setting-section">
+				<div className={styles["setting-section"]}>
 					<h3>Mod library detection</h3>
 					<div
-						className="provider-picker"
+						className={styles["provider-picker"]}
 						role="radiogroup"
 						aria-label="Store provider for library auto-detection"
 					>
@@ -175,30 +193,38 @@ export function SettingsDialog({
 								<button
 									key={option}
 									type="button"
-									className={
-										selected ? "provider-option selected" : "provider-option"
-									}
+									className={[
+										styles["provider-option"],
+										selected ? styles.selected : "",
+									]
+										.filter(Boolean)
+										.join(" ")}
 									aria-pressed={selected}
 									onClick={() => onSelectLibraryProvider(option)}
 									title={`${libraryProviderLabels[option]} library auto-detection`}
 								>
-									<Logo className="provider-option-logo" />
+									<Logo className={styles["provider-option-logo"] ?? ""} />
 									{libraryProviderLabels[option]}
 									{selected && (
-										<Check className="theme-option-check" aria-hidden="true" />
+										<Check
+											className={styles["theme-option-check"]}
+											aria-hidden="true"
+										/>
 									)}
 								</button>
 							);
 						})}
 					</div>
-					<p className="setting-section-hint">
+					<p className={styles["setting-section-hint"]}>
 						Which store's Marvel Rivals installation the library auto-detect searches.
 					</p>
 				</div>
-				<div className="setting-section">
+				<div className={styles["setting-section"]}>
 					<h3>Updates</h3>
-					<div className="update-settings-row">
-						<span className="update-settings-version">Version {appVersion}</span>
+					<div className={styles["update-settings-row"]}>
+						<span className={styles["update-settings-version"]}>
+							Version {appVersion}
+						</span>
 						<button
 							type="button"
 							className="quiet-button"

@@ -1,0 +1,97 @@
+.selected-mod-panel {
+	display: flex;
+	margin-top: 1rem;
+	padding: 0.9rem 1rem;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 56%);
+	border-radius: 0.7rem;
+	background: color-mix(in srgb, var(--accent), transparent 93%);
+}
+
+.selected-mod-panel.empty {
+	border-color: var(--line);
+	background: color-mix(in srgb, var(--panel-raised), transparent 16%);
+}
+
+.selected-mod-panel p {
+	margin: 0;
+}
+
+.selected-mod-panel h3 {
+	max-width: min(36rem, 50vw);
+	margin: 0.2rem 0;
+	font-size: 0.95rem;
+	overflow-wrap: anywhere;
+}
+
+.selected-mod-details > p:last-child,
+.selected-mod-hint {
+	color: var(--muted);
+	font-size: 0.76rem;
+}
+
+.selected-mod-hint {
+	max-width: 18rem;
+	text-align: right;
+}
+
+.selected-mod-tags {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0.5rem 0 0;
+	padding: 0;
+	gap: 0.35rem;
+	list-style: none;
+}
+
+.selected-mod-tags li {
+	padding: 0.2rem 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--accent), transparent 50%);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--accent), transparent 88%);
+	color: var(--text);
+	font-size: 0.7rem;
+	font-weight: 700;
+}
+
+.selected-mod-actions {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.mod-action {
+	align-self: start;
+	padding: 0.45rem 0.65rem;
+	font-size: 0.78rem;
+}
+
+.selected-mod-actions .mod-action,
+.selected-mod-actions :global(.quiet-button),
+.selected-mod-actions :global(.destructive-button) {
+	min-height: 2.8rem;
+	padding: 0.65rem 0.9rem;
+	align-self: auto;
+	/* .mod-action's own 0.78rem would otherwise leave the panel's buttons at
+	   two different font sizes. */
+	font-size: inherit;
+}
+
+@media (max-width: 760px) {
+	.selected-mod-panel {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.selected-mod-panel h3 {
+		max-width: none;
+	}
+
+	.selected-mod-hint {
+		max-width: none;
+		text-align: left;
+	}
+}
