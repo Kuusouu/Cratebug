@@ -61,6 +61,12 @@ A batch that only partly succeeds says so. It does not call the whole run a succ
 
 Encrypt and Decrypt live only in the Actions menu. They rebuild each complete IoStore bundle (`.pak` + `.utoc` + `.ucas`) so the Marvel Rivals game key wraps the container. Classic PAK mods cannot be encrypted. A mix of encrypted and unencrypted IoStore mods disables the action until the set is uniform.
 
-Encryption is a rebuild, not a bit-flip. Large mods can take several minutes. Close Marvel Rivals first. A failed rebuild leaves that one mod as it was. Mods that already finished in the same batch stay changed.
+Encryption is a rebuild, not a bit-flip. Large mods can take several minutes. Close Marvel Rivals first. A failed rebuild leaves that one mod as it was. Mods that already finished in the same batch stay changed. The rebuilt companion `.pak` is stripped of `chunknames` and `patched_files` before it replaces the live files.
 
 A lock mark on a card means that IoStore bundle is encrypted. The category pill (Mesh, UI, and so on) does not change.
+
+## Unsupported companion PAK entries
+
+As of 3 September 2026, leftover `chunknames` and `patched_files` entries inside a companion `.pak` crash Marvel Rivals anti-cheat. The first time Cratebug loads a library in a session, it lists those files and asks to rewrite the affected `.pak` files. The IoStore `.utoc` and `.ucas` stay as they are. You can decline for this session. A later Refresh does not ask again.
+
+Install preview shows the same warning. Installing still proceeds, and Cratebug rewrites those staged `.pak` files before they land in the library. Close the game first. A failed rewrite leaves that one mod as it was.

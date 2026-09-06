@@ -346,6 +346,7 @@ export namespace install {
 	    collision: CollisionInfo;
 	    identity: modtype.Identity;
 	    issues?: discovery.Issue[];
+	    unsupportedCompanionPak?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new PreviewItem(source);
@@ -364,6 +365,7 @@ export namespace install {
 	        this.collision = this.convertValues(source["collision"], CollisionInfo);
 	        this.identity = this.convertValues(source["identity"], modtype.Identity);
 	        this.issues = this.convertValues(source["issues"], discovery.Issue);
+	        this.unsupportedCompanionPak = source["unsupportedCompanionPak"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -612,6 +614,52 @@ export namespace modtype {
 
 export namespace mutation {
 	
+	export class CompanionCleanupFailure {
+	    entryID: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CompanionCleanupFailure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entryID = source["entryID"];
+	        this.message = source["message"];
+	    }
+	}
+	export class CompanionCleanupResult {
+	    succeeded: string[];
+	    failed: CompanionCleanupFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CompanionCleanupResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.succeeded = source["succeeded"];
+	        this.failed = this.convertValues(source["failed"], CompanionCleanupFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class EncryptionFailure {
 	    entryID: string;
 	    message: string;

@@ -133,6 +133,17 @@ export function hasUnresolvedCollisions(
 	});
 }
 
+// Counts selected preview items whose companion PAK still has chunknames or patched_files.
+export function selectedUnsupportedCompanionCount(
+	items: readonly install.PreviewItem[],
+	configs: Record<string, ModConfig>,
+): number {
+	return items.filter((item) => {
+		const config = configs[item.id];
+		return Boolean(config?.selected && item.unsupportedCompanionPak);
+	}).length;
+}
+
 // Reports whether any selected item carries an unresolved staging issue (e.g. a bundle
 // that could not be fully copied), which must be excluded rather than installed silently.
 export function hasBlockingIssues(

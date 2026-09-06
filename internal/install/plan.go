@@ -20,17 +20,18 @@ type CollisionInfo struct {
 
 // PreviewItem represents one staged mod candidate presented to the user before installation.
 type PreviewItem struct {
-	ID                string                 `json:"id"`
-	ModName           string                 `json:"modName"`
-	OriginalStem      string                 `json:"originalStem"`
-	SourcePath        string                 `json:"sourcePath"`
-	BundleFormat      discovery.BundleFormat `json:"bundleFormat"`
-	Files             []string               `json:"files"`
-	TotalSizeBytes    int64                  `json:"totalSizeBytes"`
-	DestinationFolder string                 `json:"destinationFolder"`
-	Collision         CollisionInfo          `json:"collision"`
-	Identity          modtype.Identity       `json:"identity"`
-	Issues            []discovery.Issue      `json:"issues,omitempty"`
+	ID                      string                 `json:"id"`
+	ModName                 string                 `json:"modName"`
+	OriginalStem            string                 `json:"originalStem"`
+	SourcePath              string                 `json:"sourcePath"`
+	BundleFormat            discovery.BundleFormat `json:"bundleFormat"`
+	Files                   []string               `json:"files"`
+	TotalSizeBytes          int64                  `json:"totalSizeBytes"`
+	DestinationFolder       string                 `json:"destinationFolder"`
+	Collision               CollisionInfo          `json:"collision"`
+	Identity                modtype.Identity       `json:"identity"`
+	Issues                  []discovery.Issue      `json:"issues,omitempty"`
+	UnsupportedCompanionPak bool                   `json:"unsupportedCompanionPak,omitempty"`
 }
 
 // PreviewResult contains all discovered mods in a staging session with collision checks.
@@ -73,17 +74,18 @@ func BuildPreview(modRoot string, session *StagedSession, defaultFolder string, 
 		collision := checkModCollision(modRoot, normDefaultFolder, mod, library)
 
 		previewItems = append(previewItems, PreviewItem{
-			ID:                mod.ID,
-			ModName:           mod.DisplayName,
-			OriginalStem:      mod.Stem,
-			SourcePath:        mod.SourcePath,
-			BundleFormat:      mod.BundleFormat,
-			Files:             displayFilePaths,
-			TotalSizeBytes:    mod.TotalSizeBytes,
-			DestinationFolder: normDefaultFolder,
-			Collision:         collision,
-			Identity:          identities[mod.ID],
-			Issues:            mod.Issues,
+			ID:                      mod.ID,
+			ModName:                 mod.DisplayName,
+			OriginalStem:            mod.Stem,
+			SourcePath:              mod.SourcePath,
+			BundleFormat:            mod.BundleFormat,
+			Files:                   displayFilePaths,
+			TotalSizeBytes:          mod.TotalSizeBytes,
+			DestinationFolder:       normDefaultFolder,
+			Collision:               collision,
+			Identity:                identities[mod.ID],
+			Issues:                  mod.Issues,
+			UnsupportedCompanionPak: mod.UnsupportedCompanionPak,
 		})
 	}
 

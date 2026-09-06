@@ -355,6 +355,114 @@ func TestCompanionPakHasRawFilesIgnoresMetadata(t *testing.T) {
 	}
 }
 
+func TestCompanionPakHasRawFilesIgnoresCleanupStub(t *testing.T) {
+	// Arrange
+	entries := []PakEntry{
+		{Path: CompanionStubName},
+		{Path: "../../../" + CompanionStubName},
+	}
+
+	// Act / Assert
+	if CompanionPakHasRawFiles(entries) {
+		t.Fatal("CompanionPakHasRawFiles() = true, want false for the cleanup stub")
+	}
+	if !IsCompanionStubPath("Content/" + CompanionStubName) {
+		t.Fatal("IsCompanionStubPath() = false, want true")
+	}
+	if IsCompanionStubPath("Audio/sound.bnk") {
+		t.Fatal("IsCompanionStubPath() = true for a raw file")
+	}
+}
+
+func TestIsCompanionMetadataPathMatchesMountPrefixes(t *testing.T) {
+	// Arrange / Act / Assert
+	for _, path := range []string{
+		"chunknames",
+		"../../..//chunknames",
+		"../../../patched_files",
+		"Content/patched_files",
+	} {
+		if !IsCompanionMetadataPath(path) {
+			t.Errorf("IsCompanionMetadataPath(%q) = false, want true", path)
+		}
+	}
+	if IsCompanionMetadataPath("Audio/sound.bnk") {
+		t.Fatal("IsCompanionMetadataPath() = true for a raw file")
+	}
+}
+
+func TestCompanionPakUnsupportedPathsReturnsMatches(t *testing.T) {
+	// Arrange
+	entries := []PakEntry{
+		{Path: "../../../patched_files"},
+		{Path: "Audio/sound.bnk"},
+		{Path: "../../..//chunknames"},
+	}
+
+	// Act
+	got := CompanionPakUnsupportedPaths(entries)
+
+	// Assert
+	if len(got) != 2 || got[0] != "../../../patched_files" || got[1] != "../../..//chunknames" {
+		t.Fatalf("CompanionPakUnsupportedPaths() = %v, want the two metadata paths", got)
+	}
+}
+
+func TestCreatePakRejectsEmptyOutput(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{}
+
+	// Act
+	err := CreatePak(fake, "", nil, "")
+
+	// Assert
+	if err == nil {
+		t.Fatal("CreatePak() error = nil, want an error for an empty output path")
+	}
+	if fake.action != "" {
+		t.Error("CreatePak() called the worker with an empty path, want no call")
+	}
+}
+
+func TestCreatePakRejectsEmptyFileList(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{}
+
+	// Act
+	err := CreatePak(fake, "out.pak", nil, "../../../")
+
+	// Assert
+	if err == nil {
+		t.Fatal("CreatePak() error = nil, want an error for an empty file list")
+	}
+	if fake.action != "" {
+		t.Error("CreatePak() called the worker with no files, want no call")
+	}
+}
+
+func TestCreatePakSendsMappedPaths(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{}
+	files := []string{".cratebug-companion-stub=C:\\tmp\\stub"}
+
+	// Act
+	if err := CreatePak(fake, "out.pak", files, "../../../"); err != nil {
+		t.Fatalf("CreatePak() error = %v, want nil", err)
+	}
+
+	// Assert
+	if fake.action != "create_pak" {
+		t.Errorf("action = %q, want create_pak", fake.action)
+	}
+	if fake.params["mount_point"] != "../../../" {
+		t.Errorf("params[mount_point] = %v, want ../../../", fake.params["mount_point"])
+	}
+	paths, ok := fake.params["file_paths"].([]string)
+	if !ok || len(paths) != 1 || paths[0] != files[0] {
+		t.Errorf("params[file_paths] = %v, want %v", fake.params["file_paths"], files)
+	}
+}
+
 func TestListIoStoreFilesPropagatesCallError(t *testing.T) {
 	// Arrange
 	fake := &fakeCaller{err: &ToolError{Action: "list_iostore_files", Message: "UTOC file not found: mod.utoc"}}
@@ -586,6 +694,58 @@ func TestOperationsAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 		}
 		if files == nil {
 			t.Errorf("ListIoStoreFiles() = nil, want a non-nil (possibly empty) slice")
+		}
+	})
+
+	t.Run("create_pak stub drops companion metadata names", func(t *testing.T) {
+		// Arrange
+		inputDir := filepath.Join(dir, "companion-input")
+		if err := os.MkdirAll(inputDir, 0o700); err != nil {
+			t.Fatalf("create companion input dir: %v", err)
+		}
+		chunknames := filepath.Join(inputDir, "chunknames")
+		patched := filepath.Join(inputDir, "patched_files")
+		raw := filepath.Join(inputDir, "readme.txt")
+		for path, body := range map[string]string{
+			chunknames: "names",
+			patched:    "patched",
+			raw:        "keep",
+		} {
+			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+				t.Fatalf("write %s: %v", path, err)
+			}
+		}
+		dirty := filepath.Join(dir, "dirty-companion.pak")
+		if err := CreatePak(worker, dirty, []string{chunknames, patched, raw}, "../../../"); err != nil {
+			t.Fatalf("CreatePak() dirty: %v", err)
+		}
+		listed, err := ListPak(worker, dirty)
+		if err != nil {
+			t.Fatalf("ListPak() dirty: %v", err)
+		}
+		if len(CompanionPakUnsupportedPaths(listed)) == 0 {
+			t.Fatalf("dirty listing had no metadata names: %#v", listed)
+		}
+
+		// Act
+		// The worker rejects an empty file list. A metadata-only companion
+		// is rewritten with one harmless placeholder instead.
+		stubFile := filepath.Join(inputDir, ".cratebug-companion-stub")
+		if err := os.WriteFile(stubFile, []byte("cratebug companion stub\n"), 0o600); err != nil {
+			t.Fatalf("write stub file: %v", err)
+		}
+		stub := filepath.Join(dir, "stub-companion.pak")
+		if err := CreatePak(worker, stub, []string{".cratebug-companion-stub=" + stubFile}, "../../../"); err != nil {
+			t.Fatalf("CreatePak() stub: %v", err)
+		}
+		clean, err := ListPak(worker, stub)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListPak() stub: %v", err)
+		}
+		if got := CompanionPakUnsupportedPaths(clean); len(got) != 0 {
+			t.Fatalf("stub listing still has metadata names: %v", got)
 		}
 	})
 }

@@ -4,8 +4,8 @@ import {install} from '../models';
 import {main} from '../models';
 import {modtype} from '../models';
 import {discovery} from '../models';
-import {conflict} from '../models';
 import {mutation} from '../models';
+import {conflict} from '../models';
 import {metadata} from '../models';
 import {gamedetect} from '../models';
 import {update} from '../models';
@@ -15,6 +15,8 @@ export function ApplyInstall(arg1:string,arg2:string,arg3:Array<install.ApplyIte
 export function ApplyUpdate(arg1:string):Promise<void>;
 
 export function AssignModTag(arg1:string,arg2:string):Promise<void>;
+
+export function CancelCompanionCleanup():Promise<void>;
 
 export function CancelEncryption():Promise<void>;
 
@@ -27,6 +29,8 @@ export function CheckWhatsNew():Promise<main.UpdateCheckResult>;
 export function ClassificationType():Promise<modtype.Identity>;
 
 export function ClassifyLibrary(arg1:string,arg2:Array<discovery.Entry>):Promise<Record<string, modtype.Identity>>;
+
+export function CompanionCleanupType():Promise<mutation.CompanionCleanupResult>;
 
 export function ConflictType():Promise<conflict.Result>;
 
@@ -49,6 +53,9 @@ export function DetectLibrary(arg1:string):Promise<gamedetect.Detection>;
 export function DownloadUpdate(arg1:update.Release):Promise<string>;
 
 export function EncryptionType():Promise<mutation.EncryptionBatchResult>;
+
+
+export function FindUnsupportedCompanionPaks(arg1:string):Promise<Array<string>>;
 
 export function GetAppVersion():Promise<string>;
 
@@ -91,6 +98,8 @@ export function SetModPriority(arg1:string,arg2:string,arg3:number):Promise<muta
 export function SetModRoot(arg1:string):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
+
+export function StripCompanionPaks(arg1:string,arg2:Array<string>):Promise<mutation.CompanionCleanupResult>;
 
 export function UnassignModTag(arg1:string,arg2:string):Promise<void>;
 

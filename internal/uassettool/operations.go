@@ -10,6 +10,10 @@ import (
 // well-known public constant, not a secret, and must stay in this package.
 const MarvelRivalsAESKey = "0C263D8C22DCB085894899C3A3796383E9BF9DE0CBFB08C9BF2DEF2E84F29D74"
 
+// Packed when create_pak would otherwise get an empty file list. Not a
+// leftover IoStore bookkeeping name, and not a hybrid raw file.
+const CompanionStubName = ".cratebug-companion-stub"
+
 // Sends one worker request and decodes its data payload into result. Adapter
 // and Worker both implement this, so the operations below run against a fake
 // transport in unit tests and a supervised process in integration tests with
@@ -237,16 +241,61 @@ func CreateModIoStore(c caller, outputPath, inputDir string, options IoStoreCrea
 	}, nil
 }
 
+// True when path is the leftover IoStore bookkeeping name that anti-cheat
+// rejects as of 3 September 2026. Mount prefixes and doubled slashes still match.
+func IsCompanionMetadataPath(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.Contains(lower, "chunknames") || strings.Contains(lower, "patched_files")
+}
+
+// Paths from a PAK listing that IsCompanionMetadataPath accepts.
+func CompanionPakUnsupportedPaths(entries []PakEntry) []string {
+	var paths []string
+	for _, entry := range entries {
+		if IsCompanionMetadataPath(entry.Path) {
+			paths = append(paths, entry.Path)
+		}
+	}
+	return paths
+}
+
+// True when path is the placeholder packed after a metadata-only companion
+// rewrite. Mount prefixes still match.
+func IsCompanionStubPath(path string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	return strings.Contains(normalized, CompanionStubName)
+}
+
 // Reports whether a companion PAK listing contains raw files that must be
-// kept with hybrid:true on recreate. Chunknames and patched_files metadata
-// do not count.
+// kept with hybrid:true on recreate. Chunknames, patched_files, and the
+// cleanup stub do not count.
 func CompanionPakHasRawFiles(entries []PakEntry) bool {
 	for _, entry := range entries {
-		lower := strings.ToLower(entry.Path)
-		if strings.Contains(lower, "chunknames") || strings.Contains(lower, "patched_files") {
+		if IsCompanionMetadataPath(entry.Path) || IsCompanionStubPath(entry.Path) {
 			continue
 		}
 		return true
 	}
 	return false
+}
+
+// Builds a PAK at outputPath from filePaths. Each path may be an absolute
+// file or `internal=absolute` so the archive keeps the original entry name.
+// The pinned worker rejects an empty file list.
+func CreatePak(c caller, outputPath string, filePaths []string, mountPoint string) error {
+	if outputPath == "" {
+		return fmt.Errorf("uassettool: create_pak: output path is required")
+	}
+	if len(filePaths) == 0 {
+		return fmt.Errorf("uassettool: create_pak: at least one file is required")
+	}
+
+	params := map[string]any{
+		"output_path": outputPath,
+		"file_paths":  filePaths,
+	}
+	if mountPoint != "" {
+		params["mount_point"] = mountPoint
+	}
+	return c.Call("create_pak", params, nil)
 }

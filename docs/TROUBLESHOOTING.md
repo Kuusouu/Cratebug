@@ -36,6 +36,14 @@ The app reports download and install failures as toasts - note the message, then
 
 The link must be the direct download - the URL the browser actually saves the file from - and it must start with `https://`. A link to a mod *page* (where you click a Download button) won't work; copy the file's direct link instead. Supported targets are `.zip`, `.7z`, `.rar` archives and bare `.pak`/`.utoc`/`.ucas` files.
 
+## Companion PAK cleanup says the game is running
+
+Cratebug will not rewrite a live `.pak` while Marvel Rivals is running. Close the game, then try again.
+
+## Companion PAK cleanup failed partway through
+
+Each `.pak` is rewritten on its own. A failure leaves that file as it was. Mods that already finished stay fixed. Read the toast, then scan again. The warning is once per library per session, so a failed run needs a new Cratebug launch (or a later install) to retry.
+
 ## Encrypt or Decrypt is greyed out
 
 The Actions menu only encrypts complete IoStore mods (`.pak` + `.utoc` + `.ucas`). Classic PAK mods, incomplete bundles, and orphaned sidecars are ineligible. If the checked set mixes encrypted and unencrypted IoStore mods, the action stays disabled until you check only one kind.

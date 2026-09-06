@@ -12,26 +12,57 @@ import (
 )
 
 type scriptedEncryptionCaller struct {
-	encryptedByUTOC map[string]bool
-	failCreate      bool
-	failListPak     bool
+	encryptedByUTOC   map[string]bool
+	failCreate        bool
+	failListPak       bool
+	pakListing        string
+	rebuiltPakListing string
+	createPakBody     string
+	writeUasset       bool
 }
 
 func (s *scriptedEncryptionCaller) Call(action string, params map[string]any, result any) error {
 	switch action {
 	case "is_iostore_encrypted":
 		path, _ := params["file_path"].(string)
+		if s.rebuiltPakListing != "" && filepath.Base(path) == "rebuilt.utoc" {
+			return json.Unmarshal([]byte(encryptionJSON(true)), result)
+		}
 		return json.Unmarshal([]byte(encryptionJSON(s.encryptedByUTOC[filepath.Base(path)])), result)
 	case "extract_iostore":
 		output, _ := params["output_path"].(string)
-		return os.WriteFile(filepath.Join(output, "extracted.txt"), []byte("extracted"), 0o600)
+		name := "extracted.txt"
+		if s.writeUasset {
+			name = "extracted.uasset"
+		}
+		return os.WriteFile(filepath.Join(output, name), []byte("extracted"), 0o600)
 	case "list_pak":
 		if s.failListPak {
 			return &uassettool.ToolError{Action: action, Message: "list failed"}
 		}
-		return json.Unmarshal([]byte(`{"files":[]}`), result)
+		path, _ := params["file_path"].(string)
+		key, _ := params["aes_key"].(string)
+		listing := s.pakListing
+		if listing == "" {
+			listing = `{"files":[]}`
+		}
+		if s.rebuiltPakListing != "" && filepath.Base(path) == "rebuilt.pak" {
+			if key == "" {
+				listing = `{"files":[]}`
+			} else {
+				listing = s.rebuiltPakListing
+			}
+		}
+		return json.Unmarshal([]byte(listing), result)
 	case "extract_pak_all":
 		return json.Unmarshal([]byte(`{"extracted_count":0}`), result)
+	case "create_pak":
+		output, _ := params["output_path"].(string)
+		body := s.createPakBody
+		if body == "" {
+			body = "stripped.pak"
+		}
+		return os.WriteFile(output, []byte(body), 0o600)
 	case "create_mod_iostore":
 		if s.failCreate {
 			return &uassettool.ToolError{Action: action, Message: "rebuild failed"}
@@ -273,5 +304,69 @@ func TestSetModEncryptionSkipsWhenAlreadyAtTarget(t *testing.T) {
 	}
 	if string(body) != "live-Hero_9999999_P.pak" {
 		t.Errorf("already-encrypted bundle was rewritten: %q", body)
+	}
+}
+
+func TestSetModEncryptionStripsCompanionMetadataFromRebuiltPak(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	entry := library.Entries[0]
+	caller := &scriptedEncryptionCaller{
+		encryptedByUTOC:   map[string]bool{"Hero_9999999_P.utoc": false},
+		rebuiltPakListing: metadataListing(),
+		createPakBody:     "stripped-companion",
+	}
+
+	// Act
+	result, err := SetModEncryption(root, []string{entry.ID}, true, caller, nil, nil)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetModEncryption() error = %v, want nil", err)
+	}
+	if len(result.Failed) != 0 {
+		t.Fatalf("Failed = %v, want none", result.Failed)
+	}
+	body, err := os.ReadFile(filepath.Join(root, "Hero_9999999_P.pak"))
+	if err != nil {
+		t.Fatalf("read primary: %v", err)
+	}
+	if string(body) != "stripped-companion" {
+		t.Errorf("primary content = %q, want the stripped companion PAK, not the raw create_mod_iostore output", body)
+	}
+}
+
+func TestSetModEncryptionIgnoresCompanionCleanupStub(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	entry := library.Entries[0]
+	caller := &scriptedEncryptionCaller{
+		encryptedByUTOC: map[string]bool{"Hero_9999999_P.utoc": false},
+		pakListing:      `{"files":[{"path":"` + uassettool.CompanionStubName + `"}]}`,
+		writeUasset:     true,
+	}
+
+	// Act
+	result, err := SetModEncryption(root, []string{entry.ID}, true, caller, nil, nil)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetModEncryption() error = %v, want nil", err)
+	}
+	if len(result.Failed) != 0 {
+		t.Fatalf("Failed = %v, want none for a stub-only companion PAK", result.Failed)
+	}
+	if len(result.Succeeded) != 1 {
+		t.Fatalf("Succeeded = %v, want [%s]", result.Succeeded, entry.ID)
 	}
 }

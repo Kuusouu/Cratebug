@@ -14,6 +14,10 @@ export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
+export function CancelCompanionCleanup() {
+  return window['go']['main']['App']['CancelCompanionCleanup']();
+}
+
 export function CancelEncryption() {
   return window['go']['main']['App']['CancelEncryption']();
 }
@@ -36,6 +40,10 @@ export function ClassificationType() {
 
 export function ClassifyLibrary(arg1, arg2) {
   return window['go']['main']['App']['ClassifyLibrary'](arg1, arg2);
+}
+
+export function CompanionCleanupType() {
+  return window['go']['main']['App']['CompanionCleanupType']();
 }
 
 export function ConflictType() {
@@ -80,6 +88,12 @@ export function DownloadUpdate(arg1) {
 
 export function EncryptionType() {
   return window['go']['main']['App']['EncryptionType']();
+}
+
+}
+
+export function FindUnsupportedCompanionPaks(arg1) {
+  return window['go']['main']['App']['FindUnsupportedCompanionPaks'](arg1);
 }
 
 export function GetAppVersion() {
@@ -164,6 +178,10 @@ export function SetModRoot(arg1) {
 
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function StripCompanionPaks(arg1, arg2) {
+  return window['go']['main']['App']['StripCompanionPaks'](arg1, arg2);
 }
 
 export function UnassignModTag(arg1, arg2) {

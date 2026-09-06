@@ -47,6 +47,8 @@ type App struct {
 	tableLoaded           bool
 	encryptMu             sync.Mutex
 	encryptCancel         chan struct{}
+	companionMu           sync.Mutex
+	companionCancel       chan struct{}
 }
 
 // Creates the application binding.
@@ -363,6 +365,66 @@ func (a *App) CancelEncryption() {
 	if a.encryptCancel != nil {
 		close(a.encryptCancel)
 		a.encryptCancel = nil
+	}
+}
+
+// CompanionCleanupType anchors mutation.CompanionCleanupResult so Wails emits its TypeScript model.
+func (a *App) CompanionCleanupType() mutation.CompanionCleanupResult {
+	return mutation.CompanionCleanupResult{}
+}
+
+// Lists scanner IDs whose companion PAK still contains chunknames or patched_files.
+func (a *App) FindUnsupportedCompanionPaks(modRoot string) ([]string, error) {
+	worker, err := uassettool.NewWriteWorker(nil)
+	if err != nil {
+		return nil, err
+	}
+	defer worker.Close()
+	return mutation.FindUnsupportedCompanionPaks(modRoot, worker)
+}
+
+// Rewrites each dirty companion PAK one at a time. Emits companion:progress.
+func (a *App) StripCompanionPaks(modRoot string, entryIDs []string) (mutation.CompanionCleanupResult, error) {
+	if a.gameRunningChecker != nil {
+		running, err := a.gameRunningChecker.IsGameRunning()
+		if err != nil {
+			return mutation.CompanionCleanupResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
+		}
+		if running {
+			return mutation.CompanionCleanupResult{}, mutation.ErrGameRunning
+		}
+	}
+
+	worker, err := uassettool.NewWriteWorker(nil)
+	if err != nil {
+		return mutation.CompanionCleanupResult{}, err
+	}
+	defer worker.Close()
+
+	a.companionMu.Lock()
+	a.companionCancel = make(chan struct{})
+	cancel := a.companionCancel
+	a.companionMu.Unlock()
+	defer func() {
+		a.companionMu.Lock()
+		a.companionCancel = nil
+		a.companionMu.Unlock()
+	}()
+
+	return mutation.StripCompanionPaks(modRoot, entryIDs, worker, func(progress mutation.CompanionCleanupProgress) {
+		if a.ctx != nil {
+			wailsRuntime.EventsEmit(a.ctx, "companion:progress", progress)
+		}
+	}, cancel)
+}
+
+// Stops an in-progress StripCompanionPaks after the current bundle finishes.
+func (a *App) CancelCompanionCleanup() {
+	a.companionMu.Lock()
+	defer a.companionMu.Unlock()
+	if a.companionCancel != nil {
+		close(a.companionCancel)
+		a.companionCancel = nil
 	}
 }
 
@@ -699,6 +761,11 @@ func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder 
 	// must not block installation, so the error is intentionally not propagated.
 	identities, _ := a.classifier.Classify(session.Dir, entries, a.getCharacterTable())
 
+	if worker, err := uassettool.NewWriteWorker(nil); err == nil {
+		markStagedCompanionPaks(session, worker)
+		_ = worker.Close()
+	}
+
 	preview, err := install.BuildPreview(modRoot, session, defaultFolder, identities)
 	if err != nil {
 		_ = a.installSessionManager.RemoveSession(session.ID)
@@ -721,6 +788,15 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 	ctx := a.ctx
 	if ctx == nil {
 		ctx = context.Background()
+	}
+
+	worker, err := uassettool.NewWriteWorker(nil)
+	if err != nil {
+		return install.ApplyResult{}, err
+	}
+	defer worker.Close()
+	if err := stripStagedCompanionPaks(session, items, worker); err != nil {
+		return install.ApplyResult{}, err
 	}
 
 	return install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)

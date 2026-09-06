@@ -7,6 +7,7 @@ import {
 	formatBytes,
 	hasBlockingIssues,
 	hasUnresolvedCollisions,
+	selectedUnsupportedCompanionCount,
 	validateInstallModName,
 } from "./installPresentation";
 
@@ -433,5 +434,37 @@ describe("hasBlockingIssues", () => {
 		};
 
 		expect(hasBlockingIssues([item], configs)).toBe(false);
+	});
+});
+
+describe("selectedUnsupportedCompanionCount", () => {
+	it("counts selected dirty companion PAKs and ignores issues-only blockers", () => {
+		const dirty = new install.PreviewItem({
+			id: "mod-1",
+			unsupportedCompanionPak: true,
+		});
+		const clean = new install.PreviewItem({
+			id: "mod-2",
+			unsupportedCompanionPak: false,
+		});
+		const configs = {
+			"mod-1": {
+				id: "mod-1",
+				selected: true,
+				modName: "Hulk",
+				destinationFolder: "",
+				overwrite: false,
+			},
+			"mod-2": {
+				id: "mod-2",
+				selected: true,
+				modName: "Storm",
+				destinationFolder: "",
+				overwrite: false,
+			},
+		};
+
+		expect(selectedUnsupportedCompanionCount([dirty, clean], configs)).toBe(1);
+		expect(hasBlockingIssues([dirty], { "mod-1": configs["mod-1"] })).toBe(false);
 	});
 });

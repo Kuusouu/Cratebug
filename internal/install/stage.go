@@ -47,16 +47,17 @@ type Progress struct {
 
 // StagedMod describes one discovered Unreal mod bundle within a staged session.
 type StagedMod struct {
-	ID                  string                 `json:"id"`
-	RelativePrimaryPath string                 `json:"relativePrimaryPath"`
-	SourcePath          string                 `json:"sourcePath"`
-	Sidecars            discovery.Sidecars     `json:"sidecars"`
-	BundleFormat        discovery.BundleFormat `json:"bundleFormat"`
-	DisplayName         string                 `json:"displayName"`
-	Stem                string                 `json:"stem"`
-	TotalSizeBytes      int64                  `json:"totalSizeBytes"`
-	AllFiles            []string               `json:"allFiles"`
-	Issues              []discovery.Issue      `json:"issues,omitempty"`
+	ID                      string                 `json:"id"`
+	RelativePrimaryPath     string                 `json:"relativePrimaryPath"`
+	SourcePath              string                 `json:"sourcePath"`
+	Sidecars                discovery.Sidecars     `json:"sidecars"`
+	BundleFormat            discovery.BundleFormat `json:"bundleFormat"`
+	DisplayName             string                 `json:"displayName"`
+	Stem                    string                 `json:"stem"`
+	TotalSizeBytes          int64                  `json:"totalSizeBytes"`
+	AllFiles                []string               `json:"allFiles"`
+	Issues                  []discovery.Issue      `json:"issues,omitempty"`
+	UnsupportedCompanionPak bool                   `json:"unsupportedCompanionPak,omitempty"`
 }
 
 // StagedSession holds the temporary workspace where mod files are unpacked and inspected.

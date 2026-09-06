@@ -207,9 +207,17 @@ func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt, curren
 		return fmt.Errorf("rebuild IoStore: %w", err)
 	}
 
+	rebuiltPak := outputBase + ".pak"
+	rebuiltUtoc := outputBase + ".utoc"
+	// create_mod_iostore can write chunknames / patched_files back into the
+	// companion PAK. Strip them here so the library never receives those names.
+	if err := RewriteCompanionPak(workDir, rebuiltPak, rebuiltUtoc, caller); err != nil {
+		return fmt.Errorf("strip companion metadata after rebuild: %w", err)
+	}
+
 	rebuilt := map[string]string{
-		primaryAbs: outputBase + ".pak",
-		utocAbs:    outputBase + ".utoc",
+		primaryAbs: rebuiltPak,
+		utocAbs:    rebuiltUtoc,
 		ucasAbs:    outputBase + ".ucas",
 	}
 	return replaceBundleFiles(root, rebuilt)

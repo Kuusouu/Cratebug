@@ -31,6 +31,7 @@ import {
 	formatWailsError as formatError,
 	hasBlockingIssues,
 	hasUnresolvedCollisions,
+	selectedUnsupportedCompanionCount,
 	type ModConfig,
 	validateInstallModName,
 } from "./installPresentation";
@@ -188,6 +189,10 @@ export function InstallPreviewDialog({
 	// Check if any selected mod has an incomplete bundle from a staging failure
 	const blockingIssues = useMemo(() => {
 		return hasBlockingIssues(items, configs);
+	}, [items, configs]);
+
+	const unsupportedCompanionCount = useMemo(() => {
+		return selectedUnsupportedCompanionCount(items, configs);
 	}, [items, configs]);
 
 	const canInstall =
@@ -612,6 +617,13 @@ export function InstallPreviewDialog({
 						</div>
 
 						<div className={styles["install-preview-footer"]}>
+							{unsupportedCompanionCount > 0 && (
+								<p className={styles["install-footer-warning"]} role="status">
+									{unsupportedCompanionCount === 1
+										? "1 selected mod has unsupported companion PAK entries (chunknames / patched_files). Cratebug will rewrite that .pak during install. IoStore .utoc and .ucas stay as they are."
+										: `${unsupportedCompanionCount} selected mods have unsupported companion PAK entries (chunknames / patched_files). Cratebug will rewrite those .pak files during install. IoStore .utoc and .ucas stay as they are.`}
+								</p>
+							)}
 							{blockingIssues && (
 								<p className={styles["install-footer-warning"]} role="alert">
 									Exclude any mod with a staging issue before installing.

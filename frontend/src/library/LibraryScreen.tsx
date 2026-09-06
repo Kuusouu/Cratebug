@@ -2,24 +2,24 @@ import {
 	Grid2X2,
 	Link,
 	List,
-	PanelsTopLeft,
 	PackagePlus,
+	PanelsTopLeft,
 	Settings as SettingsIcon,
 	ShieldAlert,
 } from "lucide-react";
-import styles from "./LibraryScreen.module.css";
 import {
-	useCallback,
 	type CSSProperties,
+	type MouseEvent,
+	useCallback,
 	useEffect,
 	useMemo,
-	type MouseEvent,
 	useRef,
 	useState,
 } from "react";
 import {
 	ApplyUpdate,
 	AssignModTag,
+	CancelCompanionCleanup,
 	CancelEncryption,
 	CheckForUpdate,
 	CheckWhatsNew,
@@ -33,6 +33,7 @@ import {
 	DetectConflicts,
 	DetectLibrary,
 	DownloadUpdate,
+	FindUnsupportedCompanionPaks,
 	GetAppVersion,
 	LoadMetadata,
 	MoveFolder,
@@ -50,6 +51,7 @@ import {
 	SetModPriority,
 	SetModRoot,
 	SetTheme,
+	StripCompanionPaks,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import {
@@ -64,25 +66,27 @@ import {
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
 import { BatchActionsMenu } from "./BatchActionsMenu";
+import { CompanionPakDialog } from "./CompanionPakDialog";
+import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
 	type CheckClickModifiers,
 	nextCheckedIDs,
 	remapCheckedID,
 	retainCheckedIDs,
 } from "./checkedSelection";
-import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
-import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
-import { encryptionMenuState } from "./encryptionAction";
-import { EncryptConfirmDialog } from "./EncryptConfirmDialog";
 import { DetectLibraryDialog } from "./DetectLibraryDialog";
+import { EncryptConfirmDialog } from "./EncryptConfirmDialog";
+import { encryptionMenuState } from "./encryptionAction";
 import { canChangeModState, canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
 import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
 import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
 import { InstallFromUrlDialog } from "./InstallFromUrlDialog";
-import { type InstallSource, InstallPreviewDialog } from "./InstallPreviewDialog";
+import { InstallPreviewDialog, type InstallSource } from "./InstallPreviewDialog";
 import { formatWailsError as errorMessage } from "./installPresentation";
+import styles from "./LibraryScreen.module.css";
 import { detectionOutcome } from "./libraryDetection";
 import {
 	type DraggedItem,
@@ -105,7 +109,7 @@ import { SelectedModPanel } from "./SelectedModPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { providerLogos } from "./StoreLogos";
 import { TagMenu } from "./TagMenu";
-import { type UpdateDownloadProgress, UpdateDialog } from "./UpdateDialog";
+import { UpdateDialog, type UpdateDownloadProgress } from "./UpdateDialog";
 
 type LibraryIndex = {
 	folders: string[];
@@ -224,12 +228,23 @@ function sharedTagIDsForEntries(
 	return shared ?? new Set();
 }
 
+function firstFailureDetail(failed: { message?: string }[] | undefined): string {
+	return failed?.[0]?.message?.trim() ?? "";
+}
+
+function withFailureDetail(message: string, detail: string): string {
+	if (!detail) return message;
+	const base = message.endsWith(".") ? message.slice(0, -1) : message;
+	return `${base}: ${detail}`;
+}
+
 function batchFeedback(
 	verbPast: string,
 	verbInfinitive: string,
 	succeeded: number,
 	failed: number,
 	skipped: number,
+	detail = "",
 ): { kind: MutationFeedback["kind"]; message: string } {
 	if (failed === 0 && skipped === 0) {
 		return {
@@ -240,13 +255,19 @@ function batchFeedback(
 	if (succeeded === 0 && failed > 0 && skipped === 0) {
 		return {
 			kind: "error",
-			message: `Could not ${verbInfinitive} ${failed} ${failed === 1 ? "mod" : "mods"}.`,
+			message: withFailureDetail(
+				`Could not ${verbInfinitive} ${failed} ${failed === 1 ? "mod" : "mods"}.`,
+				detail,
+			),
 		};
 	}
 	const parts = [`${verbPast} ${succeeded}`];
 	if (failed > 0) parts.push(`failed ${failed}`);
 	if (skipped > 0) parts.push(`skipped ${skipped}`);
-	return { kind: "warning", message: `${parts.join(", ")}.` };
+	return {
+		kind: "warning",
+		message: withFailureDetail(`${parts.join(", ")}.`, detail),
+	};
 }
 
 function tagsByEntryID(document: metadata.Document | null): ReadonlyMap<string, metadata.Tag[]> {
@@ -333,6 +354,12 @@ export function LibraryScreen() {
 	const [checkAnchorID, setCheckAnchorID] = useState<string | null>(null);
 	const [dialogScope, setDialogScope] = useState<DialogScope>("viewed");
 	const [encryptProgress, setEncryptProgress] = useState<EncryptionProgressEvent | null>(null);
+	const [companionCleanupIDs, setCompanionCleanupIDs] = useState<string[]>([]);
+	const [companionCleanupOpen, setCompanionCleanupOpen] = useState(false);
+	const [companionProgress, setCompanionProgress] = useState<EncryptionProgressEvent | null>(
+		null,
+	);
+	const [companionOfferSettled, setCompanionOfferSettled] = useState(true);
 	const [activeDialog, setActiveDialog] = useState<MutationDialog | null>(null);
 	const [activeFolderDialog, setActiveFolderDialog] = useState<FolderDialogMode | null>(null);
 	const [folderDialogTarget, setFolderDialogTarget] = useState("");
@@ -377,6 +404,7 @@ export function LibraryScreen() {
 	const externalDragDepthRef = useRef(0);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const classificationRequestIDRef = useRef(0);
+	const offeredCompanionCleanupRootsRef = useRef(new Set<string>());
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
@@ -513,6 +541,12 @@ export function LibraryScreen() {
 	useEffect(() => {
 		return EventsOn("encrypt:progress", (progress: EncryptionProgressEvent) => {
 			setEncryptProgress(progress);
+		});
+	}, []);
+
+	useEffect(() => {
+		return EventsOn("companion:progress", (progress: EncryptionProgressEvent) => {
+			setCompanionProgress(progress);
 		});
 	}, []);
 
@@ -1420,6 +1454,7 @@ export function LibraryScreen() {
 				succeeded,
 				failed,
 				0,
+				firstFailureDetail(result.failed),
 			);
 			showMutationFeedback(feedback.kind, feedback.message);
 			return failed === 0;
@@ -1912,6 +1947,74 @@ export function LibraryScreen() {
 		}
 	}
 
+	const maybeOfferCompanionCleanup = useCallback(async (root: string) => {
+		const key = root.toLowerCase();
+		if (offeredCompanionCleanupRootsRef.current.has(key)) {
+			setCompanionOfferSettled(true);
+			return;
+		}
+		try {
+			const found = await FindUnsupportedCompanionPaks(root);
+			if (activeLibraryRootRef.current !== root) return;
+			offeredCompanionCleanupRootsRef.current.add(key);
+			if (!found?.length) return;
+			setCompanionCleanupIDs(found);
+			setCompanionCleanupOpen(true);
+		} catch {
+			// First-load warning is best-effort. A failed listing can retry on
+			// the next user-initiated scan.
+		} finally {
+			if (activeLibraryRootRef.current === root) {
+				setCompanionOfferSettled(true);
+			}
+		}
+	}, []);
+
+	const stripCompanionPaks = useCallback(async (): Promise<boolean> => {
+		if (!libraryRoot || isFolderMutatingRef.current) return false;
+		if (companionCleanupIDs.length === 0) return false;
+
+		const ids = companionCleanupIDs;
+		markEntriesBusy(ids);
+		setCompanionProgress({ current: 0, total: ids.length, entryID: "", displayName: "" });
+		try {
+			const result = await StripCompanionPaks(libraryRoot, ids);
+			if (activeLibraryRootRef.current !== libraryRoot) return false;
+			await reloadLibrary();
+			const succeeded = result.succeeded?.length ?? 0;
+			const failed = result.failed?.length ?? 0;
+			const feedback = batchFeedback(
+				"Fixed",
+				"fix",
+				succeeded,
+				failed,
+				0,
+				firstFailureDetail(result.failed),
+			);
+			showMutationFeedback(feedback.kind, feedback.message);
+			return failed === 0;
+		} catch (error) {
+			if (activeLibraryRootRef.current === libraryRoot) {
+				await reloadLibrary();
+				showMutationFeedback(
+					"error",
+					`Could not rewrite companion PAK files: ${errorMessage(error)}`,
+				);
+			}
+			return false;
+		} finally {
+			clearEntriesBusy(ids);
+			setCompanionProgress(null);
+		}
+	}, [
+		clearEntriesBusy,
+		companionCleanupIDs,
+		libraryRoot,
+		markEntriesBusy,
+		reloadLibrary,
+		showMutationFeedback,
+	]);
+
 	// Replaces the catalog only after a scan finishes successfully. Accepts an
 	// explicit root so the initial-launch scan of a persisted mod root does not
 	// have to wait a render cycle for the modRoot input's state to catch up.
@@ -1932,6 +2035,7 @@ export function LibraryScreen() {
 			setContextMenu(null);
 			setIdentitiesByEntryID({});
 			setConflictResult(null);
+			setCompanionOfferSettled(true);
 			setLibraryState("initial");
 			return;
 		}
@@ -1948,6 +2052,12 @@ export function LibraryScreen() {
 			setIdentitiesByEntryID({});
 			setConflictResult(null);
 			classify(root, result.entries);
+			if (result.entries.length > 0) {
+				setCompanionOfferSettled(false);
+				void maybeOfferCompanionCleanup(root);
+			} else {
+				setCompanionOfferSettled(true);
+			}
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
@@ -2441,6 +2551,44 @@ export function LibraryScreen() {
 					onClose={() => setActiveDialog(null)}
 					onConfirm={encryptCheckedMods}
 				/>
+			)}
+			{companionCleanupOpen && companionCleanupIDs.length > 0 && !companionProgress && (
+				<CompanionPakDialog
+					count={companionCleanupIDs.length}
+					isMutating={isMutationLocked}
+					onClose={() => setCompanionCleanupOpen(false)}
+					onConfirm={stripCompanionPaks}
+				/>
+			)}
+			{companionProgress && (
+				<div className="mutation-dialog-backdrop">
+					<section
+						className="mutation-dialog"
+						aria-labelledby="companion-progress-title"
+						aria-modal="true"
+						role="dialog"
+					>
+						<div>
+							<p className="eyebrow">Mod action</p>
+							<h2 id="companion-progress-title">Rewriting companion PAK files</h2>
+							<p className="mutation-dialog-subtitle">
+								{companionProgress.displayName || "Preparing..."}
+							</p>
+						</div>
+						<p className="delete-confirm-summary">
+							{companionProgress.current} of {companionProgress.total}
+						</p>
+						<div className="mutation-dialog-actions">
+							<button
+								type="button"
+								className="quiet-button"
+								onClick={() => void CancelCompanionCleanup()}
+							>
+								Cancel
+							</button>
+						</div>
+					</section>
+				</div>
 			)}
 			{encryptProgress && (
 				<div className="mutation-dialog-backdrop">
