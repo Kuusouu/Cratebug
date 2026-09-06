@@ -5,9 +5,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 )
 
@@ -368,5 +370,101 @@ func TestSetModEncryptionIgnoresCompanionCleanupStub(t *testing.T) {
 	}
 	if len(result.Succeeded) != 1 {
 		t.Fatalf("Succeeded = %v, want [%s]", result.Succeeded, entry.ID)
+	}
+}
+
+func TestSetModEncryptionPooledRewritesEachTarget(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeIoStoreBundle(t, root, "", "Alpha_9999999_P", false)
+	writeIoStoreBundle(t, root, "", "Beta_9999999_P", false)
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	if len(library.Entries) != 2 {
+		t.Fatalf("Scan() entries = %d, want 2", len(library.Entries))
+	}
+	ids := []string{library.Entries[0].ID, library.Entries[1].ID}
+	var launched atomic.Int32
+	launch := func() (ArchiveCaller, func(), error) {
+		launched.Add(1)
+		return &scriptedEncryptionCaller{encryptedByUTOC: map[string]bool{
+			"Alpha_9999999_P.utoc": false,
+			"Beta_9999999_P.utoc":  false,
+		}}, func() {}, nil
+	}
+
+	// Act
+	result, err := SetModEncryptionPooled(root, ids, true, launch, nil, nil)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetModEncryptionPooled() error = %v, want nil", err)
+	}
+	if len(result.Succeeded) != 2 {
+		t.Fatalf("Succeeded = %v, want both ids", result.Succeeded)
+	}
+	wantWorkers := uassettool.DefaultWorkerPoolSizeForLibrary(2)
+	if wantWorkers > 2 {
+		wantWorkers = 2
+	}
+	if got := int(launched.Load()); got != wantWorkers {
+		t.Errorf("launched workers = %d, want %d", got, wantWorkers)
+	}
+	for _, name := range []string{"Alpha_9999999_P.pak", "Beta_9999999_P.pak"} {
+		body, readErr := os.ReadFile(filepath.Join(root, name))
+		if readErr != nil {
+			t.Fatalf("read %s: %v", name, readErr)
+		}
+		if string(body) != "rebuilt.pak" {
+			t.Errorf("%s content = %q, want rebuilt.pak", name, body)
+		}
+	}
+}
+
+func TestFindModsNeedingEncryption(t *testing.T) {
+	ui := encryptableIoStoreEntry("ui-mod")
+	mesh := encryptableIoStoreEntry("mesh-mod")
+	already := encryptableIoStoreEntry("encrypted-ui")
+	classic := discovery.Entry{
+		ID:           "classic-ui",
+		Kind:         discovery.EntryMod,
+		PrimaryPath:  "classic.pak",
+		DisplayName:  "classic",
+		BundleFormat: discovery.BundleFormatClassic,
+	}
+	entries := []discovery.Entry{ui, mesh, already, classic}
+	identities := map[string]modtype.Identity{
+		already.ID: {Encrypted: true},
+	}
+	paths := map[string][]string{
+		ui.ID:      {"/Game/Marvel/UI/Icons/Icon.uasset"},
+		mesh.ID:    {"Marvel/Content/Marvel/Characters/1011/Meshes/SK_Hulk.uasset"},
+		already.ID: {"/Game/Marvel/UI/Icons/Icon.uasset"},
+		classic.ID: {"UI/Icons/Icon.uasset"},
+		"missing":  {"UI/Icons/Icon.uasset"},
+	}
+
+	// Act
+	got := FindModsNeedingEncryption(entries, identities, paths)
+
+	// Assert
+	if len(got) != 1 || got[0] != ui.ID {
+		t.Fatalf("FindModsNeedingEncryption() = %v, want [%s]", got, ui.ID)
+	}
+}
+
+func encryptableIoStoreEntry(id string) discovery.Entry {
+	return discovery.Entry{
+		ID:           id,
+		Kind:         discovery.EntryMod,
+		PrimaryPath:  id + ".pak",
+		DisplayName:  id,
+		BundleFormat: discovery.BundleFormatIoStore,
+		Sidecars: discovery.Sidecars{
+			UTOC: id + ".utoc",
+			UCAS: id + ".ucas",
+		},
 	}
 }

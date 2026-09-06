@@ -65,6 +65,8 @@ Encryption is a rebuild, not a bit-flip. Large mods can take several minutes. Cl
 
 A lock mark on a card means that IoStore bundle is encrypted. The category pill (Mesh, UI, and so on) does not change.
 
+The first time Cratebug finishes classifying a library in a session, it offers to encrypt complete IoStore mods that change files outside `/Game/Marvel/Characters`. Those mods will not load until they are encrypted. You can decline for this session. Refresh does not ask again. If leftover companion PAK names are also present, that warning is shown first.
+
 ## Unsupported companion PAK entries
 
 As of 3 September 2026, leftover `chunknames` and `patched_files` entries inside a companion `.pak` crash Marvel Rivals anti-cheat. The first time Cratebug loads a library in a session, it lists those files and asks to rewrite the affected `.pak` files. The IoStore `.utoc` and `.ucas` stay as they are. You can decline for this session. A later Refresh does not ask again.

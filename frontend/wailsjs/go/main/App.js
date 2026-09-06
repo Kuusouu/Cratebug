@@ -90,6 +90,8 @@ export function EncryptionType() {
   return window['go']['main']['App']['EncryptionType']();
 }
 
+export function FindModsNeedingEncryption(arg1) {
+  return window['go']['main']['App']['FindModsNeedingEncryption'](arg1);
 }
 
 export function FindUnsupportedCompanionPaks(arg1) {

@@ -369,6 +369,34 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Failed or cancelled encrypt leaves no partial bundle presented as the new mod.
 - Canonical checks pass. Running-app states are screenshotted and reviewed.
 
+## Phase 15 - Unsupported companion PAK cleanup and required encryption
+
+**Outcome:** Cratebug warns when installed or incoming mods still contain `chunknames` / `patched_files` companion PAK entries (anti-cheat crash as of 3 September 2026), and rewrites only those `.pak` files one at a time. After classify, it offers encryption for complete unencrypted IoStore mods that touch files outside `/Game/Marvel/Characters`, and runs those rebuilds through a write-worker pool.
+
+**Includes:**
+
+- Detect via `list_pak` (not filesystem scan): any primary whose listing contains `chunknames` or `patched_files`
+- First populated library load per root per session offers a Yes/No rewrite
+- Install preview warns and Apply rewrites the staged `.pak` before it lands in the library
+- Sequential Go mutation: extract remaining files, `create_pak` without the metadata names, replace only the `.pak`, leave `.utoc` / `.ucas` untouched
+- Game-running lock, park+replace+rollback, progress, cancellation
+- Detect required encryption from classify path listings (outside `/Game/Marvel/Characters`)
+- First-load Encrypt / Not now after classify, queued behind the companion dialog
+- Encrypt/decrypt writes use a `NewWriteWorker` pool sized by `WorkerPoolSizeForLibrary`, not the classify processes
+- Decision 0006 and the 0005 addendum
+
+**Excludes:** Rebuilding IoStore containers for companion cleanup, install-time obfuscation, classic-to-IoStore conversion, BentoMod changes, and a persistent "never ask again" setting.
+
+**Exit criteria:**
+
+- A disposable companion PAK that only contains those names is rewritten without them (one harmless stub entry, because the worker cannot write an empty PAK). Hybrid companions keep their other files.
+- First library load of a dirty library shows the companion warning once per session. Refresh does not re-prompt.
+- Install preview names the affected mods and Apply writes a clean `.pak`.
+- Failed or cancelled rewrite leaves that `.pak` as it was.
+- A complete unencrypted IoStore whose listing leaves Characters is offered for encryption once per session after classify.
+- App encrypt launches write workers using the library pool-size policy.
+- Canonical checks pass.
+
 ## Deferred post-release work
 
 Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, filesystem watching, full backup and restore, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.

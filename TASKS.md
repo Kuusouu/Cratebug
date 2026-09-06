@@ -1,86 +1,74 @@
 # Cratebug Active Tasks
 
-**Phase:** 14 - Batch actions and in-place encryption
-**Status:** Complete
-**Branch:** `feat/phase-14-batch-encryption`
+**Phase:** 15 - Unsupported companion PAK cleanup and required encryption
+**Status:** Active
 
-Review approved 2026-09-05. See `docs/reviews/phase-14-review.md`. Do not start the next phase.
+This file contains only the active work. Do not start the next phase.
 
 ## Objective
 
-Users can check many mods and run the same action on the set from one Actions menu, including encrypting or decrypting complete IoStore bundles in place.
+Warn when mods still contain `chunknames` / `patched_files` companion PAK entries, then rewrite only those `.pak` files one at a time. Offer the rewrite on first library load and strip during install. After classify, offer encryption for complete unencrypted IoStore mods whose listings leave `/Game/Marvel/Characters`, and run those rebuilds through a write-worker pool.
 
 ## Design decisions
 
-* **Two selections.** Viewing (`selectedEntryID`) is the details panel and the single-mod context menu. Checking (`checkedEntryIDs`) is the batch target. Click a card = view it and make it the only checked mod. Click it again = clear both. Ctrl+click toggles check without clearing the rest. Shift+click ranges over the current filtered list.
-* **Actions icon dropdown** in the catalog header, beside Tags. Visible chrome: `N selected`, Select all (visible mods), Clear. Menu: Enable, Disable, Move to..., Tags..., Encrypt/Decrypt, Delete....
-* **Context menu stays single-mod.** Rename / priority / move / tags / delete for the right-clicked row only.
-* **Card Enable switch stays.** Dropdown Enable/Disable is for the checked set.
-* **Encrypt is IoStore-only.** Complete `.pak` + `.utoc` + `.ucas`. Classic, incomplete, orphaned, or non-mod: ineligible.
-* **Uniform encrypt state required.** All encrypted → Decrypt. All unencrypted → Encrypt. Mixed → disabled with a mixed-state reason. Ineligible format uses a different reason.
-* **Lock on every card/row** when `Identity.encrypted` is true. Separate from the category pill.
-* **Batch organize loops existing APIs.** `SetModEnabled`, `MoveMod`, `AssignModTag` / `UnassignModTag`, `DeleteMod`. Skip already-in-state. One summary toast.
-* **Encrypt/decrypt is a new mutation.** Rebuild in temp (`extract_iostore` + `create_mod_iostore` with `obfuscate`), replace, rollback that bundle on failure, `BlockedWhileGameRunning`. Sequential. Install-style progress. Write-op timeout above 30s.
-* **AES key stays in Go.** Marvel Rivals game key, hardcoded. Frontend receives only `encrypted: boolean`.
-* **SelectedModPanel** is a viewed-mod readout only. No Enable, Delete, or Clear on that strip.
+* **Detect by listing.** `list_pak` on each primary. A path containing `chunknames` or `patched_files` (any mount prefix) is unsupported. Filesystem scan does not see inside PAKs.
+* **Pak-only rewrite.** Extract remaining files, `create_pak` without those names, replace the live `.pak` (including `.pak_crateoff`). Leave `.utoc` / `.ucas` untouched. Metadata-only companions become a valid stub PAK.
+* **First load, not every refresh.** After the first populated scan of a library root this session, offer Yes/No. Dismiss is session-only. `reloadLibrary` after a mutation does not re-prompt.
+* **Install strips.** Preview warns. The issue does not block install. Apply rewrites the staged `.pak` before copy so the library never receives the crashy names.
+* **One new mutation.** `FindUnsupportedCompanionPaks` then `StripCompanionPaks` loops one ID at a time with progress and cancel, same shape as encrypt. AES key is used only to list an encrypted index. The rewritten PAK is not obfuscated.
+* **Game-running lock.** Same as other writes.
+* **Required encryption after classify.** A complete unencrypted IoStore needs the game key when any retained listing path sits outside `/Game/Marvel/Characters` (same content-root strip classify uses). Empty listings and companion metadata names do not force it. Classic PAK stays ineligible.
+* **Companion dialog first.** The companion offer starts at scan. The encryption offer waits until that offer has settled and its dialog is closed. Encrypt strips `chunknames` / `patched_files` from the rebuilt `.pak` before replace.
+* **Write-worker pool, not the classify processes.** `SetModEncryption` from the app launches `NewWriteWorker` processes sized with `DefaultWorkerPoolSizeForLibrary`. The classify pool stays on `NewPinnedWorker` (short timeout, may be busy). Sequential `SetModEncryption` with one caller stays for tests.
 
 ## Out of scope
 
+* Rebuilding `.utoc` / `.ucas` for companion cleanup
+* Persisted "never ask again"
 * Install-time obfuscation
-* Classic-PAK encryption
-* Converting classic mods to IoStore
-* A persistent Bento-style bulk button row
-* New batch Wails methods for enable/move/tags/delete
-* Exposing the AES key to the frontend
-* VFX, recompress, BentoMod changes
+* BentoMod changes
 * `ROADMAP.md` later phases
 
-## 14.1 Docs
+## 15.1 Docs
 
-Write the ROADMAP Phase 14 entry, this TASKS file, SPEC additions (checked set, batch partial success, encryption as a library mutation, key stays in Go), `docs/decisions/0005-batch-actions-and-encryption.md`, and a short 0002 addendum that batch actions go in the Actions menu.
+Write the ROADMAP Phase 15 entry, this TASKS file, SPEC additions, and `docs/decisions/0006-companion-pak-cleanup.md`.
 
-Do not update USER_GUIDE or TROUBLESHOOTING here. That is 14.7.
+**Verify:** ROADMAP names Phase 15. SPEC says install strips and first load warns. 0006 says pak-only rewrite.
 
-**Verify:** ROADMAP names Phase 14 and no longer lists batch operations under Deferred. SPEC and 0005 state the key stays in Go. 0002 says batch lives in the Actions menu.
+## 15.2 Detect + CreatePak
 
-## 14.2 Worker write surface
+Add `IsCompanionMetadataPath` / `CompanionPakUnsupportedPaths` in `internal/uassettool`. Reuse them from `CompanionPakHasRawFiles`. Add typed `CreatePak`. The worker rejects an empty file list, so a metadata-only rewrite packs `.cratebug-companion-stub`. Prove a disposable dirty PAK lists as dirty, then a stub or hybrid rewrite lists clean.
 
-Confirm the pinned `v1.5.6` `create_mod_iostore` accepts `obfuscate`. If it does not, re-pin per `docs/decisions/0004-pin-uassettool-worker.md` before any encrypt code.
+**Verify:** Unit tests plus supervised-worker rewrite. `go test ./internal/uassettool/ -count=1` passes.
 
-Add typed `ExtractIoStore` and `CreateModIoStore` in `internal/uassettool/operations.go` only. Do not mirror the full request struct. Add `MarvelRivalsAESKey`. Add `aes_key` to `ListPak` when hybrid detection needs it. Add `ExtractPakAll` if hybrid rebuild needs companion-PAK files. Add `CallWithTimeout` so write calls can exceed the 30s default.
+## 15.3 Library mutation
 
-Prove extract → create with `obfuscate` true/false against a disposable hybrid fixture the worker itself built. Record whether extract→create needs a `.usmap`. If the pinned worker requires one for real meshes, stop and decide. Do not silently ship a broken encrypt.
+`FindUnsupportedCompanionPaks` and `StripCompanionPaks` in `internal/mutation`. Sequential. Mixed listing errors skip that member for find, fail that member for strip. Preserve disabled primary names. Rollback that `.pak` on replace failure.
 
-**Verify:** Unit tests cover the new typed ops. The supervised-worker test encrypts then decrypts a disposable fixture and `IsIoStoreEncrypted` matches. `go test ./internal/uassettool/ -count=1` passes.
+**Verify:** Go tests cover metadata-only rewrite, skip-when-clean, disabled primary, rollback. `go test ./internal/mutation/ -count=1` passes.
 
-## 14.3 Encrypted as a fact
+## 15.4 App + first-load UI
 
-Add `Encrypted bool` to `Identity`. In `ListInternalPaths`, call `IsIoStoreEncrypted`, then `ListIoStoreFiles` with the game key when encrypted. Stop returning `ErrCannotDetermineType` for encryption. Update `determine_test.go` and any conflict test that treated encrypted as unavailable.
+`FindUnsupportedCompanionPaks`, `StripCompanionPaks`, `CancelCompanionCleanup` on `App`. First populated `scan()` of a root this session offers the dialog. Confirm copy names the anti-cheat crash and that utoc/ucas stay put. Progress + cancel.
 
-Regenerate Wails bindings so the frontend can read `identity.encrypted`.
+**Verify:** `bun run check` from `frontend/`. Bindings regenerated.
 
-**Verify:** Encrypted IoStore fixtures classify instead of returning `ErrCannotDetermineType`. `Identity.encrypted` is true. `go test ./internal/modtype/ ./internal/conflict/ -count=1` passes.
+## 15.5 Install warning + strip
 
-## 14.4 Multi-select UI + lock
+`unsupportedCompanionPak` on staged/preview items. `hasBlockingIssues` stays issue-only. Preview banner. `ApplyInstall` rewrites flagged staged primaries before `install.Apply`.
 
-`checkedEntryIDs` in `LibraryScreen`. No always-visible checkbox. Click, Ctrl+click, and Shift+click on compact, large, and list. Shift/Ctrl helpers as a unit-tested function over the filtered list. Catalog header: N selected, Select all, Clear. Lock mark when `encrypted`. Remap checked IDs after rename/move/rescan the same way viewing is remapped. Right-click views that row, selects it if it was not already checked, and opens the single-mod menu. Right-clicking an already-checked row keeps the rest of the set.
+**Verify:** Preview helper tests. Install apply still transactional. `bun test` and `go test ./internal/install/ ./internal/mutation/ -count=1` pass.
 
-**Verify:** `bun test` covers the range helper. `bun run check` from `frontend/` passes.
+## 15.6 Verify companion cleanup
 
-## 14.5 Actions dropdown + batch organize
+Run `.\check.ps1`, Go tests, `bun test`. Update USER_GUIDE and TROUBLESHOOTING. Screenshot the first-load dialog and the install banner when a disposable fixture can be driven.
 
-New `BatchActionsMenu` (one exported component + module CSS). Wire Enable/Disable/Move/Tags/Delete to loop existing handlers. Reuse move, tag, and delete dialogs by passing the checked ID list (or looping from `LibraryScreen`). Skip already-enabled / already-disabled. Summary toast. Batch must own the mutation lock for the whole set. `setModEnabled` today bails if any mutation is in flight.
+## 15.7 Required encryption + write pool
 
-**Verify:** `bun run check` from `frontend/` passes. Dialogs accept a batch without changing single-mod context-menu behavior.
+`modtype.RequiresIoStoreEncryption` from retained classify paths. `FindModsNeedingEncryption` after classify. First populated load of a root this session offers Encrypt / Not now. Confirm calls `SetModEncryption(..., encrypt=true)`. App encrypt launches a `NewWriteWorker` pool sized by `DefaultWorkerPoolSizeForLibrary`. Sequential single-caller encrypt stays for unit tests. Do not re-prompt on Refresh or `reloadLibrary`. Do not encrypt the user's real library.
 
-## 14.6 Encrypt/decrypt
+**Verify:** Path-rule tests (Characters vs UI/audio, prefixes, empty listing). Pooled rewrite test counts launched workers. `bun run check` from `frontend/`. Bindings include `FindModsNeedingEncryption`.
 
-New `SetModEncryption` in `app.go` + `internal/mutation`: rescan, reject ineligible, reject mixed state server-side, extract to temp, `create_mod_iostore` with `hybrid` if the companion PAK has raw files, write beside the live bundle, replace primary+sidecars, keep folder / priority filename / `.pak_crateoff`. Progress + cancel. Confirm dialog: rebuild warning. Menu item label and disabled reason from a pure helper over the checked identities. After each success, classification cache misses on mtime and the lock updates.
+## 15.8 Verify
 
-**Verify:** Go tests cover mixed-state rejection, ineligible format, disabled-primary preservation, and rollback. Frontend helper tests cover Encrypt / Decrypt / mixed / ineligible. `go test ./internal/mutation/ ./internal/uassettool/ -count=1` passes.
-
-## 14.7 Verify and review
-
-Run `.\check.ps1`, Go tests, `bun test`, and `wails generate module` if bindings changed. Update `docs/USER_GUIDE.md` and `docs/TROUBLESHOOTING.md`. Capture running-app screenshots under `docs/screenshots/phase-14/`. Stop at the review gate. Do not start the next phase.
-
-**Verify:** Canonical checks pass. Screenshots exist for empty check set, N selected, lock mark, mixed-state disabled Encrypt, and a successful encrypt or decrypt on fixtures.
+Run `.\check.ps1`, Go tests, `bun test`. Update USER_GUIDE and TROUBLESHOOTING for the required-encryption dialog. Screenshot that dialog when a disposable fixture can be driven. Stop at the review gate.

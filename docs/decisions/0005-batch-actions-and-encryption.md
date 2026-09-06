@@ -74,3 +74,17 @@ multi-file rebuild with progress and cancellation.
   the UI and are rejected again in Go.
 - Write calls need a timeout longer than the worker's 30s default.
 - Decision 0002 still governs single-mod organize actions.
+
+## Addendum 2026-09-05: write-worker pool and required encryption
+
+App-side encrypt/decrypt launches one `NewWriteWorker` per pool slot,
+sized with `DefaultWorkerPoolSizeForLibrary(len(targets))`. Those
+processes use the write-op timeout. The classify pool stays on
+`NewPinnedWorker` and is not reused: its timeout is too short, its
+`Call` is not safe across goroutines, and it may already be busy.
+
+A complete unencrypted IoStore whose classify listing includes any path
+outside `/Game/Marvel/Characters` is offered for encryption on first
+load after classify. That confirm still calls `SetModEncryption`.
+Sequential single-caller `SetModEncryption` remains for tests.
+Install-time obfuscation stays out of scope.

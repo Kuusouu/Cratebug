@@ -44,6 +44,10 @@ Cratebug will not rewrite a live `.pak` while Marvel Rivals is running. Close th
 
 Each `.pak` is rewritten on its own. A failure leaves that file as it was. Mods that already finished stay fixed. Read the toast, then scan again. The warning is once per library per session, so a failed run needs a new Cratebug launch (or a later install) to retry.
 
+## Cratebug asked to encrypt mods I did not select
+
+Mods that change files outside `/Game/Marvel/Characters` will not load unless the IoStore container is encrypted. Character-only skins that stay under that folder are not offered. You can choose Not now for this session. Refresh will not ask again.
+
 ## Encrypt or Decrypt is greyed out
 
 The Actions menu only encrypts complete IoStore mods (`.pak` + `.utoc` + `.ucas`). Classic PAK mods, incomplete bundles, and orphaned sidecars are ineligible. If the checked set mixes encrypted and unencrypted IoStore mods, the action stays disabled until you check only one kind.
@@ -54,7 +58,13 @@ Cratebug will not rebuild a live bundle while Marvel Rivals is running. Close th
 
 ## An encrypt or decrypt failed partway through
 
-Each mod is rebuilt on its own. A failure leaves that mod as it was. Mods that already finished stay encrypted or decrypted. Read the toast, then retry the ones that failed. If a hybrid mod (audio or other raw files next to Unreal assets) fails with a message about raw files that could not be extracted, stop and report it rather than retrying blindly.
+- Each mod is rebuilt on its own
+- A failure leaves that mod as it was
+- Mods that already finished stay encrypted or decrypted
+- The toast includes the first worker error
+- Retry the ones that failed
+- A leftover `.cratebug-companion-stub` from companion PAK cleanup is not a hybrid raw file
+- If a real hybrid mod (audio or other raw files next to Unreal assets) still fails with a message about raw files that could not be extracted, stop and report it rather than retrying blindly
 
 ## Something else
 

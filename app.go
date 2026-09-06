@@ -335,12 +335,6 @@ func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) 
 		}
 	}
 
-	worker, err := uassettool.NewWriteWorker(nil)
-	if err != nil {
-		return mutation.EncryptionBatchResult{}, err
-	}
-	defer worker.Close()
-
 	a.encryptMu.Lock()
 	a.encryptCancel = make(chan struct{})
 	cancel := a.encryptCancel
@@ -351,14 +345,22 @@ func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) 
 		a.encryptMu.Unlock()
 	}()
 
-	return mutation.SetModEncryption(modRoot, entryIDs, encrypt, worker, func(progress mutation.EncryptionProgress) {
+	launch := func() (mutation.ArchiveCaller, func(), error) {
+		worker, err := uassettool.NewWriteWorker(nil)
+		if err != nil {
+			return nil, nil, err
+		}
+		return worker, func() { _ = worker.Close() }, nil
+	}
+
+	return mutation.SetModEncryptionPooled(modRoot, entryIDs, encrypt, launch, func(progress mutation.EncryptionProgress) {
 		if a.ctx != nil {
 			wailsRuntime.EventsEmit(a.ctx, "encrypt:progress", progress)
 		}
 	}, cancel)
 }
 
-// Stops an in-progress SetModEncryption after the current bundle finishes planning.
+// Stops an in-progress SetModEncryption after in-flight pool jobs finish.
 func (a *App) CancelEncryption() {
 	a.encryptMu.Lock()
 	defer a.encryptMu.Unlock()
@@ -371,6 +373,26 @@ func (a *App) CancelEncryption() {
 // CompanionCleanupType anchors mutation.CompanionCleanupResult so Wails emits its TypeScript model.
 func (a *App) CompanionCleanupType() mutation.CompanionCleanupResult {
 	return mutation.CompanionCleanupResult{}
+}
+
+// Lists complete unencrypted IoStore IDs whose classify listing leaves Characters.
+func (a *App) FindModsNeedingEncryption(modRoot string) ([]string, error) {
+	library, err := discovery.Scan(modRoot)
+	if err != nil {
+		return nil, fmt.Errorf("scan mod library before required-encryption check: %w", err)
+	}
+	table := a.getCharacterTable()
+	identities, err := a.classifier.Classify(modRoot, library.Entries, table)
+	if err != nil {
+		return nil, fmt.Errorf("classify library before required-encryption check: %w", err)
+	}
+	paths := make(map[string][]string, len(library.Entries))
+	for _, entry := range library.Entries {
+		if listing, ok := a.classifier.PathsForEntry(modRoot, entry); ok {
+			paths[entry.ID] = listing
+		}
+	}
+	return mutation.FindModsNeedingEncryption(library.Entries, identities, paths), nil
 }
 
 // Lists scanner IDs whose companion PAK still contains chunknames or patched_files.

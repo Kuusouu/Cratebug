@@ -33,6 +33,7 @@ import {
 	DetectConflicts,
 	DetectLibrary,
 	DownloadUpdate,
+	FindModsNeedingEncryption,
 	FindUnsupportedCompanionPaks,
 	GetAppVersion,
 	LoadMetadata,
@@ -78,6 +79,7 @@ import {
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { DetectLibraryDialog } from "./DetectLibraryDialog";
 import { EncryptConfirmDialog } from "./EncryptConfirmDialog";
+import { EncryptionRequiredDialog } from "./EncryptionRequiredDialog";
 import { encryptionMenuState } from "./encryptionAction";
 import { canChangeModState, canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
 import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
@@ -360,6 +362,10 @@ export function LibraryScreen() {
 		null,
 	);
 	const [companionOfferSettled, setCompanionOfferSettled] = useState(true);
+	const [requiredEncryptionIDs, setRequiredEncryptionIDs] = useState<string[]>([]);
+	const [pendingRequiredEncryptionIDs, setPendingRequiredEncryptionIDs] = useState<string[]>([]);
+	const [requiredEncryptionOpen, setRequiredEncryptionOpen] = useState(false);
+	const [encryptActionIsEncrypt, setEncryptActionIsEncrypt] = useState(true);
 	const [activeDialog, setActiveDialog] = useState<MutationDialog | null>(null);
 	const [activeFolderDialog, setActiveFolderDialog] = useState<FolderDialogMode | null>(null);
 	const [folderDialogTarget, setFolderDialogTarget] = useState("");
@@ -405,6 +411,7 @@ export function LibraryScreen() {
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const classificationRequestIDRef = useRef(0);
 	const offeredCompanionCleanupRootsRef = useRef(new Set<string>());
+	const offeredRequiredEncryptionRootsRef = useRef(new Set<string>());
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
@@ -434,6 +441,10 @@ export function LibraryScreen() {
 				) ?? [],
 			),
 		[conflictResult],
+	);
+	const requiredEncryptionEntries = useMemo(
+		() => (library?.entries ?? []).filter((entry) => requiredEncryptionIDs.includes(entry.id)),
+		[library, requiredEncryptionIDs],
 	);
 
 	const displayedEntries = useMemo(() => {
@@ -1441,6 +1452,7 @@ export function LibraryScreen() {
 
 		const ids = checkedEntries.map((entry) => entry.id);
 		markEntriesBusy(ids);
+		setEncryptActionIsEncrypt(encryptMenu.encrypt);
 		setEncryptProgress({ current: 0, total: ids.length, entryID: "", displayName: "" });
 		try {
 			const result = await SetModEncryption(libraryRoot, ids, encryptMenu.encrypt);
@@ -1970,6 +1982,21 @@ export function LibraryScreen() {
 		}
 	}, []);
 
+	const maybeOfferRequiredEncryption = useCallback(async (root: string) => {
+		const key = root.toLowerCase();
+		if (offeredRequiredEncryptionRootsRef.current.has(key)) return;
+		try {
+			const found = await FindModsNeedingEncryption(root);
+			if (activeLibraryRootRef.current !== root) return;
+			offeredRequiredEncryptionRootsRef.current.add(key);
+			if (!found?.length) return;
+			setPendingRequiredEncryptionIDs(found);
+		} catch {
+			// First-load warning is best-effort. A failed classify can retry on
+			// the next user-initiated scan.
+		}
+	}, []);
+
 	const stripCompanionPaks = useCallback(async (): Promise<boolean> => {
 		if (!libraryRoot || isFolderMutatingRef.current) return false;
 		if (companionCleanupIDs.length === 0) return false;
@@ -2015,6 +2042,66 @@ export function LibraryScreen() {
 		showMutationFeedback,
 	]);
 
+	const encryptRequiredMods = useCallback(async (): Promise<boolean> => {
+		if (!libraryRoot || isFolderMutatingRef.current) return false;
+		if (requiredEncryptionIDs.length === 0) return false;
+
+		const ids = requiredEncryptionIDs;
+		markEntriesBusy(ids);
+		setEncryptActionIsEncrypt(true);
+		setEncryptProgress({ current: 0, total: ids.length, entryID: "", displayName: "" });
+		try {
+			const result = await SetModEncryption(libraryRoot, ids, true);
+			if (activeLibraryRootRef.current !== libraryRoot) return false;
+			await reloadLibrary();
+			const succeeded = result.succeeded?.length ?? 0;
+			const failed = result.failed?.length ?? 0;
+			const feedback = batchFeedback(
+				"Encrypted",
+				"encrypt",
+				succeeded,
+				failed,
+				0,
+				firstFailureDetail(result.failed),
+			);
+			showMutationFeedback(feedback.kind, feedback.message);
+			return failed === 0;
+		} catch (error) {
+			if (activeLibraryRootRef.current === libraryRoot) {
+				await reloadLibrary();
+				showMutationFeedback(
+					"error",
+					`Could not encrypt the selected mods: ${errorMessage(error)}`,
+				);
+			}
+			return false;
+		} finally {
+			clearEntriesBusy(ids);
+			setEncryptProgress(null);
+		}
+	}, [
+		clearEntriesBusy,
+		libraryRoot,
+		markEntriesBusy,
+		reloadLibrary,
+		requiredEncryptionIDs,
+		showMutationFeedback,
+	]);
+
+	useEffect(() => {
+		if (!companionOfferSettled) return;
+		if (companionCleanupOpen || companionProgress) return;
+		if (pendingRequiredEncryptionIDs.length === 0) return;
+		setRequiredEncryptionIDs(pendingRequiredEncryptionIDs);
+		setRequiredEncryptionOpen(true);
+		setPendingRequiredEncryptionIDs([]);
+	}, [
+		companionCleanupOpen,
+		companionOfferSettled,
+		companionProgress,
+		pendingRequiredEncryptionIDs,
+	]);
+
 	// Replaces the catalog only after a scan finishes successfully. Accepts an
 	// explicit root so the initial-launch scan of a persisted mod root does not
 	// have to wait a render cycle for the modRoot input's state to catch up.
@@ -2035,6 +2122,9 @@ export function LibraryScreen() {
 			setContextMenu(null);
 			setIdentitiesByEntryID({});
 			setConflictResult(null);
+			setRequiredEncryptionOpen(false);
+			setPendingRequiredEncryptionIDs([]);
+			setRequiredEncryptionIDs([]);
 			setCompanionOfferSettled(true);
 			setLibraryState("initial");
 			return;
@@ -2051,7 +2141,14 @@ export function LibraryScreen() {
 			setLibrary(result);
 			setIdentitiesByEntryID({});
 			setConflictResult(null);
-			classify(root, result.entries);
+			setRequiredEncryptionOpen(false);
+			setPendingRequiredEncryptionIDs([]);
+			setRequiredEncryptionIDs([]);
+			void classify(root, result.entries).then(() => {
+				if (activeLibraryRootRef.current !== root) return;
+				if (result.entries.length === 0) return;
+				void maybeOfferRequiredEncryption(root);
+			});
 			if (result.entries.length > 0) {
 				setCompanionOfferSettled(false);
 				void maybeOfferCompanionCleanup(root);
@@ -2560,6 +2657,17 @@ export function LibraryScreen() {
 					onConfirm={stripCompanionPaks}
 				/>
 			)}
+			{requiredEncryptionOpen &&
+				requiredEncryptionEntries.length > 0 &&
+				!encryptProgress &&
+				!companionProgress && (
+					<EncryptionRequiredDialog
+						entries={requiredEncryptionEntries}
+						isMutating={isMutationLocked}
+						onClose={() => setRequiredEncryptionOpen(false)}
+						onConfirm={encryptRequiredMods}
+					/>
+				)}
 			{companionProgress && (
 				<div className="mutation-dialog-backdrop">
 					<section
@@ -2601,7 +2709,7 @@ export function LibraryScreen() {
 						<div>
 							<p className="eyebrow">Mod action</p>
 							<h2 id="encrypt-progress-title">
-								{encryptMenu.encrypt ? "Encrypting" : "Decrypting"}
+								{encryptActionIsEncrypt ? "Encrypting" : "Decrypting"}
 							</h2>
 							<p className="mutation-dialog-subtitle">
 								{encryptProgress.displayName || "Preparing..."}

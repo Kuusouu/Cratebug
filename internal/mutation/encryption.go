@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
+	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 )
 
@@ -41,8 +44,17 @@ type EncryptionProgress struct {
 	DisplayName string `json:"displayName"`
 }
 
-type encryptionCaller interface {
+// ArchiveCaller is the UAssetTool request surface used by encrypt.
+type ArchiveCaller interface {
 	Call(action string, params map[string]any, result any) error
+}
+
+// ArchiveCallerFactory starts one caller and returns cleanup that must run.
+type ArchiveCallerFactory func() (caller ArchiveCaller, cleanup func(), err error)
+
+type encryptionWorker struct {
+	caller  ArchiveCaller
+	cleanup func()
 }
 
 type bundleSwap struct {
@@ -58,52 +70,16 @@ func SetModEncryption(
 	modRoot string,
 	entryIDs []string,
 	encrypt bool,
-	caller encryptionCaller,
+	caller ArchiveCaller,
 	progress func(EncryptionProgress),
 	cancel <-chan struct{},
 ) (EncryptionBatchResult, error) {
-	if len(entryIDs) == 0 {
-		return EncryptionBatchResult{}, fmt.Errorf("no mods selected")
-	}
-
-	library, err := discovery.Scan(modRoot)
+	root, targets, alreadyEncrypted, early, done, err := planEncryption(modRoot, entryIDs, encrypt, caller)
 	if err != nil {
-		return EncryptionBatchResult{}, fmt.Errorf("scan mod library before encryption: %w", err)
+		return EncryptionBatchResult{}, err
 	}
-
-	root, err := filepath.Abs(library.Root)
-	if err != nil {
-		return EncryptionBatchResult{}, fmt.Errorf("resolve mod root: %w", err)
-	}
-
-	targets := make([]discovery.Entry, 0, len(entryIDs))
-	var encryptedCount int
-	for _, id := range entryIDs {
-		entry, err := findEntry(library.Entries, id)
-		if err != nil {
-			return EncryptionBatchResult{}, err
-		}
-		if err := validateEncryptableEntry(entry); err != nil {
-			return EncryptionBatchResult{}, err
-		}
-
-		utocPath := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UTOC))
-		encrypted, err := uassettool.IsIoStoreEncrypted(caller, utocPath)
-		if err != nil {
-			return EncryptionBatchResult{}, fmt.Errorf("check encryption for %q: %w", entry.DisplayName, err)
-		}
-		if encrypted {
-			encryptedCount++
-		}
-		targets = append(targets, entry)
-	}
-
-	if encryptedCount != 0 && encryptedCount != len(targets) {
-		return EncryptionBatchResult{}, ErrEncryptionMixedState
-	}
-	alreadyEncrypted := encryptedCount == len(targets)
-	if alreadyEncrypted == encrypt {
-		return EncryptionBatchResult{Succeeded: append([]string(nil), entryIDs...)}, nil
+	if done {
+		return early, nil
 	}
 
 	result := EncryptionBatchResult{}
@@ -129,6 +105,226 @@ func SetModEncryption(
 	return result, nil
 }
 
+// Same as SetModEncryption, but rewrites through one write worker per pool
+// slot. Size follows DefaultWorkerPoolSizeForLibrary. Mixed state and
+// ineligible formats still fail before any rewrite. launch must return a
+// caller that is safe to use from only one goroutine.
+func SetModEncryptionPooled(
+	modRoot string,
+	entryIDs []string,
+	encrypt bool,
+	launch ArchiveCallerFactory,
+	progress func(EncryptionProgress),
+	cancel <-chan struct{},
+) (EncryptionBatchResult, error) {
+	if launch == nil {
+		return EncryptionBatchResult{}, fmt.Errorf("encryption worker factory is required")
+	}
+	first, cleanupFirst, err := launch()
+	if err != nil {
+		return EncryptionBatchResult{}, fmt.Errorf("start encryption worker: %w", err)
+	}
+
+	root, targets, alreadyEncrypted, early, done, err := planEncryption(modRoot, entryIDs, encrypt, first)
+	if err != nil {
+		if cleanupFirst != nil {
+			cleanupFirst()
+		}
+		return EncryptionBatchResult{}, err
+	}
+	if done {
+		if cleanupFirst != nil {
+			cleanupFirst()
+		}
+		return early, nil
+	}
+
+	return rewriteBundlesPooled(root, targets, encrypt, alreadyEncrypted, first, cleanupFirst, launch, progress, cancel)
+}
+
+// Scanner IDs of complete unencrypted IoStore mods whose listings leave
+// /Game/Marvel/Characters. Missing identities or path listings are skipped.
+func FindModsNeedingEncryption(
+	entries []discovery.Entry,
+	identities map[string]modtype.Identity,
+	paths map[string][]string,
+) []string {
+	var ids []string
+	for _, entry := range entries {
+		if validateEncryptableEntry(entry) != nil {
+			continue
+		}
+		if identities[entry.ID].Encrypted {
+			continue
+		}
+		listing, ok := paths[entry.ID]
+		if !ok {
+			continue
+		}
+		if modtype.RequiresIoStoreEncryption(listing) {
+			ids = append(ids, entry.ID)
+		}
+	}
+	return ids
+}
+
+func planEncryption(
+	modRoot string,
+	entryIDs []string,
+	encrypt bool,
+	caller ArchiveCaller,
+) (string, []discovery.Entry, bool, EncryptionBatchResult, bool, error) {
+	if len(entryIDs) == 0 {
+		return "", nil, false, EncryptionBatchResult{}, false, fmt.Errorf("no mods selected")
+	}
+
+	library, err := discovery.Scan(modRoot)
+	if err != nil {
+		return "", nil, false, EncryptionBatchResult{}, false, fmt.Errorf("scan mod library before encryption: %w", err)
+	}
+
+	root, err := filepath.Abs(library.Root)
+	if err != nil {
+		return "", nil, false, EncryptionBatchResult{}, false, fmt.Errorf("resolve mod root: %w", err)
+	}
+
+	targets := make([]discovery.Entry, 0, len(entryIDs))
+	var encryptedCount int
+	for _, id := range entryIDs {
+		entry, err := findEntry(library.Entries, id)
+		if err != nil {
+			return "", nil, false, EncryptionBatchResult{}, false, err
+		}
+		if err := validateEncryptableEntry(entry); err != nil {
+			return "", nil, false, EncryptionBatchResult{}, false, err
+		}
+
+		utocPath := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UTOC))
+		encrypted, err := uassettool.IsIoStoreEncrypted(caller, utocPath)
+		if err != nil {
+			return "", nil, false, EncryptionBatchResult{}, false, fmt.Errorf("check encryption for %q: %w", entry.DisplayName, err)
+		}
+		if encrypted {
+			encryptedCount++
+		}
+		targets = append(targets, entry)
+	}
+
+	if encryptedCount != 0 && encryptedCount != len(targets) {
+		return "", nil, false, EncryptionBatchResult{}, false, ErrEncryptionMixedState
+	}
+	alreadyEncrypted := encryptedCount == len(targets)
+	if alreadyEncrypted == encrypt {
+		return root, nil, alreadyEncrypted, EncryptionBatchResult{Succeeded: append([]string(nil), entryIDs...)}, true, nil
+	}
+	return root, targets, alreadyEncrypted, EncryptionBatchResult{}, false, nil
+}
+
+func rewriteBundlesPooled(
+	root string,
+	targets []discovery.Entry,
+	encrypt, currentlyEncrypted bool,
+	first ArchiveCaller,
+	cleanupFirst func(),
+	launch ArchiveCallerFactory,
+	progress func(EncryptionProgress),
+	cancel <-chan struct{},
+) (EncryptionBatchResult, error) {
+	size := uassettool.DefaultWorkerPoolSizeForLibrary(len(targets))
+	if size > len(targets) {
+		size = len(targets)
+	}
+	if size < 1 {
+		size = 1
+	}
+
+	workers := []encryptionWorker{{caller: first, cleanup: cleanupFirst}}
+	for i := 1; i < size; i++ {
+		caller, cleanup, err := launch()
+		if err != nil {
+			for _, worker := range workers {
+				if worker.cleanup != nil {
+					worker.cleanup()
+				}
+			}
+			return EncryptionBatchResult{}, fmt.Errorf("start encryption worker: %w", err)
+		}
+		workers = append(workers, encryptionWorker{caller: caller, cleanup: cleanup})
+	}
+
+	jobs := make(chan discovery.Entry)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	var started atomic.Int32
+	result := EncryptionBatchResult{}
+	sawCancel := false
+
+	for _, worker := range workers {
+		wg.Add(1)
+		go func(caller ArchiveCaller, cleanup func()) {
+			defer wg.Done()
+			if cleanup != nil {
+				defer cleanup()
+			}
+			for entry := range jobs {
+				if cancelled(cancel) {
+					mu.Lock()
+					sawCancel = true
+					result.Failed = append(result.Failed, EncryptionFailure{
+						EntryID: entry.ID,
+						Message: ErrEncryptionCancelled.Error(),
+					})
+					mu.Unlock()
+					continue
+				}
+				current := int(started.Add(1))
+				if progress != nil {
+					progress(EncryptionProgress{
+						Current:     current,
+						Total:       len(targets),
+						EntryID:     entry.ID,
+						DisplayName: entry.DisplayName,
+					})
+				}
+				if err := rewriteBundleEncryption(root, entry, encrypt, currentlyEncrypted, caller); err != nil {
+					mu.Lock()
+					result.Failed = append(result.Failed, EncryptionFailure{EntryID: entry.ID, Message: err.Error()})
+					mu.Unlock()
+					continue
+				}
+				mu.Lock()
+				result.Succeeded = append(result.Succeeded, entry.ID)
+				mu.Unlock()
+			}
+		}(worker.caller, worker.cleanup)
+	}
+
+	sent := 0
+	for _, entry := range targets {
+		if cancelled(cancel) {
+			break
+		}
+		jobs <- entry
+		sent++
+	}
+	close(jobs)
+	wg.Wait()
+
+	if sent < len(targets) {
+		for _, entry := range targets[sent:] {
+			result.Failed = append(result.Failed, EncryptionFailure{
+				EntryID: entry.ID,
+				Message: ErrEncryptionCancelled.Error(),
+			})
+		}
+		return result, ErrEncryptionCancelled
+	}
+	if sawCancel {
+		return result, ErrEncryptionCancelled
+	}
+	return result, nil
+}
+
 func validateEncryptableEntry(entry discovery.Entry) error {
 	if err := validateMutableBundleEntry(entry); err != nil {
 		return fmt.Errorf("%w: %v", ErrEncryptionIneligible, err)
@@ -142,7 +338,7 @@ func validateEncryptableEntry(entry discovery.Entry) error {
 	return nil
 }
 
-func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt, currentlyEncrypted bool, caller encryptionCaller) error {
+func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt, currentlyEncrypted bool, caller ArchiveCaller) error {
 	primaryAbs := filepath.Join(root, filepath.FromSlash(entry.PrimaryPath))
 	utocAbs := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UTOC))
 	ucasAbs := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UCAS))

@@ -131,6 +131,8 @@ Cratebug should eventually allow users to:
 - View clear progress and failures for long-running operations.
 - Check more than one mod and run the same organize or encryption action on the checked set.
 - Encrypt or decrypt a complete IoStore bundle already in the library.
+- Warn when companion `.pak` files still contain `chunknames` or `patched_files` entries, and rewrite only those `.pak` files.
+- Warn when a complete unencrypted IoStore listing includes files outside `/Game/Marvel/Characters`, and offer to encrypt those mods.
 
 The roadmap determines implementation order.
 
@@ -217,6 +219,7 @@ Mutating operations are blocked by default while the game process is running, in
 - Delete
 - Installation or replacement
 - Encrypt or decrypt
+- Companion PAK cleanup (`chunknames` / `patched_files`)
 
 An advanced override is deferred and must never be enabled by default.
 
@@ -278,7 +281,11 @@ The integration uses a supervised helper process speaking newline-delimited JSON
 
 Only required operations should be integrated.
 
-Cratebug may encrypt or decrypt a complete IoStore bundle already in the library by asking UAssetToolRivals to extract it and recreate it with or without obfuscation. That is a rebuild, not a bit-flip of the existing files. Classic PAK encryption and install-time obfuscation are out of scope until a later phase.
+Cratebug may encrypt or decrypt a complete IoStore bundle already in the library by asking UAssetToolRivals to extract it and recreate it with or without obfuscation. That is a rebuild, not a bit-flip of the existing files. The rebuilt companion `.pak` must not contain `chunknames` or `patched_files`. Classic PAK encryption and install-time obfuscation are out of scope until a later phase. Library encrypt and decrypt must run through a pool of write-timeout worker processes sized for the number of targets, not through the classification pool.
+
+A complete unencrypted IoStore whose internal listing includes any path outside `/Game/Marvel/Characters` will not load. Cratebug must detect that from the classify path cache, warn on the first populated load of a library in a session after classify finishes, and offer to encrypt those mods. Refresh and post-mutation reload must not re-prompt. The companion-PAK warning is shown first when both apply.
+
+As of 3 September 2026, companion `.pak` entries named `chunknames` or `patched_files` cause anti-cheat crashes. Cratebug must detect those names with `list_pak`, warn on the first populated load of a library in a session, and rewrite only the `.pak`. Install preview must warn. Apply must rewrite the staged `.pak` before copy. `.utoc` and `.ucas` must not be rebuilt for this cleanup.
 
 The Marvel Rivals AES key used to read and write obfuscated IoStore containers stays in the Go backend. The frontend may receive an `encrypted` boolean. It must not receive the key.
 

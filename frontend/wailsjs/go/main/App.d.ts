@@ -54,6 +54,7 @@ export function DownloadUpdate(arg1:update.Release):Promise<string>;
 
 export function EncryptionType():Promise<mutation.EncryptionBatchResult>;
 
+export function FindModsNeedingEncryption(arg1:string):Promise<Array<string>>;
 
 export function FindUnsupportedCompanionPaks(arg1:string):Promise<Array<string>>;
 
