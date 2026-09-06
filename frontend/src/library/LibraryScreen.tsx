@@ -2117,6 +2117,8 @@ export function LibraryScreen() {
 			setSearch("");
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
+			setCheckedEntryIDs(new Set());
+			setCheckAnchorID(null);
 			setActiveDialog(null);
 			setActiveFolderDialog(null);
 			setContextMenu(null);
@@ -2158,6 +2160,9 @@ export function LibraryScreen() {
 			// A fresh catalog may not contain the previous selection.
 			setSelectedFolder("all");
 			setSelectedEntryID(null);
+			const presentIDs = new Set(result.entries.map((entry) => entry.id));
+			setCheckedEntryIDs((current) => retainCheckedIDs(current, presentIDs));
+			setCheckAnchorID((current) => (current && presentIDs.has(current) ? current : null));
 			setActiveDialog(null);
 			setActiveFolderDialog(null);
 			setContextMenu(null);
