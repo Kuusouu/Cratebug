@@ -31,7 +31,7 @@ Because both transports share one JSON contract by upstream's own design, the Go
 
 ## Consequences
 
-- Task 6.2 pins the officially released self-contained `win-x64` CLI build (currently `v1.5.6`, ~30.3 MB zipped) as the worker artifact, with its version, source revision, and checksum recorded there. No new release pipeline needs to be built for this phase.
+- Task 6.2 pins the self-contained `win-x64` CLI build (currently `v1.5.8` from `mewclouds/UAssetToolRivals`, ~30.3 MB zipped) as the worker artifact, with its version, source revision, and checksum recorded in `docs/decisions/0004-pin-uassettool-worker.md`. Cratebug does not build the worker in its own CI.
 - Task 6.3's adapter package owns process lifecycle (`os/exec`), NDJSON framing, and version verification via a one-shot `--version` call before trusting the long-lived interactive worker.
 - Task 6.4's crash/hang handling can rely on normal process supervision (exit code, timeout, kill, restart) rather than needing to guard against an in-process native fault.
 - The adapter's request/response types should mirror `UAssetRequest`/`UAssetResponse` closely enough that swapping in an FFI implementation later does not require changing call sites, in case Phase 9 or later produces the concrete performance reason this decision did not find.

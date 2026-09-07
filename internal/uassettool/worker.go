@@ -18,7 +18,7 @@ import (
 const (
 	// PinnedSourceRevision is the Git commit hash of the pinned UAssetToolRivals release.
 	// Kept in sync with docs/decisions/0004-pin-uassettool-worker.md and fetch-uassettool.ps1.
-	PinnedSourceRevision = "952bd331976c6f28efb36ca320c82c27e2456023"
+	PinnedSourceRevision = "05470f4634533437897647c93448b6d5de02d09a"
 
 	// WorkerExecutableName is the filename of the UAssetTool binary on Windows.
 	WorkerExecutableName = "UAssetTool.exe"
