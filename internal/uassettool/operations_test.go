@@ -389,6 +389,14 @@ func TestIsCompanionMetadataPathMatchesMountPrefixes(t *testing.T) {
 	if IsCompanionMetadataPath("Audio/sound.bnk") {
 		t.Fatal("IsCompanionMetadataPath() = true for a raw file")
 	}
+	for _, path := range []string{
+		"Characters/T_chunknames.uasset",
+		"patched_files_backup.bnk",
+	} {
+		if IsCompanionMetadataPath(path) {
+			t.Errorf("IsCompanionMetadataPath(%q) = true, want false for a substring in another name", path)
+		}
+	}
 }
 
 func TestCompanionPakUnsupportedPathsReturnsMatches(t *testing.T) {

@@ -202,6 +202,12 @@ func listCompanionPak(caller companionCaller, pakAbs, utocAbs string) ([]uassett
 			}
 			return listing, uassettool.MarvelRivalsAESKey, nil
 		}
+		if err != nil {
+			listing, keyErr := uassettool.ListPakWithKey(caller, pakAbs, uassettool.MarvelRivalsAESKey)
+			if keyErr == nil {
+				return listing, uassettool.MarvelRivalsAESKey, nil
+			}
+		}
 	}
 
 	listing, err := uassettool.ListPakWithKey(caller, pakAbs, "")

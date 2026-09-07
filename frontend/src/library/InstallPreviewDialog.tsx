@@ -500,6 +500,26 @@ export function InstallPreviewDialog({
 											</p>
 										)}
 
+										{isSelected && item.unsupportedCompanionPak && (
+											<div
+												className={styles["install-collision-banner"]}
+												role="status"
+											>
+												<TriangleAlert aria-hidden="true" />
+												<div
+													className={styles["install-collision-content"]}
+												>
+													<p>
+														{config.modName} has unsupported companion
+														PAK entries (chunknames / patched_files).
+														Cratebug will rewrite that .pak during
+														install. IoStore .utoc and .ucas stay as
+														they are.
+													</p>
+												</div>
+											</div>
+										)}
+
 										{isSelected && item.issues && item.issues.length > 0 && (
 											<div
 												className={styles["install-collision-banner"]}

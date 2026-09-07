@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 15 - Unsupported companion PAK cleanup and required encryption
-**Status:** Active
+**Status:** Complete. Review approved 2026-09-06; see `docs/reviews/phase-15-review.md`.
 
 This file contains only the active work. Do not start the next phase.
 

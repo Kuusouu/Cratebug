@@ -371,6 +371,8 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 15 - Unsupported companion PAK cleanup and required encryption
 
+**Status:** Complete. Review approved 2026-09-06; see `docs/reviews/phase-15-review.md`.
+
 **Outcome:** Cratebug warns when installed or incoming mods still contain `chunknames` / `patched_files` companion PAK entries (anti-cheat crash as of 3 September 2026), and rewrites only those `.pak` files one at a time. After classify, it offers encryption for complete unencrypted IoStore mods that touch files outside `/Game/Marvel/Characters`, and runs those rebuilds through a write-worker pool.
 
 **Includes:**

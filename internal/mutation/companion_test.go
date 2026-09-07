@@ -13,7 +13,9 @@ import (
 
 type scriptedCompanionCaller struct {
 	listingByPak    map[string]string
+	listingByPakKey map[string]string
 	failListByPak   map[string]bool
+	failEncrypted   bool
 	failCreate      bool
 	extractWrites   map[string]string
 	createFileCount int
@@ -27,12 +29,19 @@ func (s *scriptedCompanionCaller) Call(action string, params map[string]any, res
 		if s.failListByPak[base] {
 			return &uassettool.ToolError{Action: action, Message: "list failed"}
 		}
+		key, _ := params["aes_key"].(string)
 		body := s.listingByPak[base]
+		if key != "" && s.listingByPakKey[base] != "" {
+			body = s.listingByPakKey[base]
+		}
 		if body == "" {
 			body = `{"files":[]}`
 		}
 		return json.Unmarshal([]byte(body), result)
 	case "is_iostore_encrypted":
+		if s.failEncrypted {
+			return &uassettool.ToolError{Action: action, Message: "encrypted check failed"}
+		}
 		return json.Unmarshal([]byte(`{"encrypted":false}`), result)
 	case "extract_pak_all":
 		output, _ := params["output_path"].(string)
@@ -93,6 +102,36 @@ func TestFindUnsupportedCompanionPaksFindsDirtyAndSkipsListErrors(t *testing.T) 
 	}
 	if len(found) != 1 || found[0] != ids["Dirty_9999999_P.pak"] {
 		t.Fatalf("FindUnsupportedCompanionPaks() = %v, want only the dirty id", found)
+	}
+}
+
+func TestFindUnsupportedCompanionPaksUsesKeyWhenEncryptedCheckFails(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeIoStoreBundle(t, root, "", "Hidden_9999999_P", false)
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	caller := &scriptedCompanionCaller{
+		failEncrypted: true,
+		listingByPak: map[string]string{
+			"Hidden_9999999_P.pak": `{"files":[{"path":"Audio/sound.bnk","size":4}]}`,
+		},
+		listingByPakKey: map[string]string{
+			"Hidden_9999999_P.pak": metadataListing(),
+		},
+	}
+
+	// Act
+	found, err := FindUnsupportedCompanionPaks(root, caller)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("FindUnsupportedCompanionPaks() error = %v, want nil", err)
+	}
+	if len(found) != 1 || found[0] != library.Entries[0].ID {
+		t.Fatalf("FindUnsupportedCompanionPaks() = %v, want the dirty id from the keyed listing", found)
 	}
 }
 

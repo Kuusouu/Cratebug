@@ -17,7 +17,7 @@ see inside a PAK.
 
 ## Decision
 
-**Detect by `list_pak`.** Any primary listing whose path contains
+**Detect by `list_pak`.** Any primary listing whose last path segment is
 `chunknames` or `patched_files` is dirty. The AES key is used only when
 the IoStore index needs it. The frontend receives entry IDs and a boolean
 on install preview items, not listings or the key.

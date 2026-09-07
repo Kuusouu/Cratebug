@@ -241,11 +241,16 @@ func CreateModIoStore(c caller, outputPath, inputDir string, options IoStoreCrea
 	}, nil
 }
 
-// True when path is the leftover IoStore bookkeeping name that anti-cheat
-// rejects as of 3 September 2026. Mount prefixes and doubled slashes still match.
+// True when the last path segment is chunknames or patched_files, the leftover
+// IoStore bookkeeping names anti-cheat rejects as of 3 September 2026. Mount
+// prefixes still match; a longer filename that merely contains those strings does not.
 func IsCompanionMetadataPath(path string) bool {
-	lower := strings.ToLower(path)
-	return strings.Contains(lower, "chunknames") || strings.Contains(lower, "patched_files")
+	normalized := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	base := normalized
+	if slash := strings.LastIndexByte(normalized, '/'); slash >= 0 {
+		base = normalized[slash+1:]
+	}
+	return base == "chunknames" || base == "patched_files"
 }
 
 // Paths from a PAK listing that IsCompanionMetadataPath accepts.

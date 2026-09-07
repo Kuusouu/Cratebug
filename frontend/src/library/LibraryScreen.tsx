@@ -1988,8 +1988,10 @@ export function LibraryScreen() {
 		try {
 			const found = await FindModsNeedingEncryption(root);
 			if (activeLibraryRootRef.current !== root) return;
-			offeredRequiredEncryptionRootsRef.current.add(key);
-			if (!found?.length) return;
+			if (!found?.length) {
+				offeredRequiredEncryptionRootsRef.current.add(key);
+				return;
+			}
 			setPendingRequiredEncryptionIDs(found);
 		} catch {
 			// First-load warning is best-effort. A failed classify can retry on
@@ -2092,6 +2094,9 @@ export function LibraryScreen() {
 		if (!companionOfferSettled) return;
 		if (companionCleanupOpen || companionProgress) return;
 		if (pendingRequiredEncryptionIDs.length === 0) return;
+		if (libraryRoot) {
+			offeredRequiredEncryptionRootsRef.current.add(libraryRoot.toLowerCase());
+		}
 		setRequiredEncryptionIDs(pendingRequiredEncryptionIDs);
 		setRequiredEncryptionOpen(true);
 		setPendingRequiredEncryptionIDs([]);
@@ -2099,6 +2104,7 @@ export function LibraryScreen() {
 		companionCleanupOpen,
 		companionOfferSettled,
 		companionProgress,
+		libraryRoot,
 		pendingRequiredEncryptionIDs,
 	]);
 
