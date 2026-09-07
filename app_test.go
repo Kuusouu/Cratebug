@@ -15,6 +15,7 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
+	"github.com/Kuusouu/Cratebug/internal/uassettool"
 )
 
 type staticGameRunningChecker struct {
@@ -591,6 +592,10 @@ func TestDetectConflictsReportsUnavailableWithoutALiveWorker(t *testing.T) {
 }
 
 func TestAppInstallLifecycle(t *testing.T) {
+	if _, err := uassettool.ResolveExecutablePath(); err != nil {
+		t.Skipf("pinned worker not found; run fetch-uassettool.ps1 first")
+	}
+
 	// Arrange
 	modRoot := t.TempDir()
 	sourceDir := t.TempDir()
