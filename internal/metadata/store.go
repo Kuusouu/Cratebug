@@ -55,6 +55,11 @@ type Settings struct {
 	// missing field (every document written before this existed) is the zero
 	// value, not an error.
 	NexusProtocol NexusProtocolSnapshot `json:"nexusProtocol,omitempty"`
+
+	// When true, startup will not silently claim nxm://. Missing (every
+	// document written before this field existed) means the handler defaults
+	// on, matching the Phase 16 decision.
+	NexusProtocolOptOut bool `json:"nexusProtocolOptOut,omitempty"`
 }
 
 // Document is the versioned envelope persisted to disk.

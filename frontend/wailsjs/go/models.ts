@@ -692,6 +692,7 @@ export namespace metadata {
 	    libraryProvider?: string;
 	    lastSeenVersion?: string;
 	    nexusProtocol?: NexusProtocolSnapshot;
+	    nexusProtocolOptOut?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -706,6 +707,7 @@ export namespace metadata {
 	        this.libraryProvider = source["libraryProvider"];
 	        this.lastSeenVersion = source["lastSeenVersion"];
 	        this.nexusProtocol = this.convertValues(source["nexusProtocol"], NexusProtocolSnapshot);
+	        this.nexusProtocolOptOut = source["nexusProtocolOptOut"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

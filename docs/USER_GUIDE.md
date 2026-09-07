@@ -1,6 +1,6 @@
 # Cratebug user guide
 
-This covers installing Cratebug, keeping it updated, installing mods from a URL, and acting on several mods at once (including encrypting complete IoStore bundles). For other everyday library management, the app itself is the reference. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
+This covers installing Cratebug, keeping it updated, installing mods from Nexus Mods, and acting on several mods at once (including encrypting complete IoStore bundles). For other everyday library management, the app itself is the reference. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
 
 ## Installing
 
@@ -33,17 +33,43 @@ Cratebug closes itself, applies the update silently, and reopens automatically â
 
 If you'd rather update manually, the **View release** button opens the GitHub release page, where you can download and run the installer yourself.
 
-## Installing a mod from a URL
+## Installing a mod from Nexus Mods
 
-If you have a direct download link to a mod archive (a `.zip`, `.7z`, `.rar`, or a bare `.pak`/`.utoc`/`.ucas`), you don't need to download it yourself first.
+Cratebug downloads Marvel Rivals mods from Nexus Mods with **your** API key. The key stays on this machine. It is never sent to Cratebug infrastructure and never shown in the app after you paste it.
 
-1. Click the link icon in the header (**Install from URL**).
-2. Paste the direct download link. It must start with `https://`.
-3. Click **Download & install**.
+### Get an API key
 
-Cratebug downloads the file and takes you straight to the same install preview you'd get from picking a local file â€” same collision checks, same hero/skin detection, same control over the destination folder and mod name before anything is actually installed.
+1. Open **Settings** (gear icon).
+2. Under **Nexus Mods**, click **Get an API key on Nexus Mods**. Sign in on the Nexus site if you need to.
+3. Copy the personal API key Nexus shows you.
+4. Paste it into the **API key** field in Settings and click **Connect**.
 
-A link that requires clicking through a webpage (like a mod page's "Download" button that lands on another page) won't work directly. You need the URL the browser actually downloads from, not the page that links to it.
+Premium and free accounts both work. The difference is only how the download starts.
+
+### Open Nexus downloads in Cratebug
+
+The **Open Nexus downloads in Cratebug** switch registers Cratebug as the `nxm://` handler Windows uses when you click **Mod Manager Download** on Nexus.
+
+Installed builds turn this on by themselves when nothing else owns `nxm://`. If another app already owns it, Cratebug names that app and asks before taking over. Turning the switch off gives the previous app back.
+
+Dev builds of Cratebug (running from source with `wails dev`) do not register.
+
+### Premium accounts
+
+1. Click the download icon in the header.
+2. Paste a Marvel Rivals mod page URL (`https://www.nexusmods.com/marvelrivals/mods/...`).
+3. If the page has more than one file, pick MAIN or OPTIONAL. Cratebug pre-selects the primary file; it does not install automatically.
+4. Continue. Cratebug downloads through the Nexus API and opens the same install preview as a local archive.
+
+### Free accounts
+
+Nexus does not let a free account request the file from the API. You still paste the page URL and pick a file, then Cratebug opens the Nexus page and waits.
+
+1. On that page, click **Mod Manager Download** (not Manual Download).
+2. Windows hands Cratebug the `nxm://` link.
+3. Confirm the download. From there the preview is the same as Premium.
+
+If Cratebug is closed, a click still launches it with that link. If it is already open, the running window comes to the front.
 
 ## Checking several mods at once
 

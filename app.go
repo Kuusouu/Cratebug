@@ -718,6 +718,7 @@ func (a *App) startup(ctx context.Context) {
 	if pending != nil {
 		a.emitNexusLink(*pending)
 	}
+	a.ensureNexusProtocol()
 }
 
 // SelectFilesForInstall opens a native multiple-file dialog to select mod archives or direct bundles.
@@ -840,25 +841,33 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 		return result, err
 	}
 
+	if err := a.recordInstalledModMetadata(result); err != nil {
+		// Files are already in the library. Wails rejects the JS promise when
+		// the error is non-nil and discards ApplyResult, so the preview would
+		// show a failed install and skip the library refresh.
+		return result, nil
+	}
+	return result, nil
+}
+
+func (a *App) recordInstalledModMetadata(result install.ApplyResult) error {
 	doc := a.loadMetadataDocument()
 	source := a.takePendingNexusSource()
 	for _, entryID := range result.InstalledEntryIDs {
 		modID, err := doc.EnsureMod(entryID)
 		if err != nil {
-			return result, fmt.Errorf("ensure installed mod metadata: %w", err)
+			return fmt.Errorf("ensure installed mod metadata: %w", err)
 		}
 		if source != nil {
 			if err := doc.SetModNexusSource(modID, source.ModID, source.FileID, source.Version); err != nil {
-				return result, fmt.Errorf("record nexus source: %w", err)
+				return fmt.Errorf("record nexus source: %w", err)
 			}
 		}
 	}
-	// Files are already in the library; a metadata write failure must still
-	// report the ApplyResult so the caller can see what landed.
 	if err := a.metadataStore.Save(doc); err != nil {
-		return result, fmt.Errorf("save installed mod metadata: %w", err)
+		return fmt.Errorf("save installed mod metadata: %w", err)
 	}
-	return result, nil
+	return nil
 }
 
 // CancelInstall cleans up staging data when the user cancels the installation preview.

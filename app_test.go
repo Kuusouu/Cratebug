@@ -62,6 +62,15 @@ func testAppWithStore(t *testing.T, gameRunning bool, store metadata.Store) *App
 	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, store, nil, &emptyTable, nil, testSecretStore(t))
 }
 
+func failingMetadataStore(t *testing.T) metadata.Store {
+	t.Helper()
+	parent := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(parent, []byte("blocked"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return metadata.NewStore(filepath.Join(parent, "metadata.json"))
+}
+
 func TestRuntimeStatus(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
@@ -653,6 +662,49 @@ func TestAppInstallLifecycle(t *testing.T) {
 	destPak := filepath.Join(modRoot, "Characters", "Punisher", "Punisher_P.pak")
 	if _, err := os.Stat(destPak); err != nil {
 		t.Fatalf("expected installed file missing: %s", destPak)
+	}
+}
+
+func TestApplyInstallReturnsResultWhenMetadataSaveFails(t *testing.T) {
+	if _, err := uassettool.ResolveExecutablePath(); err != nil {
+		t.Skipf("pinned worker not found; run fetch-uassettool.ps1 first")
+	}
+
+	// Arrange
+	modRoot := t.TempDir()
+	sourceDir := t.TempDir()
+	sourcePak := filepath.Join(sourceDir, "Punisher_P.pak")
+	if err := os.WriteFile(sourcePak, []byte("punisher"), 0o600); err != nil {
+		t.Fatalf("write source pak: %v", err)
+	}
+
+	app := testApp(t, false)
+	preview, err := app.PrepareInstall(modRoot, []string{sourcePak}, "Characters/Punisher")
+	if err != nil {
+		t.Fatalf("PrepareInstall failed: %v", err)
+	}
+	app.metadataStore = failingMetadataStore(t)
+
+	// Act
+	result, err := app.ApplyInstall(modRoot, preview.SessionID, []install.ApplyItem{
+		{
+			ID:                preview.Items[0].ID,
+			ModName:           "Punisher",
+			DestinationFolder: "Characters/Punisher",
+			Overwrite:         false,
+		},
+	})
+
+	// Assert: Wails would hide ApplyResult if this returned a non-nil error.
+	if err != nil {
+		t.Fatalf("ApplyInstall() = %v, want nil after files landed", err)
+	}
+	if len(result.InstalledEntryIDs) != 1 {
+		t.Fatalf("installedEntryIDs = %d, want 1", len(result.InstalledEntryIDs))
+	}
+	destPak := filepath.Join(modRoot, "Characters", "Punisher", "Punisher_P.pak")
+	if _, err := os.Stat(destPak); err != nil {
+		t.Fatalf("installed file missing after metadata save failure: %s", destPak)
 	}
 }
 

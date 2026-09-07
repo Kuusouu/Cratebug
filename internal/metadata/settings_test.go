@@ -429,3 +429,43 @@ func TestDocumentWithNoNexusProtocolLoadsAsEmpty(t *testing.T) {
 		t.Errorf("Settings.NexusProtocol = %#v, want the zero value for a document that never set it", reloaded.Settings.NexusProtocol)
 	}
 }
+
+func TestNexusProtocolOptOutSurvivesASaveLoadRoundTrip(t *testing.T) {
+	// Arrange
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	store := NewStore(path)
+	doc := Document{SchemaVersion: CurrentSchemaVersion}
+	doc.SetNexusProtocolOptOut(true)
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	if !reloaded.Settings.NexusProtocolOptOut {
+		t.Fatal("Settings.NexusProtocolOptOut = false after round-trip, want true")
+	}
+}
+
+func TestDocumentWithNoNexusProtocolOptOutLoadsAsFalse(t *testing.T) {
+	// Arrange: a schema-1 document written before this field existed has no
+	// "nexusProtocolOptOut" key. Missing means the handler defaults on.
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	if err := os.WriteFile(path, []byte(`{"schemaVersion": 1, "settings": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(path)
+
+	// Act
+	reloaded, recovery := store.Load()
+
+	// Assert
+	if recovery.Recovered {
+		t.Fatalf("Recovery = %#v, want Recovered = false for a schema-1 document", recovery)
+	}
+	if reloaded.Settings.NexusProtocolOptOut {
+		t.Fatal("Settings.NexusProtocolOptOut = true, want false for a document that never set it")
+	}
+}

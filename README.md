@@ -23,7 +23,7 @@ Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It trea
 - **Organization** - rename, set priority, sort into folders, and tag mods; tags and settings survive renames and moves
 - **Recoverable deletion** - mods and folders go to the Recycle Bin, never straight to the void
 - **Archive installs with a preview** - drop in a `.zip`, `.7z`, `.rar`, or bare `.pak` and review exactly what will be installed first
-- **Install from a URL** - paste a direct download link, get the same preview flow
+- **Nexus Mods installs** - paste your own API key, then a Marvel Rivals mod page. Premium accounts can download with a simple URL, free accounts use **Mod Manager Download** button in Nexus!
 - **Conflict detection** - find mods stepping on the same assets, with a one-click priority fix
 - **Self-updating** - check for updates in Settings, download, restart, done
 
@@ -45,7 +45,7 @@ Open **Settings** and click **Check for updates**. If a newer release exists, Cr
 
 ## Installing mods
 
-Use the install button, drag and drop files onto the window, or paste a direct download link (the link icon in the header). Every path ends at the same preview: see the destination folder, the mod name, and any collisions before anything is written. Details in the [user guide](docs/USER_GUIDE.md).
+Use the install button, drag and drop files onto the window, or the download icon to install from Nexus Mods. Every path ends at the same preview: see the destination folder, the mod name, and any collisions before anything is written. Details in the [user guide](docs/USER_GUIDE.md).
 
 ## Building from source
 

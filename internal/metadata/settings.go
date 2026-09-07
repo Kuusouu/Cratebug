@@ -94,6 +94,13 @@ func (doc *Document) SetNexusProtocol(snapshot NexusProtocolSnapshot) error {
 	return nil
 }
 
+// Records that the user turned the nxm:// handler off. Missing (including
+// every document written before this field existed) means the handler
+// defaults on, so startup may register silently when nothing owns the scheme.
+func (doc *Document) SetNexusProtocolOptOut(optOut bool) {
+	doc.Settings.NexusProtocolOptOut = optOut
+}
+
 func validateNexusProtocolField(name, value string) error {
 	if strings.ContainsRune(value, 0) {
 		return fmt.Errorf("nexus protocol %s contains a NUL byte", name)

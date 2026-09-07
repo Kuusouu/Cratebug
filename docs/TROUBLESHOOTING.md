@@ -12,7 +12,7 @@ Cratebug renders through Microsoft's WebView2 Runtime. Windows 11 ships with it;
 
 ## Where Cratebug is installed, and how to remove it
 
-Cratebug installs to `%LOCALAPPDATA%\Programs\Cratebug` for your user account only. Uninstall from **Windows Settings > Apps**, or run `uninstall.exe` from that folder. Uninstalling removes Cratebug itself; the mods in your mod library folder are left alone.
+Cratebug installs to `%LOCALAPPDATA%\Programs\Cratebug` for your user account only. Uninstall from **Windows Settings > Apps**, or run `uninstall.exe` from that folder. Uninstalling removes Cratebug itself and deletes the saved Nexus API key. If Cratebug had taken the `nxm://` handler from another app, that app gets it back; if Cratebug was the only handler, the registration is removed. Mods in your library folder and your tags/settings (`metadata.json`) are left alone.
 
 ## Auto-detect can't find the game
 
@@ -32,9 +32,25 @@ Then you are on the latest release. You can always browse what is published on t
 
 The app reports download and install failures as toasts - note the message, then try again. If it keeps failing, use the **View release** button (or the [releases page](https://github.com/Kuusouu/Cratebug/releases/latest)) to download `Cratebug-amd64-installer.exe` and run it yourself; it installs over the existing copy and keeps your settings and tags.
 
-## Install from URL says it could not determine a file name
+## Nexus said the API key was rejected
 
-The link must be the direct download - the URL the browser actually saves the file from - and it must start with `https://`. A link to a mod *page* (where you click a Download button) won't work; copy the file's direct link instead. Supported targets are `.zip`, `.7z`, `.rar` archives and bare `.pak`/`.utoc`/`.ucas` files.
+The key was empty, damaged, or Nexus did not accept it. Open **Settings**, paste a fresh key from [your Nexus API keys page](https://www.nexusmods.com/users/myaccount?tab=api), and click **Connect**. Do not paste a browser cookie or a collection/OAuth token.
+
+## Nexus Mods rate limit reached
+
+Nexus caps how many API requests you can make. Cratebug reads the remaining-requests line from Nexus's own headers and refuses a call when none are left. Wait until the reset, then try again. Premium accounts have a higher cap than free accounts; Cratebug does not invent its own numbers.
+
+## The Nexus download link expired
+
+Free-account `nxm://` links are short-lived. Click **Mod Manager Download** on the Nexus page again. Cratebug cannot refresh that signed link for you.
+
+## Another app owns nxm:// links
+
+Vortex, Mod Organizer, or another manager may already be the `nxm://` handler. In **Settings**, Cratebug names that app and asks before taking over. You can turn the switch off later to give it back. Cratebug never takes the handler without that confirmation.
+
+## Windows opens nxm:// links in another app even though Cratebug is registered
+
+Windows **Default apps** can override the per-user handler. Open **Settings → Apps → Default apps**, find `nxm`, and choose Cratebug. The same warning appears in Cratebug Settings when that override is set.
 
 ## Companion PAK cleanup says the game is running
 
