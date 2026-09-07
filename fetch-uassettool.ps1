@@ -12,11 +12,11 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repositoryRoot = $PSScriptRoot
-$releaseRepo = "XzantGaming/UassetToolRivals"
-$releaseTag = "v1.5.6"
+$releaseRepo = "mewclouds/UAssetToolRivals"
+$releaseTag = "v1.5.8"
 $assetName = "UAssetTool-win-x64.zip"
-$expectedSha256 = "16c051cbc68bef0b9050ca83a8fd3d8d997156ed1e91f4112042f41443bdabaf"
-$expectedSourceRevision = "952bd331976c6f28efb36ca320c82c27e2456023"
+$expectedSha256 = "419bb2bb974fc7434366dbcdace74c5a2fa1ca81872a12ef7d5fdc458454395a"
+$expectedSourceRevision = "05470f4634533437897647c93448b6d5de02d09a"
 
 $downloadUrl = "https://github.com/$releaseRepo/releases/download/$releaseTag/$assetName"
 $targetDir = Join-Path $repositoryRoot "build\uassettool"
