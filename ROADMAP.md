@@ -399,8 +399,38 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - App encrypt launches write workers using the library pool-size policy.
 - Canonical checks pass.
 
+## Phase 16 - Nexus Mods integration (BYOK)
+
+**Outcome:** Users install Marvel Rivals mods from Nexus Mods with their own API key. Premium accounts download through the API. Free accounts start the download from the Nexus website via an `nxm://` link that Cratebug can own. The generic "Install from URL" path is removed.
+
+**Supersedes:** Phase 10's user-typed URL download (`App.InstallFromURL`, `InstallFromUrlDialog`, `internal/install/download.go`). Streaming, stall, and progress mechanics move into `internal/nexus`. No code path accepts an arbitrary user-typed download URL.
+
+**Includes:**
+
+- Bring-your-own Nexus API key stored locally with DPAPI, never in `metadata.json` or the WebView
+- Nexus client: validate, mod and file metadata, download links, header-driven rate limits
+- Premium API download and free-user `nxm://` download; signed `key` / `expires` stay in Go
+- Runtime-owned `nxm://` registration: silent if free, prompt if taken, restore on unregister
+- Single-instance handoff of cold and warm `nxm://` links
+- Settings for key paste, account state, and the handler toggle
+- Install UI: paste a Nexus URL, file picker, `nxm://` confirm, download progress
+- Persist Nexus mod, file, and version IDs on installed mods
+- Uninstall cleanup of the handler and `nexus.key`
+- Decision 0007
+
+**Excludes:** In-app Nexus browsing, search, endorsements, tracked mods, update checking, browser-extension intake, automating the free-user website click, Nexus application registration, silent takeover of another app's `nxm://` handler, and arbitrary-URL remote install.
+
+**Exit criteria:**
+
+- A connected premium account can resolve a Nexus URL, download, preview, and install through the existing staged pipeline.
+- A free account is sent to the Nexus page, and an `nxm://` link completes the same install.
+- Another app's handler is never taken without a named confirmation. Unregister restores it.
+- The API key and signed `nxm` parameters never appear in Wails payloads, `metadata.json`, or error text.
+- Generic URL install is gone.
+- Canonical checks pass. Running-app states are screenshotted and reviewed.
+
 ## Deferred post-release work
 
-Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, filesystem watching, full backup and restore, browser intake, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
+Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, filesystem watching, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
 
 These require separate specification and roadmap decisions.

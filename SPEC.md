@@ -133,6 +133,9 @@ Cratebug should eventually allow users to:
 - Encrypt or decrypt a complete IoStore bundle already in the library.
 - Warn when companion `.pak` files still contain `chunknames` or `patched_files` entries, and rewrite only those `.pak` files.
 - Warn when a complete unencrypted IoStore listing includes files outside `/Game/Marvel/Characters`, and offer to encrypt those mods.
+- Paste a personal Nexus Mods API key and connect or disconnect that account.
+- Install a Marvel Rivals mod from a Nexus Mods page URL or an `nxm://` download link, through the same staged preview as a local archive.
+- Register as the `nxm://` handler, asking before taking it from another application.
 
 The roadmap determines implementation order.
 
@@ -322,6 +325,12 @@ Cratebug must:
 - Avoid collecting or transmitting user data unless a future feature explicitly requires consent.
 - Log diagnostic information without unnecessarily exposing private data.
 
+### Nexus Mods
+
+Nexus Mods integration is that feature. Consent is the user pasting their own personal API key (bring-your-own-key). Cratebug stores the key only on this machine, never sends it to Cratebug infrastructure, and never exposes it to the WebView. Signed `nxm://` download parameters stay in the Go backend. Cratebug uses the key only for user-initiated Nexus API calls.
+
+Premium accounts may request a download link from the Nexus API. Free accounts must start the download from the Nexus website; Cratebug does not automate, scrape, or synthesise that step. Downloaded archives are untrusted input and use the same staged installation path as a local archive. Arbitrary user-typed download URLs are not accepted.
+
 ## 18. Initial non-goals
 
 The initial release does not require:
@@ -330,7 +339,7 @@ The initial release does not require:
 - Game launching
 - Full mod-directory backup and restore
 - Crash monitoring
-- Browser-extension or deep-link intake
+- Browser-extension intake
 - Signature bypass tooling
 - VFX updating
 - Character database updating
