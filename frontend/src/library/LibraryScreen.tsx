@@ -1,6 +1,6 @@
 import {
+	Download,
 	Grid2X2,
-	Link,
 	List,
 	PackagePlus,
 	PanelsTopLeft,
@@ -32,6 +32,7 @@ import {
 	DeleteTag,
 	DetectConflicts,
 	DetectLibrary,
+	DiscardNexusLink,
 	DownloadUpdate,
 	FindModsNeedingEncryption,
 	FindUnsupportedCompanionPaks,
@@ -53,6 +54,7 @@ import {
 	SetModRoot,
 	SetTheme,
 	StripCompanionPaks,
+	TakePendingNexusLink,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import {
@@ -85,9 +87,11 @@ import { canChangeModState, canDeleteMod, canOrganizeMod, canTagMod } from "./en
 import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
 import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
-import { InstallFromUrlDialog } from "./InstallFromUrlDialog";
+import { InstallFromNexusDialog } from "./InstallFromNexusDialog";
 import { InstallPreviewDialog, type InstallSource } from "./InstallPreviewDialog";
 import { formatWailsError as errorMessage } from "./installPresentation";
+import { NexusLinkDialog } from "./NexusLinkDialog";
+import { type InstallProgressView, formatNexusInstallError } from "./nexusPresentation";
 import styles from "./LibraryScreen.module.css";
 import { detectionOutcome } from "./libraryDetection";
 import {
@@ -127,6 +131,22 @@ type ViewModeButtonProps = {
 };
 
 type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags" | "encrypt";
+
+let firstNexusLinkIntake: Promise<main.NexusLink> | null = null;
+let firstNexusLinkIntakeDone = false;
+
+function takeNexusLink(initial: boolean): Promise<main.NexusLink> {
+	if (!firstNexusLinkIntakeDone) {
+		firstNexusLinkIntake ??= TakePendingNexusLink().finally(() => {
+			firstNexusLinkIntakeDone = true;
+		});
+		return firstNexusLinkIntake;
+	}
+	if (initial && firstNexusLinkIntake) {
+		return firstNexusLinkIntake;
+	}
+	return TakePendingNexusLink();
+}
 
 type DialogScope = "viewed" | "checked";
 
@@ -405,7 +425,9 @@ export function LibraryScreen() {
 	} | null>(null);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
 	const [installSource, setInstallSource] = useState<InstallSource | null>(null);
-	const [installFromUrlOpen, setInstallFromUrlOpen] = useState(false);
+	const [installFromNexusOpen, setInstallFromNexusOpen] = useState(false);
+	const [pendingNexusLink, setPendingNexusLink] = useState<main.NexusLink | null>(null);
+	const [installProgress, setInstallProgress] = useState<InstallProgressView | null>(null);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
 	const externalDragDepthRef = useRef(0);
 	const activeLibraryRootRef = useRef<string | null>(null);
@@ -520,10 +542,34 @@ export function LibraryScreen() {
 			showMutationFeedback("error", `Could not open file selector: ${errorMessage(error)}`);
 		}
 	}, [showMutationFeedback]);
-	const submitInstallFromUrl = useCallback((url: string) => {
-		setInstallFromUrlOpen(false);
-		setInstallSource({ kind: "url", url });
+	const startNexusInstall = useCallback((modId: number, fileId: number) => {
+		setInstallFromNexusOpen(false);
+		setPendingNexusLink(null);
+		setInstallProgress(null);
+		setInstallSource({ kind: "nexus", modId, fileId });
 	}, []);
+	const installSourceRef = useRef<InstallSource | null>(null);
+	installSourceRef.current = installSource;
+	const ingestPendingNexusLink = useCallback(
+		async (initial: boolean) => {
+			try {
+				const link = await takeNexusLink(initial);
+				if (!link.present) return;
+				if (installSourceRef.current) {
+					showMutationFeedback("error", "Finish or cancel the current install first.");
+					if (link.modId && link.fileId) {
+						DiscardNexusLink(link.modId, link.fileId);
+					}
+					return;
+				}
+				setInstallFromNexusOpen(false);
+				setPendingNexusLink(link);
+			} catch (error) {
+				showMutationFeedback("error", formatNexusInstallError(error));
+			}
+		},
+		[showMutationFeedback],
+	);
 	const handleDroppedFiles = useCallback(
 		(_x: number, _y: number, paths: string[]) => {
 			if (paths.length === 0) return;
@@ -560,6 +606,22 @@ export function LibraryScreen() {
 			setCompanionProgress(progress);
 		});
 	}, []);
+
+	useEffect(() => {
+		return EventsOn("install:progress", (progress: InstallProgressView) => {
+			setInstallProgress(progress);
+		});
+	}, []);
+
+	useEffect(() => {
+		return EventsOn("nexus:link", () => {
+			void ingestPendingNexusLink(false);
+		});
+	}, [ingestPendingNexusLink]);
+
+	useEffect(() => {
+		void ingestPendingNexusLink(true);
+	}, [ingestPendingNexusLink]);
 
 	// Best-effort welcome notice: a failure here should not surface as an
 	// error toast, since there is nothing the user needs to act on.
@@ -2321,12 +2383,12 @@ export function LibraryScreen() {
 					<button
 						type="button"
 						className="icon-button"
-						onClick={() => setInstallFromUrlOpen(true)}
+						onClick={() => setInstallFromNexusOpen(true)}
 						disabled={!libraryRoot || libraryState === "loading"}
-						aria-label="Install from URL"
-						title="Download and install a mod from a direct URL"
+						aria-label="Install from Nexus Mods"
+						title="Install a mod from Nexus Mods"
 					>
-						<Link aria-hidden="true" />
+						<Download aria-hidden="true" />
 					</button>
 					<button
 						type="button"
@@ -2824,21 +2886,62 @@ export function LibraryScreen() {
 						/>
 					);
 				})()}
-			{installFromUrlOpen && (
-				<InstallFromUrlDialog
-					onSubmit={submitInstallFromUrl}
-					onCancel={() => setInstallFromUrlOpen(false)}
+			{installFromNexusOpen && (
+				<InstallFromNexusDialog
+					onReady={startNexusInstall}
+					onOpenSettings={() => {
+						setInstallFromNexusOpen(false);
+						setSettingsOpen(true);
+					}}
+					onCancel={() => setInstallFromNexusOpen(false)}
+				/>
+			)}
+			{pendingNexusLink && (
+				<NexusLinkDialog
+					link={pendingNexusLink}
+					libraryReady={Boolean(libraryRoot)}
+					onConfirm={() => {
+						const modId = pendingNexusLink.modId ?? 0;
+						const fileId = pendingNexusLink.fileId ?? 0;
+						if (!libraryRoot) {
+							showMutationFeedback(
+								"error",
+								"Set a mod library folder before installing.",
+							);
+							return;
+						}
+						if (modId <= 0 || fileId <= 0) {
+							showMutationFeedback("error", "That Nexus link is missing a file.");
+							return;
+						}
+						startNexusInstall(modId, fileId);
+					}}
+					onCancel={() => {
+						if (pendingNexusLink.modId && pendingNexusLink.fileId) {
+							DiscardNexusLink(pendingNexusLink.modId, pendingNexusLink.fileId);
+						}
+						setPendingNexusLink(null);
+					}}
+					onOpenSettings={() => {
+						if (pendingNexusLink.modId && pendingNexusLink.fileId) {
+							DiscardNexusLink(pendingNexusLink.modId, pendingNexusLink.fileId);
+						}
+						setPendingNexusLink(null);
+						setSettingsOpen(true);
+					}}
 				/>
 			)}
 			{installSource && libraryRoot && (
 				<InstallPreviewDialog
 					modRoot={libraryRoot}
 					source={installSource}
+					downloadProgress={installProgress}
 					defaultFolder={selectedFolder === "all" ? "" : selectedFolder}
 					folders={libraryIndex.folders}
 					libraryEntries={library.entries}
 					onDone={(result) => {
 						setInstallSource(null);
+						setInstallProgress(null);
 						setLibrary(result.reconciledLibrary);
 						setLibraryState(
 							result.reconciledLibrary.entries.length === 0 ? "empty" : "populated",
@@ -2855,7 +2958,10 @@ export function LibraryScreen() {
 							setSelectedEntryID(firstInstalledID);
 						}
 					}}
-					onCancel={() => setInstallSource(null)}
+					onCancel={() => {
+						setInstallSource(null);
+						setInstallProgress(null);
+					}}
 				/>
 			)}
 			{isDraggingExternalFiles &&
@@ -2864,7 +2970,8 @@ export function LibraryScreen() {
 				!settingsOpen &&
 				!conflictDetailsOpen &&
 				!updateDialogMode &&
-				!installFromUrlOpen &&
+				!installFromNexusOpen &&
+				!pendingNexusLink &&
 				!detectionDialog &&
 				!installSource && (
 					<div className={styles["drop-overlay"]} aria-hidden="true">

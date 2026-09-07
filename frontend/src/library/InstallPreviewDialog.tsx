@@ -13,8 +13,9 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import {
 	ApplyInstall,
 	CancelInstall,
-	InstallFromURL,
+	CancelNexusDownload,
 	PrepareInstall,
+	PrepareNexusInstall,
 } from "../../wailsjs/go/main/App";
 import { type discovery, install } from "../../wailsjs/go/models";
 import {
@@ -35,12 +36,12 @@ import {
 	type ModConfig,
 	validateInstallModName,
 } from "./installPresentation";
+import { type InstallProgressView, formatInstallProgress } from "./nexusPresentation";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
-// A locally-selected/dropped set of files, or a single remote URL to
-// download first -- InstallFromURL handles the download and stages the
-// result through the exact same pipeline PrepareInstall uses for local files.
-export type InstallSource = { kind: "files"; paths: string[] } | { kind: "url"; url: string };
+export type InstallSource =
+	| { kind: "files"; paths: string[] }
+	| { kind: "nexus"; modId: number; fileId: number };
 
 export type InstallPreviewDialogProps = {
 	modRoot: string;
@@ -48,6 +49,7 @@ export type InstallPreviewDialogProps = {
 	defaultFolder: string;
 	folders: string[];
 	libraryEntries?: readonly discovery.Entry[];
+	downloadProgress?: InstallProgressView | null;
 	onDone: (result: install.ApplyResult) => void;
 	onCancel: () => void;
 };
@@ -60,6 +62,7 @@ export function InstallPreviewDialog({
 	defaultFolder,
 	folders,
 	libraryEntries = [],
+	downloadProgress = null,
 	onDone,
 	onCancel,
 }: InstallPreviewDialogProps) {
@@ -78,6 +81,13 @@ export function InstallPreviewDialog({
 
 	// Cancel session on escape or background close
 	const handleCancel = useCallback(async () => {
+		if (source.kind === "nexus") {
+			try {
+				await CancelNexusDownload();
+			} catch {
+				// Best-effort cleanup
+			}
+		}
 		const session = sessionIdRef.current;
 		if (session) {
 			try {
@@ -87,7 +97,7 @@ export function InstallPreviewDialog({
 			}
 		}
 		onCancel();
-	}, [onCancel]);
+	}, [onCancel, source.kind]);
 
 	const dialogRef = useDialogFocusTrap<HTMLElement>(() => {
 		if (phase !== "applying") {
@@ -104,8 +114,13 @@ export function InstallPreviewDialog({
 			setErrorMessage("");
 			try {
 				const result =
-					source.kind === "url"
-						? await InstallFromURL(modRoot, source.url, defaultFolder)
+					source.kind === "nexus"
+						? await PrepareNexusInstall(
+								modRoot,
+								source.modId,
+								source.fileId,
+								defaultFolder,
+							)
 						: await PrepareInstall(modRoot, source.paths, defaultFolder);
 				sessionIdRef.current = result.sessionId;
 
@@ -295,10 +310,33 @@ export function InstallPreviewDialog({
 					<div className={styles["install-preview-status-state"]}>
 						<Loader2 className="spinning-loader" aria-hidden="true" />
 						<p>
-							{source.kind === "url"
-								? "Downloading, extracting, and discovering mod bundles..."
+							{source.kind === "nexus"
+								? formatInstallProgress(downloadProgress)
 								: "Extracting archives and discovering mod bundles..."}
 						</p>
+						{source.kind === "nexus" ? (
+							<div
+								className={styles["install-download-progress"]}
+								role="progressbar"
+								aria-valuemin={0}
+								aria-valuemax={100}
+								aria-valuenow={
+									typeof downloadProgress?.percent === "number"
+										? Math.min(100, Math.round(downloadProgress.percent))
+										: undefined
+								}
+							>
+								<div
+									className={styles["install-download-progress-fill"]}
+									style={{
+										width:
+											typeof downloadProgress?.percent === "number"
+												? `${Math.min(100, Math.max(0, downloadProgress.percent))}%`
+												: "15%",
+									}}
+								/>
+							</div>
+						) : null}
 					</div>
 				)}
 

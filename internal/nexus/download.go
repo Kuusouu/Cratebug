@@ -180,11 +180,14 @@ func httpsRedirectsOnly(req *http.Request, via []*http.Request) error {
 }
 
 func expectedDownloadBytes(file FileInfo) int64 {
-	if file.Size > 0 {
-		return file.Size
+	if file.SizeInBytes > 0 {
+		return file.SizeInBytes
 	}
 	if file.SizeKB > 0 {
 		return int64(file.SizeKB) * 1024
+	}
+	if file.Size > 0 {
+		return file.Size * 1024
 	}
 	return 0
 }

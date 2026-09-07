@@ -457,6 +457,146 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class NexusAccountState {
+	    configured: boolean;
+	    verified: boolean;
+	    name?: string;
+	    isPremium: boolean;
+	    hourlyRemaining: number;
+	    dailyRemaining: number;
+	    hourlyResetUnix: number;
+	    dailyResetUnix: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new NexusAccountState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.configured = source["configured"];
+	        this.verified = source["verified"];
+	        this.name = source["name"];
+	        this.isPremium = source["isPremium"];
+	        this.hourlyRemaining = source["hourlyRemaining"];
+	        this.dailyRemaining = source["dailyRemaining"];
+	        this.hourlyResetUnix = source["hourlyResetUnix"];
+	        this.dailyResetUnix = source["dailyResetUnix"];
+	    }
+	}
+	export class NexusFileSummary {
+	    fileId: number;
+	    name: string;
+	    fileName: string;
+	    version: string;
+	    sizeKb: number;
+	    categoryName: string;
+	    isPrimary: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NexusFileSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fileId = source["fileId"];
+	        this.name = source["name"];
+	        this.fileName = source["fileName"];
+	        this.version = source["version"];
+	        this.sizeKb = source["sizeKb"];
+	        this.categoryName = source["categoryName"];
+	        this.isPrimary = source["isPrimary"];
+	    }
+	}
+	export class NexusKeyState {
+	    configured: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NexusKeyState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.configured = source["configured"];
+	    }
+	}
+	export class NexusLink {
+	    present: boolean;
+	    game?: string;
+	    modId?: number;
+	    fileId?: number;
+	    modName?: string;
+	    author?: string;
+	    pictureUrl?: string;
+	    fileName?: string;
+	    version?: string;
+	    sizeKb?: number;
+	    premium: boolean;
+	    needsWebsite: boolean;
+	    files?: NexusFileSummary[];
+	
+	    static createFrom(source: any = {}) {
+	        return new NexusLink(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.present = source["present"];
+	        this.game = source["game"];
+	        this.modId = source["modId"];
+	        this.fileId = source["fileId"];
+	        this.modName = source["modName"];
+	        this.author = source["author"];
+	        this.pictureUrl = source["pictureUrl"];
+	        this.fileName = source["fileName"];
+	        this.version = source["version"];
+	        this.sizeKb = source["sizeKb"];
+	        this.premium = source["premium"];
+	        this.needsWebsite = source["needsWebsite"];
+	        this.files = this.convertValues(source["files"], NexusFileSummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class NexusProtocolState {
+	    ownership: string;
+	    ownerName?: string;
+	    ownerPath?: string;
+	    userChoice: boolean;
+	    machineWide: boolean;
+	    canRegister: boolean;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new NexusProtocolState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ownership = source["ownership"];
+	        this.ownerName = source["ownerName"];
+	        this.ownerPath = source["ownerPath"];
+	        this.userChoice = source["userChoice"];
+	        this.machineWide = source["machineWide"];
+	        this.canRegister = source["canRegister"];
+	        this.enabled = source["enabled"];
+	    }
+	}
 	export class UpdateCheckResult {
 	    available: boolean;
 	    release?: update.Release;
@@ -511,6 +651,9 @@ export namespace metadata {
 	export class ModRecord {
 	    scannerID: string;
 	    tags?: string[];
+	    nexusModId?: number;
+	    nexusFileId?: number;
+	    nexusVersion?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ModRecord(source);
@@ -520,6 +663,25 @@ export namespace metadata {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.scannerID = source["scannerID"];
 	        this.tags = source["tags"];
+	        this.nexusModId = source["nexusModId"];
+	        this.nexusFileId = source["nexusFileId"];
+	        this.nexusVersion = source["nexusVersion"];
+	    }
+	}
+	export class NexusProtocolSnapshot {
+	    command?: string;
+	    icon?: string;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new NexusProtocolSnapshot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.command = source["command"];
+	        this.icon = source["icon"];
+	        this.description = source["description"];
 	    }
 	}
 	export class Settings {
@@ -529,6 +691,7 @@ export namespace metadata {
 	    accentColor?: string;
 	    libraryProvider?: string;
 	    lastSeenVersion?: string;
+	    nexusProtocol?: NexusProtocolSnapshot;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -542,7 +705,26 @@ export namespace metadata {
 	        this.accentColor = source["accentColor"];
 	        this.libraryProvider = source["libraryProvider"];
 	        this.lastSeenVersion = source["lastSeenVersion"];
+	        this.nexusProtocol = this.convertValues(source["nexusProtocol"], NexusProtocolSnapshot);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class Document {
 	    schemaVersion: number;
@@ -580,6 +762,7 @@ export namespace metadata {
 		    return a;
 		}
 	}
+	
 	
 	
 
@@ -731,6 +914,29 @@ export namespace mutation {
 	        this.folderPath = source["folderPath"];
 	        this.deleted = source["deleted"];
 	        this.state = source["state"];
+	    }
+	}
+
+}
+
+export namespace nexus {
+	
+	export class DownloadRequest {
+	    game: string;
+	    modId: number;
+	    fileId: number;
+	    premium: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DownloadRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.game = source["game"];
+	        this.modId = source["modId"];
+	        this.fileId = source["fileId"];
+	        this.premium = source["premium"];
 	    }
 	}
 

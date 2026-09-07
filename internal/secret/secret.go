@@ -39,6 +39,22 @@ func NewStore(path string, entropy []byte) Store {
 	}
 }
 
+// Binds a store that writes the value as-is. App-layer tests use this so they
+// do not depend on the machine's DPAPI master key.
+func NewPlainStore(path string, entropy []byte) Store {
+	identity := func(value, _ []byte) ([]byte, error) {
+		out := make([]byte, len(value))
+		copy(out, value)
+		return out, nil
+	}
+	return Store{
+		path:      path,
+		entropy:   entropy,
+		protect:   identity,
+		unprotect: identity,
+	}
+}
+
 // Encrypts value and writes it atomically. An empty value is rejected so
 // callers use Clear to remove a stored secret.
 func (s Store) Set(value string) error {

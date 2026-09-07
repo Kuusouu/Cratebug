@@ -377,6 +377,13 @@ func (c *Client) invalidateValidateCache() {
 	}
 }
 
+// Reports whether key is acceptable as an HTTP header value. Empty keys,
+// oversized keys, and anything outside printable ASCII are rejected so a
+// crafted paste cannot inject headers.
+func CheckAPIKey(key string) error {
+	return validateAPIKey(key)
+}
+
 func validateAPIKey(key string) error {
 	if key == "" {
 		return ErrNoAPIKey

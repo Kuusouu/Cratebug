@@ -253,6 +253,62 @@ func TestDownloadRejectsHTTPRedirect(t *testing.T) {
 	}
 }
 
+func TestExpectedDownloadBytesTreatsNexusSizeAsKilobytes(t *testing.T) {
+	tests := []struct {
+		name string
+		file FileInfo
+		want int64
+	}{
+		{name: "empty", want: 0},
+		{name: "size_in_bytes wins", file: FileInfo{SizeInBytes: 75641204, SizeKB: 73868, Size: 73868}, want: 75641204},
+		{name: "size_kb is kibibytes", file: FileInfo{SizeKB: 73868, Size: 73868}, want: 73868 * 1024},
+		{name: "size alone is kibibytes", file: FileInfo{Size: 73868}, want: 73868 * 1024},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Arrange / Act
+			got := expectedDownloadBytes(tt.file)
+
+			// Assert
+			if got != tt.want {
+				t.Fatalf("expectedDownloadBytes() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDownloadAcceptsNexusKilobyteSizeFields(t *testing.T) {
+	// Arrange: live Nexus file metadata sends size and size_kb as the same
+	// kilobyte count. Treating size as bytes rejected a 72 MB archive.
+	const sizeKB = 4
+	body := make([]byte, sizeKB*1024+16)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "4112")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(server.Close)
+
+	// Act
+	path, cleanup, err := testDownload(context.Background(), server, FileInfo{
+		FileName: "Mod.zip",
+		Size:     sizeKB,
+		SizeKB:   sizeKB,
+	}, nil)
+	t.Cleanup(func() {
+		if cleanup != nil {
+			cleanup()
+		}
+	})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Download() = %v, want success for a Nexus-sized archive", err)
+	}
+	if path == "" {
+		t.Fatal("Download() path is empty")
+	}
+}
+
 func TestDownloadRejectsSizeMismatch(t *testing.T) {
 	// Arrange: Nexus said ~1 KiB; the CDN offered 20 KiB.
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

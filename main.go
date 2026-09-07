@@ -3,7 +3,9 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
 
+	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -18,10 +20,26 @@ var assets embed.FS
 // which never claim to be a real release for update-check purposes.
 var AppVersion = "dev"
 
+const (
+	singleInstanceID     = "com.kuusouu.cratebug"
+	uninstallCleanupFlag = "--uninstall-cleanup"
+)
+
 func main() {
+	launchURL, cleanup := parseLaunchArgs(os.Args[1:])
+	if cleanup {
+		if err := runUninstallCleanup(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	app, err := NewApp()
 	if err != nil {
 		log.Fatal(err)
+	}
+	if launchURL != "" {
+		app.setLaunchURL(launchURL)
 	}
 
 	window := defaultWindowSize()
@@ -41,6 +59,10 @@ func main() {
 			// frontend handler ever fails to intercept the drop.
 			DisableWebViewDrop: true,
 		},
+		SingleInstanceLock: &options.SingleInstanceLock{
+			UniqueId:               singleInstanceID,
+			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
+		},
 		Bind: []interface{}{
 			app,
 		},
@@ -53,4 +75,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func parseLaunchArgs(args []string) (nxmURL string, uninstallCleanup bool) {
+	for _, arg := range args {
+		if arg == uninstallCleanupFlag {
+			return "", true
+		}
+	}
+	return nexus.FirstDownloadURL(args), false
 }

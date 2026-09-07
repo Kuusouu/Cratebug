@@ -33,6 +33,7 @@ Unicode true
 ## Include the wails tools
 ####
 !include "wails_tools.nsh"
+!include "LogicLib.nsh"
 
 # The version information for this two must consist of 4 parts
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
@@ -112,6 +113,23 @@ SectionEnd
 Section "uninstall"
     !insertmacro wails.setShellContext
 
+    # Restore a previous nxm:// handler and delete nexus.key while the
+    # executable is still on disk. metadata.json is left in place.
+    IfFileExists "$INSTDIR\${PRODUCT_EXECUTABLE}" 0 skip_uninstall_cleanup
+    ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --uninstall-cleanup'
+    skip_uninstall_cleanup:
+
+    ReadRegStr $0 HKCU "Software\Classes\nxm\shell\open\command" ""
+    Push $0
+    Push $INSTDIR
+    Call un.StrContains
+    Pop $1
+    ${If} $1 == 1
+        DeleteRegKey HKCU "Software\Classes\nxm"
+    ${EndIf}
+
+    Delete "$APPDATA\Cratebug\nexus.key"
+
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 
     RMDir /r $INSTDIR
@@ -124,3 +142,31 @@ Section "uninstall"
 
     !insertmacro wails.deleteUninstaller
 SectionEnd
+
+Function un.StrContains
+    Exch $R1 ; needle
+    Exch
+    Exch $R2 ; haystack
+    Push $R3
+    Push $R4
+    Push $R5
+    StrLen $R3 $R1
+    StrCpy $R4 0
+    loop:
+        StrCpy $R5 $R2 $R3 $R4
+        StrCmp $R5 $R1 found
+        StrCmp $R5 "" done
+        IntOp $R4 $R4 + 1
+        Goto loop
+    found:
+        StrCpy $R1 1
+        Goto done2
+    done:
+        StrCpy $R1 ""
+    done2:
+        Pop $R5
+        Pop $R4
+        Pop $R3
+        Pop $R2
+        Exch $R1
+FunctionEnd

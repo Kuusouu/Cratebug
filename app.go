@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -19,8 +17,10 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
 	"github.com/Kuusouu/Cratebug/internal/nexus"
+	"github.com/Kuusouu/Cratebug/internal/secret"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/update"
+	"github.com/Kuusouu/Cratebug/internal/urlscheme"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -52,6 +52,22 @@ type App struct {
 	encryptCancel         chan struct{}
 	companionMu           sync.Mutex
 	companionCancel       chan struct{}
+
+	secretStore secret.Store
+
+	pendingURLMu sync.Mutex
+	pendingLink  *nexus.DownloadRequest
+	linkSecrets  map[string]nexus.DownloadSecrets
+	ctxReady     bool
+
+	nexusMu             sync.Mutex
+	nexusClient         *nexus.Client
+	nexusDownloadCancel context.CancelFunc
+	nexusBaseURL        string
+	pendingNexusSource  *pendingNexusInstall
+
+	protocol      *urlscheme.Registrar
+	allowProtocol bool
 }
 
 // Creates the application binding.
@@ -60,18 +76,29 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve metadata storage location: %w", err)
 	}
+	keyPath, err := secret.DefaultNexusKeyPath()
+	if err != nil {
+		return nil, fmt.Errorf("resolve nexus key location: %w", err)
+	}
 	classifier := modtype.NewSessionClassifier(modtype.DefaultWorkerLauncher(nil))
-	return newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier, nil, nil), nil
+	app := newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier, nil, nil, secret.NewStore(keyPath, nexusKeyEntropy))
+	if exe, exeErr := os.Executable(); exeErr == nil {
+		app.protocol = urlscheme.New(urlscheme.SchemeNXM, exe)
+	}
+	app.allowProtocol = AppVersion != "dev" && looksLikeInstalledBuild()
+	return app, nil
 }
 
 // Lets tests inject a deterministic game-running detector, a disposable
-// metadata store, a custom classifier, an optional character table, and an install session manager.
+// metadata store, a custom classifier, an optional character table, an
+// install session manager, and a secret store.
 func newApp(
 	gameRunningChecker mutation.GameRunningChecker,
 	metadataStore metadata.Store,
 	classifier *modtype.SessionClassifier,
 	characterTable *modtype.CharacterTable,
 	installSessionManager *install.SessionManager,
+	secretStore secret.Store,
 ) *App {
 	if classifier == nil {
 		classifier = modtype.NewSessionClassifier(nil)
@@ -86,6 +113,8 @@ func newApp(
 		classifier:            classifier,
 		installSessionManager: installSessionManager,
 		detector:              gamedetect.NewDefaultRegistry(),
+		secretStore:           secretStore,
+		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 	}
 	if characterTable != nil {
 		app.characterTable = *characterTable
@@ -681,7 +710,14 @@ func (a *App) UnassignModTag(entryID, tagID string) error {
 
 // startup is called by Wails when the application is launched, saving the runtime context.
 func (a *App) startup(ctx context.Context) {
+	a.pendingURLMu.Lock()
 	a.ctx = ctx
+	a.ctxReady = true
+	pending := a.pendingLink
+	a.pendingURLMu.Unlock()
+	if pending != nil {
+		a.emitNexusLink(*pending)
+	}
 }
 
 // SelectFilesForInstall opens a native multiple-file dialog to select mod archives or direct bundles.
@@ -716,45 +752,14 @@ func (a *App) PrepareInstall(modRoot string, filePaths []string, defaultFolder s
 	if len(filePaths) == 0 {
 		return install.PreviewResult{}, fmt.Errorf("no files selected")
 	}
+	a.clearPendingNexusSource()
 	return a.stageAndPreview(modRoot, filePaths, defaultFolder)
 }
 
-// InstallFromURL downloads a mod archive or bundle from rawURL through
-// nexus.Download, then runs it through the same staging and preview flow
-// as a locally-selected file. Removed in 16.7; kept as a shim so existing
-// bindings still compile.
-func (a *App) InstallFromURL(modRoot, rawURL, defaultFolder string) (install.PreviewResult, error) {
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	onProgress := func(p install.Progress) {
-		if a.ctx != nil {
-			wailsRuntime.EventsEmit(a.ctx, "install:progress", p)
-		}
-	}
-
-	fileName := ""
-	if parsed, parseErr := url.Parse(rawURL); parseErr == nil {
-		fileName = path.Base(parsed.Path)
-	}
-
-	// Temporary shim: 16.7 removes InstallFromURL. The name comes from the
-	// typed URL path only so this method does not reintroduce
-	// Content-Disposition guessing in the Nexus downloader.
-	downloadedPath, cleanup, err := nexus.Download(ctx, nexus.DownloadLink{URI: rawURL}, nexus.FileInfo{FileName: fileName}, nil, onProgress)
-	if err != nil {
-		return install.PreviewResult{}, err
-	}
-	defer cleanup()
-
-	return a.stageAndPreview(modRoot, []string{downloadedPath}, defaultFolder)
-}
-
 // Stages filePaths into a fresh session and builds the install preview.
-// Shared by PrepareInstall (local files) and InstallFromURL (a downloaded
-// file), which differ only in how filePaths' single entry was obtained.
+// Shared by PrepareInstall (local files) and PrepareNexusInstall (a
+// downloaded Nexus file), which differ only in how filePaths' single
+// entry was obtained.
 func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder string) (install.PreviewResult, error) {
 	session, err := a.installSessionManager.CreateSession(filePaths)
 	if err != nil {
@@ -836,9 +841,16 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 	}
 
 	doc := a.loadMetadataDocument()
+	source := a.takePendingNexusSource()
 	for _, entryID := range result.InstalledEntryIDs {
-		if _, err := doc.EnsureMod(entryID); err != nil {
+		modID, err := doc.EnsureMod(entryID)
+		if err != nil {
 			return result, fmt.Errorf("ensure installed mod metadata: %w", err)
+		}
+		if source != nil {
+			if err := doc.SetModNexusSource(modID, source.ModID, source.FileID, source.Version); err != nil {
+				return result, fmt.Errorf("record nexus source: %w", err)
+			}
 		}
 	}
 	// Files are already in the library; a metadata write failure must still
@@ -851,12 +863,14 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 
 // CancelInstall cleans up staging data when the user cancels the installation preview.
 func (a *App) CancelInstall(sessionID string) error {
+	a.clearPendingNexusSource()
 	return a.installSessionManager.RemoveSession(sessionID)
 }
 
 // shutdown is called by Wails when the application is closing, ensuring
 // any session-held workers or background resources are cleanly closed.
 func (a *App) shutdown(_ context.Context) {
+	a.CancelNexusDownload()
 	if a.classifier != nil {
 		_ = a.classifier.Close()
 	}

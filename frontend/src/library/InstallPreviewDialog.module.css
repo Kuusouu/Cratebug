@@ -30,6 +30,20 @@
 	color: var(--bad);
 }
 
+.install-download-progress {
+	width: min(100%, 18rem);
+	height: 0.5rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--panel-raised), transparent 20%);
+	overflow: hidden;
+}
+
+.install-download-progress-fill {
+	height: 100%;
+	background: var(--accent);
+	transition: width 0.2s ease;
+}
+
 .install-preview-list {
 	flex: 1 1 auto;
 	min-height: 0;

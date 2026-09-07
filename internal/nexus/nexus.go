@@ -81,13 +81,16 @@ type ModInfo struct {
 
 // One downloadable file attached to a Nexus mod.
 type FileInfo struct {
-	FileID            int    `json:"file_id"`
-	Name              string `json:"name"`
-	FileName          string `json:"file_name"`
-	Version           string `json:"version"`
-	ModVersion        string `json:"mod_version"`
+	FileID     int    `json:"file_id"`
+	Name       string `json:"name"`
+	FileName   string `json:"file_name"`
+	Version    string `json:"version"`
+	ModVersion string `json:"mod_version"`
+	// Size and SizeKB are both kilobytes on the REST file endpoints.
+	// SizeInBytes is the only byte-accurate field when Nexus sends it.
 	Size              int64  `json:"size"`
 	SizeKB            int    `json:"size_kb"`
+	SizeInBytes       int64  `json:"size_in_bytes"`
 	CategoryName      string `json:"category_name"`
 	IsPrimary         bool   `json:"is_primary"`
 	UploadedTimestamp int64  `json:"uploaded_timestamp"`
