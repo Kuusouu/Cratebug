@@ -19,6 +19,11 @@ const modIDPrefix = "mod-"
 type ModRecord struct {
 	ScannerID string   `json:"scannerID"`
 	Tags      []string `json:"tags,omitempty"`
+
+	// Persisted so a later phase can check for updates without a re-install.
+	NexusModID   int    `json:"nexusModId,omitempty"`
+	NexusFileID  int    `json:"nexusFileId,omitempty"`
+	NexusVersion string `json:"nexusVersion,omitempty"`
 }
 
 // Returns the persistent identity for scannerID, assigning a new one the
@@ -39,6 +44,26 @@ func (doc *Document) EnsureMod(scannerID string) (string, error) {
 	}
 	doc.Mods[id] = ModRecord{ScannerID: scannerID}
 	return id, nil
+}
+
+// Records the Nexus file an installed mod came from so a later phase can
+// check for updates without a re-install. Zero IDs and an empty version
+// clear the association. Negative IDs are rejected.
+func (doc *Document) SetModNexusSource(modID string, nexusModID, nexusFileID int, version string) error {
+	record, ok := doc.Mods[modID]
+	if !ok {
+		return fmt.Errorf("mod is not tracked: %q", modID)
+	}
+
+	if nexusModID < 0 || nexusFileID < 0 {
+		return fmt.Errorf("nexus IDs cannot be negative")
+	}
+
+	record.NexusModID = nexusModID
+	record.NexusFileID = nexusFileID
+	record.NexusVersion = version
+	doc.Mods[modID] = record
+	return nil
 }
 
 // Returns the persistent identity currently mapped to scannerID, if any.

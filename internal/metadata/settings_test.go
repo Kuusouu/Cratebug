@@ -1,7 +1,9 @@
 package metadata
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -309,5 +311,121 @@ func TestDocumentWithNoLastSeenVersionLoadsAsEmpty(t *testing.T) {
 	// Assert
 	if reloaded.Settings.LastSeenVersion != "" {
 		t.Errorf("Settings.LastSeenVersion = %q, want empty for a document that never set it", reloaded.Settings.LastSeenVersion)
+	}
+}
+
+func TestSetNexusProtocolRejectsInvalidFields(t *testing.T) {
+	tooLong := strings.Repeat("a", maxNexusProtocolFieldLength+1)
+	for _, test := range []struct {
+		name     string
+		snapshot NexusProtocolSnapshot
+	}{
+		{name: "NUL in command", snapshot: NexusProtocolSnapshot{Command: "path\x00.exe"}},
+		{name: "NUL in icon", snapshot: NexusProtocolSnapshot{Icon: "icon\x00.ico"}},
+		{name: "NUL in description", snapshot: NexusProtocolSnapshot{Description: "desc\x00"}},
+		{name: "command too long", snapshot: NexusProtocolSnapshot{Command: tooLong}},
+		{name: "icon too long", snapshot: NexusProtocolSnapshot{Icon: tooLong}},
+		{name: "description too long", snapshot: NexusProtocolSnapshot{Description: tooLong}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			kept := NexusProtocolSnapshot{Command: "keep"}
+			doc := Document{Settings: Settings{NexusProtocol: kept}}
+
+			// Act
+			err := doc.SetNexusProtocol(test.snapshot)
+
+			// Assert
+			if err == nil {
+				t.Fatal("SetNexusProtocol() succeeded, want an error")
+			}
+			if doc.Settings.NexusProtocol != kept {
+				t.Errorf("Settings.NexusProtocol was mutated on reject: %#v", doc.Settings.NexusProtocol)
+			}
+		})
+	}
+}
+
+func TestSetNexusProtocolAcceptsAValidSnapshot(t *testing.T) {
+	// Arrange
+	var doc Document
+	snapshot := NexusProtocolSnapshot{
+		Command:     `"C:\Program Files\BentoMod\BentoMod.exe" "%1"`,
+		Icon:        `C:\Program Files\BentoMod\BentoMod.exe,0`,
+		Description: "URL:Nexus Mods Protocol",
+	}
+
+	// Act
+	err := doc.SetNexusProtocol(snapshot)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetNexusProtocol() = %v, want no error", err)
+	}
+	if doc.Settings.NexusProtocol != snapshot {
+		t.Errorf("Settings.NexusProtocol = %#v, want %#v", doc.Settings.NexusProtocol, snapshot)
+	}
+}
+
+func TestSetNexusProtocolAcceptsTheZeroValueToClear(t *testing.T) {
+	// Arrange
+	doc := Document{Settings: Settings{NexusProtocol: NexusProtocolSnapshot{Command: "keep"}}}
+
+	// Act
+	err := doc.SetNexusProtocol(NexusProtocolSnapshot{})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetNexusProtocol() = %v, want no error", err)
+	}
+	if doc.Settings.NexusProtocol != (NexusProtocolSnapshot{}) {
+		t.Errorf("Settings.NexusProtocol = %#v, want the zero value", doc.Settings.NexusProtocol)
+	}
+}
+
+func TestNexusProtocolSurvivesASaveLoadRoundTrip(t *testing.T) {
+	// Arrange
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	var doc Document
+	snapshot := NexusProtocolSnapshot{
+		Command:     `"C:\Program Files\BentoMod\BentoMod.exe" "%1"`,
+		Icon:        `C:\Program Files\BentoMod\BentoMod.exe,0`,
+		Description: "URL:Nexus Mods Protocol",
+	}
+	if err := doc.SetNexusProtocol(snapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	if reloaded.Settings.NexusProtocol != snapshot {
+		t.Errorf("Settings.NexusProtocol = %#v, want %#v", reloaded.Settings.NexusProtocol, snapshot)
+	}
+}
+
+func TestDocumentWithNoNexusProtocolLoadsAsEmpty(t *testing.T) {
+	// Arrange: a schema-1 document written before this field existed has no
+	// "nexusProtocol" key. CurrentSchemaVersion stays 1; this is a pure
+	// field addition with a zero default, not a migration.
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	if err := os.WriteFile(path, []byte(`{"schemaVersion": 1, "settings": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(path)
+
+	// Act
+	reloaded, recovery := store.Load()
+
+	// Assert
+	if recovery.Recovered {
+		t.Fatalf("Recovery = %#v, want Recovered = false for a schema-1 document", recovery)
+	}
+	if reloaded.Settings.NexusProtocol != (NexusProtocolSnapshot{}) {
+		t.Errorf("Settings.NexusProtocol = %#v, want the zero value for a document that never set it", reloaded.Settings.NexusProtocol)
 	}
 }

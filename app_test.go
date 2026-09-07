@@ -636,7 +636,12 @@ func TestAppInstallLifecycle(t *testing.T) {
 		t.Fatalf("ApplyInstall failed: %v", err)
 	}
 	if len(result.InstalledEntryIDs) != 1 {
-		t.Errorf("expected 1 installed entry ID, got %d", len(result.InstalledEntryIDs))
+		t.Fatalf("expected 1 installed entry ID, got %d", len(result.InstalledEntryIDs))
+	}
+
+	doc := app.LoadMetadata().Document
+	if _, ok := doc.FindModByScannerID(result.InstalledEntryIDs[0]); !ok {
+		t.Fatal("freshly installed mod has no ModRecord")
 	}
 
 	destPak := filepath.Join(modRoot, "Characters", "Punisher", "Punisher_P.pak")

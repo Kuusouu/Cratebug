@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -16,6 +18,7 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
+	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/update"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -716,12 +719,10 @@ func (a *App) PrepareInstall(modRoot string, filePaths []string, defaultFolder s
 	return a.stageAndPreview(modRoot, filePaths, defaultFolder)
 }
 
-// InstallFromURL downloads a mod archive or bundle from rawURL, then runs it
-// through the exact same staging and preview flow as a locally-selected
-// file: the download is the only step that differs from PrepareInstall,
-// matching SPEC.md's requirement that a remote download carry no less
-// scrutiny than a local one. The downloaded temp file is removed once
-// staging has copied out of it, regardless of whether staging succeeds.
+// InstallFromURL downloads a mod archive or bundle from rawURL through
+// nexus.Download, then runs it through the same staging and preview flow
+// as a locally-selected file. Removed in 16.7; kept as a shim so existing
+// bindings still compile.
 func (a *App) InstallFromURL(modRoot, rawURL, defaultFolder string) (install.PreviewResult, error) {
 	ctx := a.ctx
 	if ctx == nil {
@@ -734,7 +735,15 @@ func (a *App) InstallFromURL(modRoot, rawURL, defaultFolder string) (install.Pre
 		}
 	}
 
-	downloadedPath, cleanup, err := install.DownloadRemoteFile(ctx, rawURL, nil, onProgress)
+	fileName := ""
+	if parsed, parseErr := url.Parse(rawURL); parseErr == nil {
+		fileName = path.Base(parsed.Path)
+	}
+
+	// Temporary shim: 16.7 removes InstallFromURL. The name comes from the
+	// typed URL path only so this method does not reintroduce
+	// Content-Disposition guessing in the Nexus downloader.
+	downloadedPath, cleanup, err := nexus.Download(ctx, nexus.DownloadLink{URI: rawURL}, nexus.FileInfo{FileName: fileName}, nil, onProgress)
 	if err != nil {
 		return install.PreviewResult{}, err
 	}
@@ -821,7 +830,23 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 		return install.ApplyResult{}, err
 	}
 
-	return install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
+	result, err := install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
+	if err != nil {
+		return result, err
+	}
+
+	doc := a.loadMetadataDocument()
+	for _, entryID := range result.InstalledEntryIDs {
+		if _, err := doc.EnsureMod(entryID); err != nil {
+			return result, fmt.Errorf("ensure installed mod metadata: %w", err)
+		}
+	}
+	// Files are already in the library; a metadata write failure must still
+	// report the ApplyResult so the caller can see what landed.
+	if err := a.metadataStore.Save(doc); err != nil {
+		return result, fmt.Errorf("save installed mod metadata: %w", err)
+	}
+	return result, nil
 }
 
 // CancelInstall cleans up staging data when the user cancels the installation preview.

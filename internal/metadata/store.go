@@ -23,6 +23,15 @@ type Recovery struct {
 	Cause     error
 }
 
+// NexusProtocolSnapshot is the previous nxm:// handler command, recorded so
+// unregister can restore it. It is paths and display text, not a secret, and
+// is safe to return through LoadMetadata.
+type NexusProtocolSnapshot struct {
+	Command     string `json:"command,omitempty"`
+	Icon        string `json:"icon,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
 // Settings holds app-level preferences that persist across sessions.
 type Settings struct {
 	ModRoot         string `json:"modRoot,omitempty"`
@@ -40,6 +49,12 @@ type Settings struct {
 	// this field existed) is not an error case: it just means the notice
 	// hasn't been shown for the running build yet.
 	LastSeenVersion string `json:"lastSeenVersion,omitempty"`
+
+	// The previous nxm:// handler command, recorded so unregister can restore
+	// it. This is not a secret: LoadMetadata returns the whole document. A
+	// missing field (every document written before this existed) is the zero
+	// value, not an error.
+	NexusProtocol NexusProtocolSnapshot `json:"nexusProtocol,omitempty"`
 }
 
 // Document is the versioned envelope persisted to disk.

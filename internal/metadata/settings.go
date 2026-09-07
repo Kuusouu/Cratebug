@@ -3,9 +3,14 @@ package metadata
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/Kuusouu/Cratebug/internal/gamedetect"
 )
+
+// A registry command is an executable path plus `"%1"`, not a novel.
+// Anything longer is almost certainly junk pasted through a Wails binding.
+const maxNexusProtocolFieldLength = 4096
 
 var validThemes = map[string]bool{
 	"system": true,
@@ -68,4 +73,33 @@ func (doc *Document) SetLibraryProvider(provider string) error {
 // callable setter, so it has no untrusted input to validate.
 func (doc *Document) SetLastSeenVersion(version string) {
 	doc.Settings.LastSeenVersion = version
+}
+
+// Records the previous nxm:// handler so unregister can restore it. The
+// snapshot is paths and display text, not a secret. The zero value clears
+// it. Wails bindings will later be callable from devtools, so each field
+// is rejected if it contains a NUL or exceeds a registry-command length.
+func (doc *Document) SetNexusProtocol(snapshot NexusProtocolSnapshot) error {
+	if err := validateNexusProtocolField("command", snapshot.Command); err != nil {
+		return err
+	}
+	if err := validateNexusProtocolField("icon", snapshot.Icon); err != nil {
+		return err
+	}
+	if err := validateNexusProtocolField("description", snapshot.Description); err != nil {
+		return err
+	}
+
+	doc.Settings.NexusProtocol = snapshot
+	return nil
+}
+
+func validateNexusProtocolField(name, value string) error {
+	if strings.ContainsRune(value, 0) {
+		return fmt.Errorf("nexus protocol %s contains a NUL byte", name)
+	}
+	if len(value) > maxNexusProtocolFieldLength {
+		return fmt.Errorf("nexus protocol %s exceeds %d bytes", name, maxNexusProtocolFieldLength)
+	}
+	return nil
 }

@@ -172,3 +172,185 @@ func TestPersistentIdentitySurvivesRealMutations(t *testing.T) {
 		})
 	}
 }
+
+func TestSetModNexusSourceRejectsAnUnknownMod(t *testing.T) {
+	// Arrange
+	var doc Document
+
+	// Act
+	err := doc.SetModNexusSource("mod-missing", 1, 2, "1.0")
+
+	// Assert
+	if err == nil {
+		t.Fatal("SetModNexusSource() succeeded for an unknown mod, want an error")
+	}
+}
+
+func TestSetModNexusSourceRejectsNegativeIDs(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		nexusModID  int
+		nexusFileID int
+	}{
+		{name: "negative mod ID", nexusModID: -1, nexusFileID: 2},
+		{name: "negative file ID", nexusModID: 1, nexusFileID: -2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			var doc Document
+			modID, err := doc.EnsureMod("mod:folder:example")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Act
+			err = doc.SetModNexusSource(modID, test.nexusModID, test.nexusFileID, "1.0")
+
+			// Assert
+			if err == nil {
+				t.Fatal("SetModNexusSource() succeeded for a negative ID, want an error")
+			}
+			record := doc.Mods[modID]
+			if record.NexusModID != 0 || record.NexusFileID != 0 || record.NexusVersion != "" {
+				t.Errorf("Nexus fields were mutated on reject: {%d, %d, %q}", record.NexusModID, record.NexusFileID, record.NexusVersion)
+			}
+		})
+	}
+}
+
+func TestSetModNexusSourceAssignsOntoTheExistingRecord(t *testing.T) {
+	// Arrange
+	var doc Document
+	modID, err := doc.EnsureMod("mod:folder:example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tag, err := doc.CreateTag("Combat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.AssignTag(modID, tag.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	err = doc.SetModNexusSource(modID, 123, 456, "1.2.3")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetModNexusSource() = %v, want no error", err)
+	}
+	record := doc.Mods[modID]
+	if record.ScannerID != "mod:folder:example" {
+		t.Errorf("ScannerID = %q, want %q", record.ScannerID, "mod:folder:example")
+	}
+	if len(record.Tags) != 1 || record.Tags[0] != tag.ID {
+		t.Errorf("Tags = %#v, want [%q]", record.Tags, tag.ID)
+	}
+	if record.NexusModID != 123 || record.NexusFileID != 456 || record.NexusVersion != "1.2.3" {
+		t.Errorf("Nexus fields = {%d, %d, %q}, want {123, 456, \"1.2.3\"}", record.NexusModID, record.NexusFileID, record.NexusVersion)
+	}
+}
+
+func TestSetModNexusSourceAcceptsZerosToClear(t *testing.T) {
+	// Arrange
+	var doc Document
+	modID, err := doc.EnsureMod("mod:folder:example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.SetModNexusSource(modID, 123, 456, "1.2.3"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	err = doc.SetModNexusSource(modID, 0, 0, "")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetModNexusSource() = %v, want no error", err)
+	}
+	record := doc.Mods[modID]
+	if record.NexusModID != 0 || record.NexusFileID != 0 || record.NexusVersion != "" {
+		t.Errorf("Nexus fields = {%d, %d, %q}, want zeros", record.NexusModID, record.NexusFileID, record.NexusVersion)
+	}
+}
+
+func TestModNexusSourceSurvivesASaveLoadRoundTrip(t *testing.T) {
+	// Arrange
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	var doc Document
+	modID, err := doc.EnsureMod("mod:folder:example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := doc.SetModNexusSource(modID, 123, 456, "1.2.3"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	record, ok := reloaded.Mods[modID]
+	if !ok {
+		t.Fatal("mod record missing after load")
+	}
+	if record.NexusModID != 123 || record.NexusFileID != 456 || record.NexusVersion != "1.2.3" {
+		t.Errorf("Nexus fields = {%d, %d, %q}, want {123, 456, \"1.2.3\"}", record.NexusModID, record.NexusFileID, record.NexusVersion)
+	}
+}
+
+func TestEnsureModRecordLoadsWithZeroNexusFields(t *testing.T) {
+	// Arrange
+	store := NewStore(filepath.Join(t.TempDir(), "metadata.json"))
+	var doc Document
+	if _, err := doc.EnsureMod("mod:folder:example"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	modID, ok := reloaded.FindModByScannerID("mod:folder:example")
+	if !ok {
+		t.Fatal("EnsureMod record missing after load")
+	}
+	record := reloaded.Mods[modID]
+	if record.NexusModID != 0 || record.NexusFileID != 0 || record.NexusVersion != "" {
+		t.Errorf("Nexus fields = {%d, %d, %q}, want zeros", record.NexusModID, record.NexusFileID, record.NexusVersion)
+	}
+}
+
+func TestDocumentWhoseModsHaveNoNexusFieldsLoadsAsZeros(t *testing.T) {
+	// Arrange: a schema-1 document written before these fields existed has
+	// no nexus keys on the mod record. CurrentSchemaVersion stays 1.
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	raw := `{"schemaVersion": 1, "settings": {}, "mods": {"mod-1": {"scannerID": "mod:folder:example"}}}`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(path)
+
+	// Act
+	reloaded, recovery := store.Load()
+
+	// Assert
+	if recovery.Recovered {
+		t.Fatalf("Recovery = %#v, want Recovered = false for a schema-1 document", recovery)
+	}
+	record, ok := reloaded.Mods["mod-1"]
+	if !ok {
+		t.Fatal("mod-1 missing after load")
+	}
+	if record.NexusModID != 0 || record.NexusFileID != 0 || record.NexusVersion != "" {
+		t.Errorf("Nexus fields = {%d, %d, %q}, want zeros", record.NexusModID, record.NexusFileID, record.NexusVersion)
+	}
+}

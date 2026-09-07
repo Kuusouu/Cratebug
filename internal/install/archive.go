@@ -56,6 +56,13 @@ func hasBundleExtension(fileName string) bool {
 	return false
 }
 
+// Reports whether name is an archive or a raw Unreal bundle Cratebug can
+// stage. Nexus downloads check this before the transfer starts so a CDN
+// URL cannot pick the filename.
+func IsSupportedInstallFile(name string) bool {
+	return IsArchiveFile(name) || hasBundleExtension(name)
+}
+
 // Reports whether a file path has an archive extension and is not a raw Unreal bundle.
 func IsArchiveFile(filePath string) bool {
 	if hasBundleExtension(filePath) {

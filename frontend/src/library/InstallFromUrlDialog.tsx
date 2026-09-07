@@ -6,8 +6,8 @@ type InstallFromUrlDialogProps = {
 	onCancel: () => void;
 };
 
-// Client-side validation is a courtesy only: the backend (install.DownloadRemoteFile)
-// re-validates HTTPS and the file name independently and is the actual enforcement point.
+// Client-side validation is a courtesy only: the backend re-validates
+// HTTPS and the file name independently and is the actual enforcement point.
 export function InstallFromUrlDialog({ onSubmit, onCancel }: InstallFromUrlDialogProps) {
 	const [url, setUrl] = useState("");
 	const [validationError, setValidationError] = useState("");
