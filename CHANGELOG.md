@@ -13,6 +13,20 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.09.08]
+
+### Making it yours
+
+- Feeling brave? Settings can skip the three-second countdown on delete, encrypt, and rebuild. You still confirm, the button just stops making you wait for it. Off by default!
+
+### Opening the crates faster
+
+- We've made improvements in how we handle classifying mods, resulting in a startup that is 8x faster than it was before!
+
+### Lighter crates
+
+- 85 MB down to about 36 MB, portraits and all. Updates grab the whole installer, so every one from here is a lighter haul!
+
 ## [2026.09.07]
 
 ### Getting new crates in
