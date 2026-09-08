@@ -258,7 +258,7 @@
 
 .nexus-account,
 .nexus-key-row,
-.nexus-handler-row,
+.setting-switch-row,
 .nexus-takeover {
 	display: grid;
 	gap: 0.55rem;
@@ -322,19 +322,19 @@
 	outline: none;
 }
 
-.nexus-handler-row {
+.setting-switch-row {
 	grid-template-columns: minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 0.75rem;
 }
 
-.nexus-handler-label {
+.setting-switch-label {
 	margin: 0;
 	font-size: 0.85rem;
 	font-weight: 650;
 }
 
-.nexus-switch {
+.setting-switch {
 	position: relative;
 	display: inline-flex;
 	width: 2.5rem;
@@ -347,22 +347,22 @@
 	background: var(--panel);
 }
 
-.nexus-switch:hover:not(:disabled) {
+.setting-switch:hover:not(:disabled) {
 	border-color: color-mix(in srgb, var(--muted), var(--line) 40%);
 	filter: none;
 }
 
-.nexus-switch[aria-checked="true"] {
+.setting-switch[aria-checked="true"] {
 	border-color: color-mix(in srgb, var(--accent), transparent 40%);
 	background: var(--accent);
 }
 
-.nexus-switch:disabled {
+.setting-switch:disabled {
 	cursor: not-allowed;
 	opacity: 0.55;
 }
 
-.nexus-switch-knob {
+.setting-switch-knob {
 	width: 1.05rem;
 	height: 1.05rem;
 	border-radius: 50%;
@@ -371,7 +371,7 @@
 	transition: transform 0.15s ease;
 }
 
-.nexus-switch[aria-checked="true"] .nexus-switch-knob {
+.setting-switch[aria-checked="true"] .setting-switch-knob {
 	transform: translateX(1.05rem);
 }
 

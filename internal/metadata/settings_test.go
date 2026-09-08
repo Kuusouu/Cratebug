@@ -469,3 +469,43 @@ func TestDocumentWithNoNexusProtocolOptOutLoadsAsFalse(t *testing.T) {
 		t.Fatal("Settings.NexusProtocolOptOut = true, want false for a document that never set it")
 	}
 }
+
+func TestSkipDestructiveDelaySurvivesASaveLoadRoundTrip(t *testing.T) {
+	// Arrange
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	store := NewStore(path)
+	doc := Document{SchemaVersion: CurrentSchemaVersion}
+	doc.SetSkipDestructiveDelay(true)
+
+	// Act
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, _ := store.Load()
+
+	// Assert
+	if !reloaded.Settings.SkipDestructiveDelay {
+		t.Fatal("Settings.SkipDestructiveDelay = false after round-trip, want true")
+	}
+}
+
+func TestDocumentWithNoSkipDestructiveDelayLoadsAsFalse(t *testing.T) {
+	// Arrange: a schema-1 document written before this field existed has no
+	// "skipDestructiveDelay" key. Missing keeps the confirmation delay.
+	path := filepath.Join(t.TempDir(), "metadata.json")
+	if err := os.WriteFile(path, []byte(`{"schemaVersion": 1, "settings": {}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(path)
+
+	// Act
+	reloaded, recovery := store.Load()
+
+	// Assert
+	if recovery.Recovered {
+		t.Fatalf("Recovery = %#v, want Recovered = false for a schema-1 document", recovery)
+	}
+	if reloaded.Settings.SkipDestructiveDelay {
+		t.Fatal("Settings.SkipDestructiveDelay = true, want false for a document that never set it")
+	}
+}

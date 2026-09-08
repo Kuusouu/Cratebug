@@ -693,6 +693,7 @@ export namespace metadata {
 	    lastSeenVersion?: string;
 	    nexusProtocol?: NexusProtocolSnapshot;
 	    nexusProtocolOptOut?: boolean;
+	    skipDestructiveDelay?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -708,6 +709,7 @@ export namespace metadata {
 	        this.lastSeenVersion = source["lastSeenVersion"];
 	        this.nexusProtocol = this.convertValues(source["nexusProtocol"], NexusProtocolSnapshot);
 	        this.nexusProtocolOptOut = source["nexusProtocolOptOut"];
+	        this.skipDestructiveDelay = source["skipDestructiveDelay"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

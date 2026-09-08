@@ -649,6 +649,13 @@ func (a *App) SetAccentColor(color string) error {
 	return a.metadataStore.Save(doc)
 }
 
+// Persists whether destructive confirmation dialogs skip their countdown.
+func (a *App) SetSkipDestructiveDelay(skip bool) error {
+	doc := a.loadMetadataDocument()
+	doc.SetSkipDestructiveDelay(skip)
+	return a.metadataStore.Save(doc)
+}
+
 // Adds a new tag to the persisted catalog.
 func (a *App) CreateTag(name string) (metadata.Tag, error) {
 	doc := a.loadMetadataDocument()

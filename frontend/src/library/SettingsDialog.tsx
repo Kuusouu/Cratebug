@@ -37,10 +37,12 @@ type SettingsDialogProps = {
 	appVersion: string;
 	isCheckingForUpdate: boolean;
 	libraryProvider: LibraryProvider;
+	skipConfirmDelay: boolean;
 	onClose: () => void;
 	onSelectTheme: (theme: Theme) => void;
 	onSelectAccentColor: (hex: string) => void;
 	onSelectLibraryProvider: (provider: LibraryProvider) => void;
+	onToggleSkipConfirmDelay: (skip: boolean) => void;
 	onCheckForUpdate: () => void;
 };
 
@@ -59,10 +61,12 @@ export function SettingsDialog({
 	appVersion,
 	isCheckingForUpdate,
 	libraryProvider,
+	skipConfirmDelay,
 	onClose,
 	onSelectTheme,
 	onSelectAccentColor,
 	onSelectLibraryProvider,
+	onToggleSkipConfirmDelay,
 	onCheckForUpdate,
 }: SettingsDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -362,6 +366,32 @@ export function SettingsDialog({
 						</p>
 					</div>
 					<div className={styles["setting-section"]}>
+						<h3>Confirmations</h3>
+						<div className={styles["setting-switch-row"]}>
+							<div>
+								<p className={styles["setting-switch-label"]}>
+									Skip the countdown on destructive actions
+								</p>
+								<p className={styles["setting-section-hint"]}>
+									Avoid waiting three seconds. You still have to confirm.
+								</p>
+							</div>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={skipConfirmDelay}
+								aria-label="Skip the countdown on destructive actions"
+								className={styles["setting-switch"]}
+								onClick={() => onToggleSkipConfirmDelay(!skipConfirmDelay)}
+							>
+								<span
+									className={styles["setting-switch-knob"]}
+									aria-hidden="true"
+								/>
+							</button>
+						</div>
+					</div>
+					<div className={styles["setting-section"]}>
 						<h3>Nexus Mods</h3>
 						<p className={styles["setting-section-hint"]}>
 							Paste a personal API key. Cratebug stores it only on this machine.
@@ -428,9 +458,9 @@ export function SettingsDialog({
 								</button>
 							</div>
 						)}
-						<div className={styles["nexus-handler-row"]}>
+						<div className={styles["setting-switch-row"]}>
 							<div>
-								<p className={styles["nexus-handler-label"]}>
+								<p className={styles["setting-switch-label"]}>
 									Open Nexus downloads in Cratebug
 								</p>
 								<p className={styles["setting-section-hint"]}>
@@ -442,11 +472,14 @@ export function SettingsDialog({
 								role="switch"
 								aria-checked={handlerEnabled}
 								aria-label="Open Nexus downloads in Cratebug"
-								className={styles["nexus-switch"]}
+								className={styles["setting-switch"]}
 								disabled={nexusBusy || handlerDisabledReason !== null}
 								onClick={() => void toggleHandler()}
 							>
-								<span className={styles["nexus-switch-knob"]} aria-hidden="true" />
+								<span
+									className={styles["setting-switch-knob"]}
+									aria-hidden="true"
+								/>
 							</button>
 						</div>
 						{handlerDisabledReason ? (

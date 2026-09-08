@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { discovery } from "../../wailsjs/go/models";
+import { useConfirmDelay } from "./useConfirmDelay";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type EncryptionRequiredDialogProps = {
@@ -7,9 +8,8 @@ type EncryptionRequiredDialogProps = {
 	isMutating: boolean;
 	onClose: () => void;
 	onConfirm: () => Promise<boolean>;
+	skipConfirmDelay: boolean;
 };
-
-const confirmDelaySeconds = 3;
 
 /**
  * Warns that unencrypted IoStore mods outside /Game/Marvel/Characters will
@@ -21,23 +21,14 @@ export function EncryptionRequiredDialog({
 	isMutating,
 	onClose,
 	onConfirm,
+	skipConfirmDelay,
 }: EncryptionRequiredDialogProps) {
-	const [secondsRemaining, setSecondsRemaining] = useState(confirmDelaySeconds);
-	const ready = secondsRemaining <= 0;
+	const { secondsRemaining, ready } = useConfirmDelay(skipConfirmDelay);
 	const cancelRef = useRef<HTMLButtonElement>(null);
 	const names = entries.map((entry) => entry.displayName);
 	const listed =
 		names.length <= 8 ? names.join(", ") : `${names.slice(0, 8).join(", ")}, and more`;
 	const modsLabel = entries.length === 1 ? "1 installed mod" : `${entries.length} installed mods`;
-
-	useEffect(() => {
-		if (secondsRemaining <= 0) return;
-		const timeout = window.setTimeout(
-			() => setSecondsRemaining((current) => current - 1),
-			1000,
-		);
-		return () => window.clearTimeout(timeout);
-	}, [secondsRemaining]);
 
 	useEffect(() => {
 		cancelRef.current?.focus();

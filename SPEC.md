@@ -230,7 +230,7 @@ An advanced override is deferred and must never be enabled by default.
 
 Normal deletion must use the Windows Recycle Bin or another recoverable Windows shell operation.
 
-The interface should retain a short deliberate delay before destructive confirmation. This is an extra guard and does not replace backend validation.
+The interface should retain a short deliberate delay before destructive confirmation. Users may turn that delay off in Settings; the confirmation itself always remains. This is an extra guard and does not replace backend validation.
 
 Permanent deletion is not required initially. Cratebug must never silently fall back from recoverable deletion to permanent deletion.
 

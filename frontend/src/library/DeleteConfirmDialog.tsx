@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { discovery } from "../../wailsjs/go/models";
 import { hasMissingSidecar } from "./entryPresentation";
+import { useConfirmDelay } from "./useConfirmDelay";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type DeleteConfirmDialogProps = {
@@ -8,10 +9,8 @@ type DeleteConfirmDialogProps = {
 	isMutating: boolean;
 	onClose: () => void;
 	onConfirm: (entries: discovery.Entry[]) => Promise<boolean>;
+	skipConfirmDelay: boolean;
 };
-
-// SPEC.md requires a short deliberate delay before destructive confirmation.
-const deleteConfirmDelaySeconds = 3;
 
 /**
  * Sends one or more scanner-recognized bundles to the Recycle Bin after a
@@ -23,19 +22,10 @@ export function DeleteConfirmDialog({
 	isMutating,
 	onClose,
 	onConfirm,
+	skipConfirmDelay,
 }: DeleteConfirmDialogProps) {
-	const [secondsRemaining, setSecondsRemaining] = useState(deleteConfirmDelaySeconds);
-	const ready = secondsRemaining <= 0;
+	const { secondsRemaining, ready } = useConfirmDelay(skipConfirmDelay);
 	const cancelRef = useRef<HTMLButtonElement>(null);
-
-	useEffect(() => {
-		if (secondsRemaining <= 0) return;
-		const timeout = window.setTimeout(
-			() => setSecondsRemaining((current) => current - 1),
-			1000,
-		);
-		return () => window.clearTimeout(timeout);
-	}, [secondsRemaining]);
 
 	// Cancel, not the destructive action, gets initial focus. This also puts
 	// focus inside the dialog so the shared focus trap's Escape/Tab handling

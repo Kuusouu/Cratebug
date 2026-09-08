@@ -52,6 +52,7 @@ import {
 	SetModEncryption,
 	SetModPriority,
 	SetModRoot,
+	SetSkipDestructiveDelay,
 	SetTheme,
 	StripCompanionPaks,
 	TakePendingNexusLink,
@@ -417,6 +418,7 @@ export function LibraryScreen() {
 	const [downloadedInstallerPath, setDownloadedInstallerPath] = useState<string | null>(null);
 	const [appVersion, setAppVersion] = useState("dev");
 	const [libraryProvider, setLibraryProvider] = useState<LibraryProvider>("steam");
+	const [skipConfirmDelay, setSkipConfirmDelay] = useState(false);
 	const [isDetectingLibrary, setIsDetectingLibrary] = useState(false);
 	const [isCreatingLibrary, setIsCreatingLibrary] = useState(false);
 	const [detectionDialog, setDetectionDialog] = useState<{
@@ -972,6 +974,25 @@ export function LibraryScreen() {
 					);
 				});
 			}, 400);
+		},
+		[showMutationFeedback],
+	);
+
+	// Same optimistic-then-revert pattern as the theme. Turning the countdown
+	// off only changes how soon the confirm button enables; the backend safety
+	// checks are unaffected.
+	const selectSkipConfirmDelay = useCallback(
+		async (skip: boolean) => {
+			setSkipConfirmDelay(skip);
+			try {
+				await SetSkipDestructiveDelay(skip);
+			} catch (error) {
+				setSkipConfirmDelay(!skip);
+				showMutationFeedback(
+					"error",
+					`Could not save the confirmation delay setting: ${errorMessage(error)}`,
+				);
+			}
 		},
 		[showMutationFeedback],
 	);
@@ -2287,6 +2308,8 @@ export function LibraryScreen() {
 					setLibraryProvider(persistedProvider as LibraryProvider);
 				}
 
+				setSkipConfirmDelay(Boolean(state.document.settings.skipDestructiveDelay));
+
 				const persistedRoot = state.document.settings.modRoot?.trim();
 				if (persistedRoot) {
 					setModRoot(persistedRoot);
@@ -2691,6 +2714,7 @@ export function LibraryScreen() {
 									return first ? deleteMod(first) : Promise.resolve(false);
 								}
 					}
+					skipConfirmDelay={skipConfirmDelay}
 				/>
 			)}
 			{activeDialog === "tags" && dialogEntry && (
@@ -2720,6 +2744,7 @@ export function LibraryScreen() {
 					isMutating={isMutationLocked}
 					onClose={() => setActiveDialog(null)}
 					onConfirm={encryptCheckedMods}
+					skipConfirmDelay={skipConfirmDelay}
 				/>
 			)}
 			{companionCleanupOpen && companionCleanupIDs.length > 0 && !companionProgress && (
@@ -2728,6 +2753,7 @@ export function LibraryScreen() {
 					isMutating={isMutationLocked}
 					onClose={() => setCompanionCleanupOpen(false)}
 					onConfirm={stripCompanionPaks}
+					skipConfirmDelay={skipConfirmDelay}
 				/>
 			)}
 			{requiredEncryptionOpen &&
@@ -2739,6 +2765,7 @@ export function LibraryScreen() {
 						isMutating={isMutationLocked}
 						onClose={() => setRequiredEncryptionOpen(false)}
 						onConfirm={encryptRequiredMods}
+						skipConfirmDelay={skipConfirmDelay}
 					/>
 				)}
 			{companionProgress && (
@@ -2824,6 +2851,7 @@ export function LibraryScreen() {
 					key={folderDialogTarget}
 					onClose={() => setActiveFolderDialog(null)}
 					onConfirm={deleteFolder}
+					skipConfirmDelay={skipConfirmDelay}
 				/>
 			)}
 			{contextMenu && (
@@ -2836,10 +2864,12 @@ export function LibraryScreen() {
 					appVersion={appVersion}
 					isCheckingForUpdate={isCheckingForUpdate}
 					libraryProvider={libraryProvider}
+					skipConfirmDelay={skipConfirmDelay}
 					onClose={() => setSettingsOpen(false)}
 					onSelectTheme={selectTheme}
 					onSelectAccentColor={selectAccentColor}
 					onSelectLibraryProvider={(provider) => void selectLibraryProvider(provider)}
+					onToggleSkipConfirmDelay={(skip) => void selectSkipConfirmDelay(skip)}
 					onCheckForUpdate={() => void checkForUpdate()}
 				/>
 			)}

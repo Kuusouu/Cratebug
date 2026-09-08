@@ -60,6 +60,11 @@ type Settings struct {
 	// document written before this field existed) means the handler defaults
 	// on, matching the Phase 16 decision.
 	NexusProtocolOptOut bool `json:"nexusProtocolOptOut,omitempty"`
+
+	// When true, destructive confirmation dialogs enable their confirm button
+	// immediately instead of counting down. Missing keeps the delay, so the safer behavior is the
+	// default and opting out is always a deliberate choice.
+	SkipDestructiveDelay bool `json:"skipDestructiveDelay,omitempty"`
 }
 
 // Document is the versioned envelope persisted to disk.

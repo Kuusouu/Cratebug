@@ -119,6 +119,8 @@ export function SetModRoot(arg1:string):Promise<void>;
 
 export function SetNexusAPIKey(arg1:string):Promise<main.NexusKeyState>;
 
+export function SetSkipDestructiveDelay(arg1:boolean):Promise<void>;
+
 export function SetTheme(arg1:string):Promise<void>;
 
 export function StripCompanionPaks(arg1:string,arg2:Array<string>):Promise<mutation.CompanionCleanupResult>;

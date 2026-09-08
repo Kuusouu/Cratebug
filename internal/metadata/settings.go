@@ -101,6 +101,13 @@ func (doc *Document) SetNexusProtocolOptOut(optOut bool) {
 	doc.Settings.NexusProtocolOptOut = optOut
 }
 
+// Records that the user turned off the countdown on destructive confirmation
+// dialogs. The delay is only a UI safeguard and the backend safety checks run
+// either way, so there is nothing to validate beyond the boolean.
+func (doc *Document) SetSkipDestructiveDelay(skip bool) {
+	doc.Settings.SkipDestructiveDelay = skip
+}
+
 func validateNexusProtocolField(name, value string) error {
 	if strings.ContainsRune(value, 0) {
 		return fmt.Errorf("nexus protocol %s contains a NUL byte", name)

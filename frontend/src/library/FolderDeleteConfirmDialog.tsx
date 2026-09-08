@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IsFolderEmpty } from "../../wailsjs/go/main/App";
+import { useConfirmDelay } from "./useConfirmDelay";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type FolderDeleteConfirmDialogProps = {
@@ -8,10 +9,8 @@ type FolderDeleteConfirmDialogProps = {
 	isMutating: boolean;
 	onClose: () => void;
 	onConfirm: (folder: string) => Promise<boolean>;
+	skipConfirmDelay: boolean;
 };
-
-// SPEC.md requires a short deliberate delay before destructive confirmation.
-const deleteConfirmDelaySeconds = 3;
 
 // Mirrors the mod delete dialog's deliberate delay. The emptiness check runs
 // against the real directory listing, not the mod index, so files the scanner
@@ -22,20 +21,12 @@ export function FolderDeleteConfirmDialog({
 	isMutating,
 	onClose,
 	onConfirm,
+	skipConfirmDelay,
 }: FolderDeleteConfirmDialogProps) {
-	const [secondsRemaining, setSecondsRemaining] = useState(deleteConfirmDelaySeconds);
+	const { secondsRemaining, ready: delayReady } = useConfirmDelay(skipConfirmDelay);
 	const [isEmpty, setIsEmpty] = useState<boolean | null>(null);
-	const ready = secondsRemaining <= 0 && isEmpty !== null;
+	const ready = delayReady && isEmpty !== null;
 	const cancelRef = useRef<HTMLButtonElement>(null);
-
-	useEffect(() => {
-		if (secondsRemaining <= 0) return;
-		const timeout = window.setTimeout(
-			() => setSecondsRemaining((current) => current - 1),
-			1000,
-		);
-		return () => window.clearTimeout(timeout);
-	}, [secondsRemaining]);
 
 	// Cancel, not the destructive action, gets initial focus. This also puts
 	// focus inside the dialog so the shared focus trap's Escape/Tab handling

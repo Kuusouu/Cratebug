@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useConfirmDelay } from "./useConfirmDelay";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type CompanionPakDialogProps = {
@@ -6,9 +7,8 @@ type CompanionPakDialogProps = {
 	isMutating: boolean;
 	onClose: () => void;
 	onConfirm: () => Promise<boolean>;
+	skipConfirmDelay: boolean;
 };
-
-const confirmDelaySeconds = 3;
 
 /**
  * Warns that leftover chunknames / patched_files entries crash anti-cheat,
@@ -19,20 +19,11 @@ export function CompanionPakDialog({
 	isMutating,
 	onClose,
 	onConfirm,
+	skipConfirmDelay,
 }: CompanionPakDialogProps) {
-	const [secondsRemaining, setSecondsRemaining] = useState(confirmDelaySeconds);
-	const ready = secondsRemaining <= 0;
+	const { secondsRemaining, ready } = useConfirmDelay(skipConfirmDelay);
 	const cancelRef = useRef<HTMLButtonElement>(null);
 	const modsLabel = count === 1 ? "1 installed mod" : `${count} installed mods`;
-
-	useEffect(() => {
-		if (secondsRemaining <= 0) return;
-		const timeout = window.setTimeout(
-			() => setSecondsRemaining((current) => current - 1),
-			1000,
-		);
-		return () => window.clearTimeout(timeout);
-	}, [secondsRemaining]);
 
 	useEffect(() => {
 		cancelRef.current?.focus();
