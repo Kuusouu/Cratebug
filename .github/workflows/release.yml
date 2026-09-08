@@ -67,6 +67,11 @@ jobs:
 
             - name: Install pinned toolchain
               uses: jdx/mise-action@v4.2.3
+              with:
+                  # Without this the action installs whatever mise.jdx.dev/VERSION
+                  # advertises, which can name a release before it exists on
+                  # GitHub and 404 the download. Pin it like every other tool.
+                  version: 2026.9.2
 
             - name: Install frontend dependencies
               shell: pwsh
