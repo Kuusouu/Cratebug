@@ -1,5 +1,9 @@
 Unicode true
 
+# NSIS defaults to zlib. Solid LZMA is a build-time-only change: it shrinks the
+# installer the updater re-downloads in full for every release.
+SetCompressor /SOLID lzma
+
 ####
 ## Please note: Template replacements don't work in this file. They are provided with default defines like
 ## mentioned underneath.
