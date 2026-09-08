@@ -27,7 +27,7 @@ export function entryCharacterLabel(identity?: modtype.Identity | null): string 
 
 let heroPortraitModules: Record<string, string> = {};
 try {
-	heroPortraitModules = import.meta.glob<string>("../assets/heroes/*.png", {
+	heroPortraitModules = import.meta.glob<string>("../assets/heroes/*.webp", {
 		eager: true,
 		import: "default",
 	});
@@ -37,7 +37,7 @@ try {
 
 const heroPortraitsByID: Record<string, string> = {};
 for (const [path, url] of Object.entries(heroPortraitModules)) {
-	const match = path.match(/(\d{4,7})\.png$/i);
+	const match = path.match(/(\d{4,7})\.webp$/i);
 	if (match?.[1] && url) {
 		heroPortraitsByID[match[1]] = url;
 	}

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$Force,
-    [switch]$NoClean
+    [switch]$Clean
 )
 
 # Sourcing script for Marvel Rivals hero portraits and skin icons from Rivalskins.com.
@@ -11,9 +11,15 @@ param(
 # Process:
 # 1. Fetches the community-maintained Character ID reference table.
 # 2. Filters strictly to playable hero IDs (1011 to 1066), excluding stale/(Old) rows.
-# 3. Downloads the official PNG hero headshots and skin icons directly from Rivalskins
-#    into frontend/src/assets/heroes/<id>.png.
-# 4. Performs self-validation ensuring all playable heroes and downloaded skins are valid PNGs.
+# 3. Downloads the official PNG hero headshots and skin icons directly from Rivalskins,
+#    converting each to a downscaled WebP at frontend/src/assets/heroes/<id>.webp.
+# 4. Performs self-validation ensuring all playable heroes and downloaded skins are valid images.
+#
+# Fetching is incremental by default: an ID whose .webp already exists is left
+# alone, so a run after a new skin ships downloads only that skin. A hero's page
+# is only requested when at least one of its known skins is still missing, which
+# keeps a no-op run down to the character table fetch alone. Use -Force to
+# re-download and re-encode everything, or -Clean to delete the assets first.
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -21,9 +27,47 @@ Set-StrictMode -Version Latest
 $repositoryRoot = $PSScriptRoot
 $targetDir = Join-Path $repositoryRoot "frontend\src\assets\heroes"
 
-if (-not $NoClean -and (Test-Path $targetDir)) {
+$portraitSize = 128
+$webpQuality = 82
+$userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+
+function Resolve-Magick {
+    $onPath = Get-Command magick -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+
+    $resolved = & mise which magick 2>$null | Select-Object -First 1
+    if ($resolved -and (Test-Path $resolved)) { return $resolved }
+
+    throw "ImageMagick not found. Run 'mise install' from the repository root, or put magick on PATH."
+}
+
+# Downloads one source image and writes it as a downscaled WebP. The '>' on the
+# resize geometry means shrink-only, so the smaller hero avatars are never
+# upscaled into blur.
+function Save-Portrait {
+    param(
+        [Parameter(Mandatory)][string]$Url,
+        [Parameter(Mandatory)][string]$Destination
+    )
+
+    $temp = Join-Path ([IO.Path]::GetTempPath()) ([IO.Path]::GetRandomFileName() + ".png")
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $temp -UserAgent $userAgent -ErrorAction Stop
+        & $magick $temp -strip -resize "$($portraitSize)x$($portraitSize)>" -quality $webpQuality -define webp:method=6 $Destination
+        if ($LASTEXITCODE -ne 0) {
+            throw "magick exited with code $LASTEXITCODE converting $Url"
+        }
+    }
+    finally {
+        Remove-Item $temp -Force -ErrorAction SilentlyContinue
+    }
+}
+
+$magick = Resolve-Magick
+
+if ($Clean -and (Test-Path $targetDir)) {
     Write-Host "==> Cleaning existing hero/skin portrait assets..."
-    Get-ChildItem -Path $targetDir -Filter "*.png" | Remove-Item -Force
+    Get-ChildItem -Path $targetDir -Include "*.png", "*.webp" -Recurse | Remove-Item -Force
 }
 
 New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
@@ -124,51 +168,71 @@ function Clean-Name {
     return ($str.ToLowerInvariant() -replace '[^a-z0-9]', '')
 }
 
-Write-Host "==> Downloading hero avatars and skin icons from Rivalskins..."
-$heroSuccess = 0
-$skinSuccess = 0
+Write-Host "==> Downloading missing hero avatars and skin icons from Rivalskins..."
+$heroDownloaded = 0
+$heroSkipped = 0
+$skinDownloaded = 0
+$skinSkipped = 0
+$heroesQueried = 0
 $failedHeroes = @()
 
 foreach ($heroID in ($heroMap.Keys | Sort-Object)) {
     $heroName = $heroMap[$heroID]
     $slug = Get-RivalskinsSlug -HeroName $heroName
     
-    # 1. Download base hero avatar
-    $heroDest = Join-Path $targetDir "$heroID.png"
+    # Download base hero avatar
+    $heroDest = Join-Path $targetDir "$heroID.webp"
     if ($Force -or -not (Test-Path $heroDest)) {
         $avatarUrl = "https://rivalskins.com/wp-content/uploads/marvel-assets/ui/heroes/avatar/${slug}_avatar.png"
         try {
-            Invoke-WebRequest -Uri $avatarUrl -OutFile $heroDest -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -ErrorAction Stop
-            $heroSuccess++
+            Save-Portrait -Url $avatarUrl -Destination $heroDest
+            $heroDownloaded++
         }
         catch {
             $failedHeroes += "$heroID ($heroName -> $slug)"
         }
     } else {
-        $heroSuccess++
+        $heroSkipped++
     }
 
-    # 2. Fetch hero page to discover costume skin icons
+    $heroSkins = if ($skinMap.ContainsKey($heroID)) { $skinMap[$heroID] } else { @{} }
+
+    # The skin IDs this hero still needs. Resolved before any network call so a
+    # hero whose skins are all present costs nothing at all.
+    $missingSkinIDs = New-Object 'System.Collections.Generic.HashSet[string]'
+    foreach ($sId in $heroSkins.Keys) {
+        if ($Force -or -not (Test-Path (Join-Path $targetDir "$sId.webp"))) {
+            [void]$missingSkinIDs.Add($sId)
+        } else {
+            $skinSkipped++
+        }
+    }
+
+    # Nothing this hero could contribute, so skip the page request entirely.
+    if ($missingSkinIDs.Count -eq 0) {
+        continue
+    }
+
+    # Fetch hero page to discover costume skin icons
+    $heroesQueried++
     $heroPageUrl = "https://rivalskins.com/hero/${slug}/"
     $heroHtml = $null
     try {
-        $heroHtml = (Invoke-WebRequest -Uri $heroPageUrl -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -UseBasicParsing -ErrorAction Stop).Content
+        $heroHtml = (Invoke-WebRequest -Uri $heroPageUrl -UserAgent $userAgent -UseBasicParsing -ErrorAction Stop).Content
     }
     catch {
         continue
     }
 
     $costumePattern = '<img[^>]+src="(?<url>https://rivalskins\.com/wp-content/uploads/marvel-assets/items/costume/[^"]+img_icon_[^"]+\.png)"[^>]*alt="(?<alt>[^"]+)"'
-    $matches = [regex]::Matches($heroHtml, $costumePattern)
+    $matchesPattern = [regex]::Matches($heroHtml, $costumePattern)
 
-    $heroSkins = if ($skinMap.ContainsKey($heroID)) { $skinMap[$heroID] } else { @{} }
-
-    foreach ($m in $matches) {
+    foreach ($m in $matchesPattern) {
         $altName = $m.Groups['alt'].Value
         $iconUrl = $m.Groups['url'].Value
         $cleanAlt = Clean-Name -str $altName
 
-        # Pass 1: Exact match
+        # Exact match
         $matchedSkinID = $null
         foreach ($sId in $heroSkins.Keys) {
             $cleanSkin = Clean-Name -str $heroSkins[$sId]
@@ -178,7 +242,7 @@ foreach ($heroID in ($heroMap.Keys | Sort-Object)) {
             }
         }
 
-        # Pass 2: Fallback substring match (longer/more specific names checked first)
+        # Fallback substring match (longer/more specific names checked first)
         if (-not $matchedSkinID) {
             $sortedKeys = $heroSkins.Keys | Sort-Object { $heroSkins[$_].Length } -Descending
             foreach ($sId in $sortedKeys) {
@@ -190,31 +254,28 @@ foreach ($heroID in ($heroMap.Keys | Sort-Object)) {
             }
         }
 
-        if ($matchedSkinID) {
-            $skinDest = Join-Path $targetDir "$matchedSkinID.png"
-            if ($Force -or -not (Test-Path $skinDest)) {
-                try {
-                    Invoke-WebRequest -Uri $iconUrl -OutFile $skinDest -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -ErrorAction Stop
-                    $skinSuccess++
-                }
-                catch {
-                    # Skip download failure for individual icon
-                }
-            } else {
-                $skinSuccess++
+        if ($matchedSkinID -and $missingSkinIDs.Contains($matchedSkinID)) {
+            $skinDest = Join-Path $targetDir "$matchedSkinID.webp"
+            try {
+                Save-Portrait -Url $iconUrl -Destination $skinDest
+                $skinDownloaded++
+            }
+            catch {
+                # Skip download failure for individual icon
             }
         }
     }
 }
 
-Write-Host "==> Download summary: $heroSuccess heroes, $skinSuccess skin icons."
+Write-Host "==> Fetched $heroDownloaded hero avatars and $skinDownloaded skin icons; skipped $heroSkipped heroes and $skinSkipped skins already present."
+Write-Host "==> Requested $heroesQueried of $($heroMap.Count) hero pages."
 
-# 3. Built-in Self-Validation
+# Built-in Self-Validation
 Write-Host "==> Running self-validation on downloaded assets..."
 $validationErrors = @()
 
 foreach ($heroID in ($heroMap.Keys | Sort-Object)) {
-    $heroFile = Join-Path $targetDir "$heroID.png"
+    $heroFile = Join-Path $targetDir "$heroID.webp"
     if (-not (Test-Path $heroFile)) {
         $validationErrors += "Missing hero avatar: $heroID.png ($($heroMap[$heroID]))"
     } elseif ((Get-Item $heroFile).Length -eq 0) {
@@ -222,8 +283,8 @@ foreach ($heroID in ($heroMap.Keys | Sort-Object)) {
     }
 }
 
-$allPngFiles = Get-ChildItem -Path $targetDir -Filter "*.png"
-foreach ($file in $allPngFiles) {
+$allPortraitFiles = Get-ChildItem -Path $targetDir -Filter "*.webp"
+foreach ($file in $allPortraitFiles) {
     if ($file.Length -eq 0) {
         $validationErrors += "Corrupt/empty image: $($file.Name)"
     }
@@ -234,5 +295,5 @@ if ($validationErrors.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Self-validation passed: all $($heroMap.Count) playable heroes and $($allPngFiles.Count - $heroMap.Count) skins verified."
-Write-Host "Hero & Skin assets ready: $($allPngFiles.Count) images in $targetDir"
+Write-Host "Self-validation passed: all $($heroMap.Count) playable heroes and $($allPortraitFiles.Count - $heroMap.Count) skins verified."
+Write-Host "Hero & Skin assets ready: $($allPortraitFiles.Count) images in $targetDir"
