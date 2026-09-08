@@ -120,7 +120,7 @@ func TestCallReadsOneResponseLinePerCall(t *testing.T) {
 
 func TestCheckVersionAcceptsMatchingRevision(t *testing.T) {
 	// Act
-	err := CheckVersion("UAssetTool v1.5.8+"+PinnedSourceRevision, PinnedSourceRevision)
+	err := CheckVersion("UAssetTool v1.5.9+"+PinnedSourceRevision, PinnedSourceRevision)
 
 	// Assert
 	if err != nil {
@@ -130,7 +130,7 @@ func TestCheckVersionAcceptsMatchingRevision(t *testing.T) {
 
 func TestCheckVersionRejectsMismatchedRevision(t *testing.T) {
 	// Act
-	err := CheckVersion("UAssetTool v1.5.8+deadbeef", PinnedSourceRevision)
+	err := CheckVersion("UAssetTool v1.5.9+deadbeef", PinnedSourceRevision)
 
 	// Assert
 	if !errors.Is(err, ErrVersionMismatch) {

@@ -98,9 +98,15 @@ Section
     # Install third-party licensing notices next to the executable
     File "..\..\..\THIRD_PARTY_NOTICES.md"
 
-    # Install pinned UAssetTool worker into uassettool/ subdirectory
+    # Install pinned UAssetTool worker into uassettool/ subdirectory. The worker
+    # publishes as an apphost plus its runtime DLLs, so the whole directory
+    # ships, not just the executable.
     SetOutPath "$INSTDIR\uassettool"
-    File "..\..\uassettool\UAssetTool.exe"
+    # Two things in that directory are deliberately not shipped: the pinned
+    # archive, kept only for fetch-uassettool.ps1 checksum fast path, and
+    # oo2core, which the worker downloads for itself on first Oodle use and
+    # which Cratebug has no license to redistribute.
+    File /r /x "*.zip" /x "oo2core*.dll" "..\..\uassettool\*.*"
 
     # Reset output path back to root installation directory
     SetOutPath $INSTDIR

@@ -5,18 +5,20 @@ param()
 # docs/decisions/0004-pin-uassettool-worker.md for why this version and
 # repository are pinned, and what changes require re-pinning.
 #
-# Does not require the .NET SDK: the release is a self-contained, single-file
-# publish, and this script only downloads, verifies, and extracts it.
+# Does not require the .NET SDK: the release is a self-contained publish, and
+# this script only downloads, verifies, and extracts it. The archive holds the
+# apphost alongside its runtime DLLs rather than one bundled executable, so the
+# worker no longer unpacks itself into %TEMP% on first run.
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repositoryRoot = $PSScriptRoot
 $releaseRepo = "mewclouds/UAssetToolRivals"
-$releaseTag = "v1.5.8"
+$releaseTag = "v1.5.9"
 $assetName = "UAssetTool-win-x64.zip"
-$expectedSha256 = "419bb2bb974fc7434366dbcdace74c5a2fa1ca81872a12ef7d5fdc458454395a"
-$expectedSourceRevision = "05470f4634533437897647c93448b6d5de02d09a"
+$expectedSha256 = "51427b436046a69872fe375df425b8e17d81c460999874d6c1346449f141f6d3"
+$expectedSourceRevision = "7c185ae5da2ac446cf58db75ebd34f9402b8b5dc"
 
 $downloadUrl = "https://github.com/$releaseRepo/releases/download/$releaseTag/$assetName"
 $targetDir = Join-Path $repositoryRoot "build\uassettool"
