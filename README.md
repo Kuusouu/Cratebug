@@ -13,7 +13,7 @@
 
 </div>
 
-Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It treats related mod files as one logical bundle, makes every filesystem change planned and recoverable, and shows you exactly what is about to happen before it happens.
+Cratebug is an open-source, Windows-first (and Linux soon!) mod manager for Marvel Rivals. It treats related mod files as one logical bundle, makes every filesystem change planned and recoverable, and shows you exactly what is about to happen before it happens.
 
 ## Features
 
@@ -26,6 +26,7 @@ Cratebug is an open-source, Windows-first mod manager for Marvel Rivals. It trea
 - **Nexus Mods installs** - paste your own API key, then a Marvel Rivals mod page. Premium accounts can download with a simple URL, free accounts use **Mod Manager Download** button in Nexus!
 - **Conflict detection** - find mods stepping on the same assets, with a one-click priority fix
 - **Self-updating** - check for updates in Settings, download, restart, done
+- **Linux, soon!** - Marvel Rivals plays fine through Proton, so Cratebug is packing its crate for Ubuntu, Fedora and Arch-based distros!
 
 ## Install
 

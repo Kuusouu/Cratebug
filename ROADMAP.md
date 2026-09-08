@@ -429,6 +429,39 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Generic URL install is gone.
 - Canonical checks pass. Running-app states are screenshotted and reviewed.
 
+## Phase 17 - Linux distribution
+
+**Outcome:** Cratebug runs on Linux as a first-class build. Marvel Rivals is playable on Linux through Proton with its anti-cheat working, so the mods a Linux player manages are the same Windows bundles in the same Steam library layout. The work is making Cratebug itself portable, not changing what a mod is.
+
+**Includes:**
+
+- Portable Go core. Four packages block a Linux build today, each already following the repository's `_windows.go` / `_other.go` split convention used by `internal/secret` and `internal/urlscheme`:
+  - `internal/gamedetect` - Steam detection reads the Windows registry. Linux resolves the library from `steamapps/libraryfolders.vdf` under the user's Steam root. Epic has no native Linux launcher; decide between Heroic/Legendary support and declaring Epic Windows-only.
+  - `internal/mutation` - Recycle Bin deletion and the running-game check are Win32. Linux needs an XDG trash implementation and a process check that never silently degrades to permanent deletion.
+  - `internal/update` - the updater writes and runs a `.bat` script around an NSIS installer. AppImage updates are a different mechanism entirely.
+  - `internal/uassettool` - `syscall.SysProcAttr{HideWindow}` does not compile off Windows, and `WorkerExecutableName` is hardcoded to `UAssetTool.exe`.
+- Secret storage. `internal/secret` compiles on Linux but its `protect_other.go` stub returns an error, so the Nexus API key has no at-rest protection. Linux needs a real backend (Secret Service / libsecret, kwallet) or an explicitly documented weaker fallback. Storing the key in plaintext silently is not acceptable.
+- Worker on Linux. The pinned release already publishes `UAssetTool-linux-x64.tar.gz` alongside the Windows zip, self-contained and multi-file since `v1.5.9`. Needs: a portable fetch script (`fetch-uassettool.ps1` is PowerShell and zip-only), the executable-bit set on extract, platform-aware worker path resolution, and confirmation that the tool's runtime Oodle download resolves the Linux library rather than `oo2core_9_win64.dll`.
+- `nxm://` handling through a `.desktop` file and `xdg-mime` instead of the Windows registry, including restoring a previous handler on unregister.
+- Build and packaging. Wails needs GTK3 and WebKit2GTK at build and run time, with the `webkit2_41` build tag on modern distros and `webkit2_40` on older ones. Publish an AppImage as the primary artifact so one download works everywhere.
+- Documented per-distro setup: `libgtk-3-dev` + `libwebkit2gtk-4.1-dev` (Debian/Ubuntu), `gtk3-devel` + `webkit2gtk4.1-devel` (Fedora), `gtk3` + `webkit2gtk-4.1` (Arch).
+- CI builds the Linux artifact alongside the Windows installer.
+
+**Excludes:** macOS, ARM builds, Flatpak and Snap, native distro packages (`.deb`, `.rpm`, AUR), Steam Deck / gamescope-specific work, and any attempt to make Cratebug manage mods for a Proton prefix differently from a normal Steam library.
+
+**Test matrix:** Pop!_OS (Ubuntu-based), Fedora, CachyOS (Arch-based). A virtual machine per distro is sufficient.
+
+**Exit criteria:**
+
+- `go build ./...` and the full test suite pass with `GOOS=linux`.
+- The AppImage launches on all three distros and detects a real Steam library.
+- Enable, disable, rename, move, tag, install, delete, conflict detection, and encrypt/decrypt all work on each, with the worker running.
+- Deletion reaches the desktop trash and is restorable. It never falls back to permanent deletion.
+- The Nexus API key is either protected at rest or its fallback is documented in the UI and the user guide.
+- Windows behavior is unchanged: canonical checks still pass and the installer still builds.
+- Setup and publishing steps are documented well enough to follow from a clean install of each distro.
+- Screenshots from each distro are reviewed against the Windows build.
+
 ## Deferred post-release work
 
 Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, filesystem watching, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
