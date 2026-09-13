@@ -13,6 +13,10 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.09.13]
+
+Small release. Added a few missing skins to your crates after the most recent Season 10 release! Enjoy modding!
+
 ## [2026.09.08]
 
 ### Making it yours
