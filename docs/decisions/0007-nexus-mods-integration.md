@@ -114,3 +114,23 @@ product constraint.
 - A later phase can add update checks from persisted Nexus IDs
   without a re-install. Nexus application registration remains a
   gate on public distribution and is handled outside this phase.
+
+## Addendum 2026-09-18: adult content gate
+
+Honor Nexus `contains_adult_content` and the signed-in account's
+GraphQL `preferences.adult` / `isBlockingContent`. Fail closed: an
+adult mod is refused when the preference is false, missing, or
+unreadable, or when Content Blocking is on. Non-adult mods continue
+even if the preference query fails. There is no in-app override and
+Cratebug does not send GraphQL `viewAdultContent`. Users change the
+setting on Nexus [Content Blocking](https://next.nexusmods.com/settings/content-blocking).
+
+Personal API keys remain the auth for this phase. v1 REST and signed
+`nxm://` `download_link` calls still return adult files when the
+website hides the page, and REST often omits `contains_adult_content`.
+Cratebug therefore asks GraphQL (without `viewAdultContent`) before
+showing or downloading a file. An `ADULT_CONTENT_BLOCKED` error, a
+hidden mod, or GraphQL adult flags are refused unless the account
+has adult content on and Content Blocking off. If that GraphQL lookup
+fails, the mod is treated as adult so a REST miss cannot bypass the
+site. Tag and author content blocks are out of scope.

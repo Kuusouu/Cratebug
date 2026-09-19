@@ -71,6 +71,10 @@ Nexus does not let a free account request the file from the API. You still paste
 
 If Cratebug is closed, a click still launches it with that link. If it is already open, the running window comes to the front.
 
+### Adult content
+
+Cratebug follows the adult-content setting on your Nexus account. If a mod is marked adult and that setting is off, Cratebug refuses it before showing a name, screenshot, or files — including when you paste a page URL or click Mod Manager Download. There is no in-app switch. Change it on Nexus under [Content Blocking](https://next.nexusmods.com/settings/content-blocking), then try the install again.
+
 ## Checking several mods at once
 
 Clicking a card opens it in the details panel and makes it the only checked mod. Click that same card again to deselect it.

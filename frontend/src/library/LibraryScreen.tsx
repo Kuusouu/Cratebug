@@ -91,8 +91,6 @@ import { FolderNavigation } from "./FolderNavigation";
 import { InstallFromNexusDialog } from "./InstallFromNexusDialog";
 import { InstallPreviewDialog, type InstallSource } from "./InstallPreviewDialog";
 import { formatWailsError as errorMessage } from "./installPresentation";
-import { NexusLinkDialog } from "./NexusLinkDialog";
-import { type InstallProgressView, formatNexusInstallError } from "./nexusPresentation";
 import styles from "./LibraryScreen.module.css";
 import { detectionOutcome } from "./libraryDetection";
 import {
@@ -112,6 +110,13 @@ import { ModCatalog } from "./ModCatalog";
 import { ModMutationDialog } from "./ModMutationDialog";
 import { ModTagDialog } from "./ModTagDialog";
 import { type MutationFeedback, MutationToast } from "./MutationToast";
+import { NexusAdultBlockedDialog } from "./NexusAdultBlockedDialog";
+import { NexusLinkDialog } from "./NexusLinkDialog";
+import {
+	formatNexusInstallError,
+	type InstallProgressView,
+	isAdultContentBlockedError,
+} from "./nexusPresentation";
 import { SelectedModPanel } from "./SelectedModPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { providerLogos } from "./StoreLogos";
@@ -429,6 +434,7 @@ export function LibraryScreen() {
 	const [installSource, setInstallSource] = useState<InstallSource | null>(null);
 	const [installFromNexusOpen, setInstallFromNexusOpen] = useState(false);
 	const [pendingNexusLink, setPendingNexusLink] = useState<main.NexusLink | null>(null);
+	const [adultContentBlocked, setAdultContentBlocked] = useState(false);
 	const [installProgress, setInstallProgress] = useState<InstallProgressView | null>(null);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
 	const externalDragDepthRef = useRef(0);
@@ -567,6 +573,12 @@ export function LibraryScreen() {
 				setInstallFromNexusOpen(false);
 				setPendingNexusLink(link);
 			} catch (error) {
+				if (isAdultContentBlockedError(error)) {
+					setInstallFromNexusOpen(false);
+					setPendingNexusLink(null);
+					setAdultContentBlocked(true);
+					return;
+				}
 				showMutationFeedback("error", formatNexusInstallError(error));
 			}
 		},
@@ -2926,6 +2938,9 @@ export function LibraryScreen() {
 					onCancel={() => setInstallFromNexusOpen(false)}
 				/>
 			)}
+			{adultContentBlocked && (
+				<NexusAdultBlockedDialog onClose={() => setAdultContentBlocked(false)} />
+			)}
 			{pendingNexusLink && (
 				<NexusLinkDialog
 					link={pendingNexusLink}
@@ -3002,6 +3017,7 @@ export function LibraryScreen() {
 				!updateDialogMode &&
 				!installFromNexusOpen &&
 				!pendingNexusLink &&
+				!adultContentBlocked &&
 				!detectionDialog &&
 				!installSource && (
 					<div className={styles["drop-overlay"]} aria-hidden="true">

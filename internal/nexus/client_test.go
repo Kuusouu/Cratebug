@@ -657,6 +657,379 @@ func TestClientDownloadLinksSendsKeyQuery(t *testing.T) {
 	}
 }
 
+func TestClientPreferencesParsesAdultFlag(t *testing.T) {
+	// Arrange
+	var hits int
+	var method string
+	var gotBody string
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		method = r.Method
+		if r.URL.Path != "/v2/graphql" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("apikey") != testAPIKey {
+			t.Errorf("apikey header = %q, want the test key", r.Header.Get("apikey"))
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("Content-Type = %q, want application/json", r.Header.Get("Content-Type"))
+		}
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		writeJSON(w, `{"data":{"preferences":{"adult":true,"isBlockingContent":true}}}`)
+	})
+
+	// Act
+	prefs, err := client.Preferences(context.Background())
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Preferences() = %v, want no error", err)
+	}
+	if !prefs.Adult {
+		t.Fatal("Preferences().Adult = false, want true")
+	}
+	if !prefs.IsBlockingContent {
+		t.Fatal("Preferences().IsBlockingContent = false, want true")
+	}
+	if method != http.MethodPost {
+		t.Fatalf("method = %s, want POST", method)
+	}
+	if !strings.Contains(gotBody, "preferences") || !strings.Contains(gotBody, "isBlockingContent") || strings.Contains(gotBody, "viewAdultContent") {
+		t.Fatalf("body = %s, want preferences query without viewAdultContent", gotBody)
+	}
+}
+
+func TestClientPreferencesIsCached(t *testing.T) {
+	// Arrange
+	var hits int
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		writeJSON(w, `{"data":{"preferences":{"adult":true}}}`)
+	})
+	if _, err := client.Preferences(context.Background()); err != nil {
+		t.Fatalf("first Preferences() = %v", err)
+	}
+
+	// Act
+	_, err := client.Preferences(context.Background())
+
+	// Assert
+	if err != nil {
+		t.Fatalf("second Preferences() = %v", err)
+	}
+	if hits != 1 {
+		t.Fatalf("graphql hits = %d, want 1 (cached)", hits)
+	}
+}
+
+func TestClientPreferencesMissingDataIsError(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "graphql errors", body: `{"errors":[{"message":"nope"}]}`},
+		{name: "empty data", body: `{"data":{}}`},
+		{name: "malformed", body: `{`},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				writeJSON(w, test.body)
+			})
+
+			// Act
+			_, err := client.Preferences(context.Background())
+
+			// Assert
+			if err == nil {
+				t.Fatal("Preferences() succeeded, want an error")
+			}
+		})
+	}
+}
+
+func TestClientPreferences401IsInvalidKey(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+
+	// Act
+	_, err := client.Preferences(context.Background())
+
+	// Assert
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("Preferences() = %v, want ErrInvalidKey", err)
+	}
+}
+
+func TestClientPreferencesHonoursPreflightRateLimit(t *testing.T) {
+	// Arrange
+	var hits int
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		writeJSON(w, `{"data":{"preferences":{"adult":true}}}`)
+	})
+	client.rateLimit = RateLimit{
+		HourlyRemaining: 0,
+		HourlyReset:     time.Now().Add(time.Hour),
+	}
+
+	// Act
+	_, err := client.Preferences(context.Background())
+
+	// Assert
+	if !errors.Is(err, ErrRateLimited) {
+		t.Fatalf("Preferences() = %v, want ErrRateLimited", err)
+	}
+	if hits != 0 {
+		t.Fatalf("handler called %d times, want 0", hits)
+	}
+}
+
+func TestClientPreferencesRedactsAPIKeyInGraphQLError(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, `{"errors":[{"message":"bad apikey=`+sentinelKey+`"}]}`)
+	})
+	client.APIKey = sentinelKey
+
+	// Act
+	_, err := client.Preferences(context.Background())
+
+	// Assert
+	if err == nil {
+		t.Fatal("Preferences() succeeded, want an error")
+	}
+	assertNoSecretLeak(t, err)
+}
+
+func TestClientCheckAdultContentAllowsVisibleSafeMods(t *testing.T) {
+	// Arrange
+	var prefsHits int
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			prefsHits++
+			writeJSON(w, `{"data":{"preferences":{"adult":false}}}`)
+			return
+		}
+		writeJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[{"modId":9,"adult":false,"adultContent":false}]}}}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{ModID: 9, ContainsAdultContent: false})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("CheckAdultContent() = %v, want no error", err)
+	}
+	if prefsHits != 0 {
+		t.Fatalf("preferences hits = %d, want 0 for a visible non-adult mod", prefsHits)
+	}
+}
+
+func TestClientCheckAdultContentBlocksWhenGraphQLHidesMod(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[]}}}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                12911,
+		Name:                 "NSFW SENTINEL",
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+}
+
+func TestClientCheckAdultContentBlocksWhenGraphQLReportsAdultBlocked(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, `{"errors":[{"message":"Adult content blocked","extensions":{"code":"ADULT_CONTENT_BLOCKED"}}]}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                12911,
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+}
+
+func TestClientCheckAdultContentBlocksWhenPreferenceOff(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			writeJSON(w, `{"data":{"preferences":{"adult":false}}}`)
+			return
+		}
+		writeJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[{"modId":9,"adult":true,"adultContent":true}]}}}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                9,
+		Name:                 "NSFW SENTINEL",
+		ContainsAdultContent: true,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+}
+
+func TestClientCheckAdultContentBlocksWhenRESTOmitsAdultFlag(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			writeJSON(w, `{"data":{"preferences":{"adult":false}}}`)
+			return
+		}
+		writeJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[{"modId":9,"adult":true,"adultContent":true}]}}}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                9,
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+}
+
+func TestClientCheckAdultContentBlocksWhenGraphQLFailsAndPreferenceOff(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			writeJSON(w, `{"data":{"preferences":{"adult":false}}}`)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                9,
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+}
+
+func TestClientCheckAdultContentAllowsWhenGraphQLFailsAndPreferenceOn(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			writeJSON(w, `{"data":{"preferences":{"adult":true,"isBlockingContent":false}}}`)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                9,
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if err != nil {
+		t.Fatalf("CheckAdultContent() = %v, want no error", err)
+	}
+}
+
+func TestClientCheckAdultContentBlocksWhenContentBlockingOn(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			writeJSON(w, `{"data":{"preferences":{"adult":true,"isBlockingContent":true}}}`)
+			return
+		}
+		writeJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[{"modId":9,"adult":true,"adultContent":true}]}}}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                9,
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+}
+
+func TestClientCheckAdultContentUsesGraphQLDataWhenOtherErrorsPresent(t *testing.T) {
+	// Arrange
+	var prefsHits int
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), "preferences") {
+			prefsHits++
+			writeJSON(w, `{"data":{"preferences":{"adult":false}}}`)
+			return
+		}
+		writeJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[{"modId":9,"adult":true,"adultContent":true}]}},"errors":[{"message":"warning"}]}`)
+	})
+
+	// Act
+	err := client.CheckAdultContent(context.Background(), ModInfo{
+		ModID:                9,
+		ContainsAdultContent: false,
+	})
+
+	// Assert
+	if !errors.Is(err, ErrAdultContentBlocked) {
+		t.Fatalf("CheckAdultContent() = %v, want ErrAdultContentBlocked", err)
+	}
+	if prefsHits != 1 {
+		t.Fatalf("preferences hits = %d, want 1", prefsHits)
+	}
+}
+
+func TestClientModDecodesContainsAdultContent(t *testing.T) {
+	// Arrange
+	client := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, `{"name":"Skin","mod_id":9,"contains_adult_content":true}`)
+	})
+
+	// Act
+	mod, err := client.Mod(context.Background(), 9)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("Mod() = %v", err)
+	}
+	if !mod.ContainsAdultContent || mod.Name != "Skin" {
+		t.Fatalf("Mod = %+v, want adult Skin", mod)
+	}
+}
+
 func assertNoSecretLeak(t *testing.T, err error) {
 	t.Helper()
 	msg := err.Error()

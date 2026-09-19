@@ -7,8 +7,14 @@ import (
 	"time"
 )
 
-// Marvel Rivals' Nexus Mods game domain.
-const GameDomain = "marvelrivals"
+const (
+	// Marvel Rivals' Nexus Mods game domain.
+	GameDomain = "marvelrivals"
+
+	// Site page where the user opts into adult content. Cratebug does not
+	// offer an in-app override.
+	ContentBlockingURL = "https://next.nexusmods.com/settings/content-blocking"
+)
 
 const (
 	defaultAPIBaseURL = "https://api.nexusmods.com"
@@ -55,6 +61,11 @@ var (
 
 	// An nxm:// host or a site-URL path named a game other than Marvel Rivals.
 	ErrWrongGame = errors.New("nexus: URL is not for Marvel Rivals")
+
+	// The mod is tagged adult and the signed-in account does not have adult
+	// content enabled. Fail closed: a missing or unreadable preference is
+	// treated the same as adult content off.
+	ErrAdultContentBlocked = errors.New("nexus: adult content is blocked")
 )
 
 // Account profile returned by the validate endpoint. The API also sends a
@@ -71,12 +82,21 @@ type User struct {
 
 // Public metadata for one Nexus mod.
 type ModInfo struct {
-	Name       string `json:"name"`
-	Summary    string `json:"summary"`
-	Version    string `json:"version"`
-	PictureURL string `json:"picture_url"`
-	Author     string `json:"author"`
-	ModID      int    `json:"mod_id"`
+	Name                 string `json:"name"`
+	Summary              string `json:"summary"`
+	Version              string `json:"version"`
+	PictureURL           string `json:"picture_url"`
+	Author               string `json:"author"`
+	ModID                int    `json:"mod_id"`
+	ContainsAdultContent bool   `json:"contains_adult_content"`
+}
+
+// Signed-in user's Content Blocking flags from GraphQL v2.
+type Preferences struct {
+	Adult bool `json:"adult"`
+	// True when the account has Content Blocking on. The website can hide
+	// adult pages while preferences.adult is still true.
+	IsBlockingContent bool `json:"isBlockingContent"`
 }
 
 // One downloadable file attached to a Nexus mod.

@@ -7,6 +7,9 @@ import {
 	formatNexusInstallError,
 	formatNexusLinkTitle,
 	groupNexusFiles,
+	isAdultContentBlockedError,
+	nexusAdultContentBlockedMessage,
+	nexusContentBlockingURL,
 	nexusInstallStep,
 	nexusModPageURL,
 	parseNexusModPageInput,
@@ -207,5 +210,15 @@ describe("format helpers", () => {
 			"That download link has expired. Click Mod Manager Download again.",
 		);
 		expect(formatNexusInstallError(new Error("disk is full"))).toBe("disk is full");
+	});
+
+	it("maps the adult content gate to the Nexus setting copy", () => {
+		const blocked = new Error("nexus: adult content is blocked");
+		expect(isAdultContentBlockedError(blocked)).toBe(true);
+		expect(isAdultContentBlockedError(new Error("nexus: rate limited"))).toBe(false);
+		expect(formatNexusInstallError(blocked)).toBe(nexusAdultContentBlockedMessage);
+		expect(nexusContentBlockingURL).toBe(
+			"https://next.nexusmods.com/settings/content-blocking",
+		);
 	});
 });

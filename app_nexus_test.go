@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +17,34 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/Kuusouu/Cratebug/internal/secret"
 )
+
+const (
+	adultFixtureModID    = 9
+	adultFixtureFileID   = 2
+	adultNameSentinel    = "NSFW Adult Skin SENTINEL"
+	adultAuthorSentinel  = "Adult Author SENTINEL"
+	adultPictureSentinel = "https://example.invalid/adult-sentinel.png"
+	safeModName          = "Safe Skin"
+)
+
+type nexusMockAPIConfig struct {
+	adultMod  bool
+	gqlAdult  bool
+	adultPref bool
+	blocking  bool
+	gqlHide   bool
+	gqlHTTP   int
+	prefsHTTP int
+}
+
+type nexusMockAPI struct {
+	URL      string
+	mod      int
+	prefs    int
+	files    int
+	file     int
+	download int
+}
 
 func TestSetNexusAPIKeyRejectsInvalidKeys(t *testing.T) {
 	tooLong := strings.Repeat("a", 513)
@@ -277,6 +307,261 @@ func TestNexusAccountUnreadableKeyIsUnverified(t *testing.T) {
 	}
 }
 
+func TestResolveNexusModPageAdultGate(t *testing.T) {
+	pageURL := fmt.Sprintf("https://www.nexusmods.com/marvelrivals/mods/%d", adultFixtureModID)
+
+	tests := []struct {
+		name      string
+		adultMod  bool
+		gqlAdult  bool
+		adultPref bool
+		blocking  bool
+		gqlHide   bool
+		gqlHTTP   int
+		prefsHTTP int
+		wantErr   error
+		wantName  string
+		wantPrefs int
+		wantFiles int
+	}{
+		{
+			name:      "blocks adult when preference is off",
+			adultMod:  true,
+			wantErr:   nexus.ErrAdultContentBlocked,
+			wantPrefs: 1,
+		},
+		{
+			name:    "blocks adult REST missed when GraphQL hides it",
+			gqlHide: true,
+			wantErr: nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:      "blocks GraphQL-adult when REST omitted the flag",
+			gqlAdult:  true,
+			wantErr:   nexus.ErrAdultContentBlocked,
+			wantPrefs: 1,
+		},
+		{
+			name:      "blocks when GraphQL fails and preference is off",
+			gqlHTTP:   http.StatusInternalServerError,
+			wantErr:   nexus.ErrAdultContentBlocked,
+			wantPrefs: 1,
+		},
+		{
+			name:      "blocks when content blocking is on",
+			adultMod:  true,
+			adultPref: true,
+			blocking:  true,
+			wantErr:   nexus.ErrAdultContentBlocked,
+			wantPrefs: 1,
+		},
+		{
+			name:      "allows adult when preference is on",
+			adultMod:  true,
+			adultPref: true,
+			wantName:  adultNameSentinel,
+			wantPrefs: 1,
+			wantFiles: 1,
+		},
+		{
+			name:      "allows non-adult when preferences fail",
+			prefsHTTP: http.StatusInternalServerError,
+			wantName:  safeModName,
+			wantFiles: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			api := newNexusMockAPI(t, nexusMockAPIConfig{
+				adultMod:  test.adultMod,
+				gqlAdult:  test.gqlAdult,
+				adultPref: test.adultPref,
+				blocking:  test.blocking,
+				gqlHide:   test.gqlHide,
+				gqlHTTP:   test.gqlHTTP,
+				prefsHTTP: test.prefsHTTP,
+			})
+			app := connectedNexusApp(t, api.URL)
+
+			// Act
+			link, err := app.ResolveNexusModPage(pageURL)
+
+			// Assert
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("ResolveNexusModPage() error = %v, want %v", err, test.wantErr)
+			}
+			if test.wantErr != nil {
+				assertBlockedNexusLink(t, link)
+			} else if link.ModName != test.wantName {
+				t.Fatalf("ModName = %q, want %q", link.ModName, test.wantName)
+			}
+			if api.prefs != test.wantPrefs || api.files != test.wantFiles {
+				t.Fatalf("hits prefs=%d files=%d, want prefs=%d files=%d", api.prefs, api.files, test.wantPrefs, test.wantFiles)
+			}
+		})
+	}
+}
+
+func TestTakePendingNexusLinkAdultGate(t *testing.T) {
+	nxmURL := fmt.Sprintf(
+		"nxm://marvelrivals/mods/%d/files/%d?key=SENTINEL&expires=SENTINEL",
+		adultFixtureModID,
+		adultFixtureFileID,
+	)
+
+	tests := []struct {
+		name      string
+		adultMod  bool
+		gqlAdult  bool
+		adultPref bool
+		gqlHTTP   int
+		wantErr   error
+		wantName  string
+		wantFile  int
+		keepKey   bool
+	}{
+		{
+			name:     "blocks adult without metadata or secrets",
+			adultMod: true,
+			wantErr:  nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:     "blocks GraphQL-adult nxm when REST omitted the flag",
+			gqlAdult: true,
+			wantErr:  nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:    "blocks nxm when GraphQL fails and preference is off",
+			gqlHTTP: http.StatusInternalServerError,
+			wantErr: nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:      "allows adult when preference is on",
+			adultMod:  true,
+			adultPref: true,
+			wantName:  adultNameSentinel,
+			wantFile:  1,
+			keepKey:   true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			api := newNexusMockAPI(t, nexusMockAPIConfig{
+				adultMod:  test.adultMod,
+				gqlAdult:  test.gqlAdult,
+				adultPref: test.adultPref,
+				gqlHTTP:   test.gqlHTTP,
+			})
+			app := connectedNexusApp(t, api.URL)
+			app.setLaunchURL(nxmURL)
+
+			// Act
+			link, err := app.TakePendingNexusLink()
+
+			// Assert
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("TakePendingNexusLink() error = %v, want %v", err, test.wantErr)
+			}
+			if test.wantErr != nil {
+				assertBlockedNexusLink(t, link)
+			} else if link.ModName != test.wantName {
+				t.Fatalf("ModName = %q, want %q", link.ModName, test.wantName)
+			}
+			if api.file != test.wantFile || api.download != 0 {
+				t.Fatalf("hits file=%d download=%d, want file=%d download=0", api.file, api.download, test.wantFile)
+			}
+			_, hasSecrets := app.peekLinkSecrets(adultFixtureModID, adultFixtureFileID)
+			if hasSecrets != test.keepKey {
+				t.Fatalf("secrets present = %v, want %v", hasSecrets, test.keepKey)
+			}
+		})
+	}
+}
+
+func TestPrepareNexusInstallAdultGate(t *testing.T) {
+	tests := []struct {
+		name         string
+		adultMod     bool
+		gqlAdult     bool
+		adultPref    bool
+		blocking     bool
+		gqlHide      bool
+		gqlHTTP      int
+		wantErr      error
+		wantFile     int
+		wantDownload int
+	}{
+		{
+			name:     "blocks adult before file and download",
+			adultMod: true,
+			wantErr:  nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:    "blocks when REST omits the adult flag",
+			gqlHide: true,
+			wantErr: nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:     "blocks GraphQL-adult when REST omitted the flag",
+			gqlAdult: true,
+			wantErr:  nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:    "blocks when GraphQL fails and preference is off",
+			gqlHTTP: http.StatusInternalServerError,
+			wantErr: nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:      "blocks when content blocking is on",
+			adultMod:  true,
+			adultPref: true,
+			blocking:  true,
+			wantErr:   nexus.ErrAdultContentBlocked,
+		},
+		{
+			name:         "allows adult past the gate",
+			adultMod:     true,
+			adultPref:    true,
+			wantFile:     1,
+			wantDownload: 1,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Arrange
+			api := newNexusMockAPI(t, nexusMockAPIConfig{
+				adultMod:  test.adultMod,
+				gqlAdult:  test.gqlAdult,
+				adultPref: test.adultPref,
+				blocking:  test.blocking,
+				gqlHide:   test.gqlHide,
+				gqlHTTP:   test.gqlHTTP,
+			})
+			app := connectedNexusApp(t, api.URL)
+
+			// Act
+			_, err := app.PrepareNexusInstall(t.TempDir(), adultFixtureModID, adultFixtureFileID, "")
+
+			// Assert
+			if test.wantErr != nil {
+				if !errors.Is(err, test.wantErr) {
+					t.Fatalf("PrepareNexusInstall() error = %v, want %v", err, test.wantErr)
+				}
+			} else if errors.Is(err, nexus.ErrAdultContentBlocked) {
+				t.Fatal("PrepareNexusInstall() blocked adult content when preference is on")
+			}
+			if api.file != test.wantFile || api.download != test.wantDownload {
+				t.Fatalf("hits file=%d download=%d, want file=%d download=%d", api.file, api.download, test.wantFile, test.wantDownload)
+			}
+		})
+	}
+}
+
 func newNexusValidateServer(t *testing.T, premium bool) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -284,10 +569,7 @@ func newNexusValidateServer(t *testing.T, premium bool) *httptest.Server {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("X-RL-Hourly-Remaining", "100")
-		w.Header().Set("X-RL-Daily-Remaining", "1000")
-		_, _ = w.Write([]byte(`{"user_id":1,"name":"TestUser","is_premium":` + boolJSON(premium) + `,"key":"should-not-leak"}`))
+		writeNexusJSON(w, `{"user_id":1,"name":"TestUser","is_premium":`+boolJSON(premium)+`,"key":"should-not-leak"}`)
 	}))
 	t.Cleanup(server.Close)
 	return server
@@ -298,4 +580,127 @@ func boolJSON(value bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func writeNexusJSON(w http.ResponseWriter, body string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-RL-Hourly-Remaining", "100")
+	w.Header().Set("X-RL-Daily-Remaining", "1000")
+	_, _ = w.Write([]byte(body))
+}
+
+func newNexusMockAPI(t *testing.T, cfg nexusMockAPIConfig) *nexusMockAPI {
+	t.Helper()
+
+	mod := nexus.ModInfo{
+		Name:    safeModName,
+		Author:  "Author",
+		Version: "1.0",
+		ModID:   adultFixtureModID,
+	}
+	if cfg.adultMod {
+		mod.Name = adultNameSentinel
+		mod.Author = adultAuthorSentinel
+		mod.PictureURL = adultPictureSentinel
+		mod.ContainsAdultContent = true
+	}
+	file := nexus.FileInfo{
+		FileID:       adultFixtureFileID,
+		Name:         "Main",
+		FileName:     "mod.zip",
+		Version:      "1.0",
+		SizeKB:       4,
+		CategoryName: "MAIN",
+		IsPrimary:    true,
+	}
+
+	modBody := marshalJSON(t, mod)
+	filesBody := marshalJSON(t, struct {
+		Files []nexus.FileInfo `json:"files"`
+	}{Files: []nexus.FileInfo{file}})
+	fileBody := marshalJSON(t, file)
+	prefsBody := fmt.Sprintf(
+		`{"data":{"preferences":{"adult":%s,"isBlockingContent":%s}}}`,
+		boolJSON(cfg.adultPref),
+		boolJSON(cfg.blocking),
+	)
+
+	api := &nexusMockAPI{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch path := r.URL.Path; {
+		case path == "/v1/users/validate.json":
+			writeNexusJSON(w, `{"user_id":1,"name":"TestUser","is_premium":true,"key":"should-not-leak"}`)
+		case path == "/v2/graphql":
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), "preferences") {
+				api.prefs++
+				if cfg.prefsHTTP != 0 {
+					w.WriteHeader(cfg.prefsHTTP)
+					return
+				}
+				writeNexusJSON(w, prefsBody)
+				return
+			}
+			if cfg.gqlHTTP != 0 {
+				w.WriteHeader(cfg.gqlHTTP)
+				return
+			}
+			if cfg.gqlHide {
+				writeNexusJSON(w, `{"errors":[{"message":"Adult content blocked","extensions":{"code":"ADULT_CONTENT_BLOCKED"}}]}`)
+				return
+			}
+			adultFlag := boolJSON(cfg.adultMod || cfg.gqlAdult)
+			writeNexusJSON(w, `{"data":{"legacyModsByDomain":{"nodes":[{"modId":9,"adult":`+adultFlag+`,"adultContent":`+adultFlag+`}]}}}`)
+		case strings.HasSuffix(path, "/download_link.json"):
+			api.download++
+			writeNexusJSON(w, "[]")
+		case strings.Contains(path, "/files/") && strings.HasSuffix(path, ".json"):
+			api.file++
+			writeNexusJSON(w, fileBody)
+		case strings.HasSuffix(path, "/files.json"):
+			api.files++
+			writeNexusJSON(w, filesBody)
+		case strings.Contains(path, "/mods/") && strings.HasSuffix(path, ".json"):
+			api.mod++
+			writeNexusJSON(w, modBody)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	api.URL = server.URL
+	return api
+}
+
+func marshalJSON(t *testing.T, value any) string {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
+func connectedNexusApp(t *testing.T, baseURL string) *App {
+	t.Helper()
+	app := testApp(t, false)
+	app.nexusBaseURL = baseURL
+	if _, err := app.SetNexusAPIKey("valid-test-key"); err != nil {
+		t.Fatalf("SetNexusAPIKey() = %v", err)
+	}
+	return app
+}
+
+func assertBlockedNexusLink(t *testing.T, link NexusLink) {
+	t.Helper()
+	if link.ModName != "" || link.Author != "" || link.PictureURL != "" || len(link.Files) != 0 {
+		t.Fatalf("blocked NexusLink still has metadata: %+v", link)
+	}
+	raw, err := json.Marshal(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "SENTINEL") {
+		t.Fatalf("blocked NexusLink JSON leaked adult metadata: %s", raw)
+	}
 }

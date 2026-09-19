@@ -331,6 +331,8 @@ Nexus Mods integration is that feature. Consent is the user pasting their own pe
 
 Premium accounts may request a download link from the Nexus API. Free accounts must start the download from the Nexus website; Cratebug does not automate, scrape, or synthesise that step. Downloaded archives are untrusted input and use the same staged installation path as a local archive. Arbitrary user-typed download URLs are not accepted.
 
+Cratebug refuses to show or download a mod Nexus marks as adult when the connected account has adult content hidden. There is no in-app override; the user changes that on Nexus.
+
 ## 18. Initial non-goals
 
 The initial release does not require:

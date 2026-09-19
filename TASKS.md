@@ -22,6 +22,7 @@ Make Nexus Mods a first-class install source. Each user pastes their own persona
 * **Secrets never cross the Wails boundary.** Signed `key` / `expires` stay in Go (`linkSecrets`). The frontend sees identifiers and display metadata only.
 * **Header-driven rate limits.** Read `X-RL-*` headers. Never hardcode published numbers. Pre-flight refuse when remaining is zero and reset is still in the future.
 * **Dev builds do not register.** Skip `nxm://` registration when `AppVersion` is `dev` or the executable is not under the install directory.
+* **Adult content follows the Nexus account.** Honor `contains_adult_content` and GraphQL `preferences.adult` / `isBlockingContent`. Fail closed. No in-app override. Signed `nxm://` links are gated the same way as page URLs.
 
 ## Out of scope
 
@@ -32,6 +33,7 @@ Make Nexus Mods a first-class install source. Each user pastes their own persona
 * Silent takeover of another app's `nxm://` handler
 * Arbitrary-URL remote install
 * Windows Credential Manager (DPAPI is the chosen store)
+* In-app adult toggle, tag/author content blocks, OAuth, or dropping personal API keys
 
 ## 16.1 Docs
 
@@ -97,6 +99,12 @@ Delete `InstallFromUrlDialog.tsx` and every Install-from-URL reference. Add `Ins
 
 **Verify:** `bun run check`, `bun test`. Screenshots: not-connected, connected-free, connected-premium, paste dialog, file picker, nxm confirm, download progress, free-user-needs-website-click, and each error state.
 
-## 16.11 Verify
+## 16.11 Adult content gate
+
+Refuse adult Nexus mods when the signed-in account has adult content off. Decode `contains_adult_content`, read GraphQL `preferences.adult`, fail closed, no in-app override. Gate `resolveDownloadRequest` (before metadata) and `PrepareNexusInstall` (before File/DownloadLinks). Map the error in the paste and nxm dialogs with an **Open Content Blocking** button to `https://next.nexusmods.com/settings/content-blocking`.
+
+**Verify:** `go test ./internal/nexus/ ./ -count=1` (and `-race` on the app tests that grow). Table tests for `AllowAdultContent`. Client tests: GraphQL decode, cache, rate-limit, no API key in error strings. App tests: `ResolveNexusModPage` / `TakePendingNexusLink` / `PrepareNexusInstall` against httptest (adult + preference off is blocked with empty metadata; adult + preference on is allowed). `bun test` for the error string.
+
+## 16.12 Verify
 
 `.\check.ps1`, `go test ./... -count=1 -race`, `bun test`. Update `docs/USER_GUIDE.md` (getting an API key, what the handler toggle does, the free-user click) and `docs/TROUBLESHOOTING.md` (key rejected, rate limited, link expired, another app owns `nxm://`, a Windows default-apps override). Screenshots to `docs/screenshots/phase-16/task-<n>-<state>.png`. Run a real uninstall and confirm the handler is restored and `nexus.key` is gone. Stop at the review gate.

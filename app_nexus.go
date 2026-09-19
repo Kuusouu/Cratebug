@@ -200,6 +200,15 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 		cancel()
 	}()
 
+	mod, err := client.Mod(ctx, modID)
+	if err != nil {
+		return install.PreviewResult{}, err
+	}
+	if err := client.CheckAdultContent(ctx, mod); err != nil {
+		a.dropLinkSecrets(modID, fileID)
+		return install.PreviewResult{}, err
+	}
+
 	file, err := client.File(ctx, modID, fileID)
 	if err != nil {
 		return install.PreviewResult{}, err
@@ -306,6 +315,10 @@ func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, erro
 	ctx := a.requestContext()
 	mod, err := client.Mod(ctx, req.ModID)
 	if err != nil {
+		return NexusLink{}, err
+	}
+	if err := client.CheckAdultContent(ctx, mod); err != nil {
+		a.dropLinkSecrets(req.ModID, req.FileID)
 		return NexusLink{}, err
 	}
 	link.ModName = mod.Name

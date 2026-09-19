@@ -1,19 +1,21 @@
 import { Loader2 } from "lucide-react";
-import styles from "./InstallFromNexusDialog.module.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { NexusAccount, ResolveNexusModPage } from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import styles from "./InstallFromNexusDialog.module.css";
 import {
 	defaultNexusFileId,
 	formatNexusFileSize,
 	formatNexusInstallError,
 	groupNexusFiles,
+	nexusAdultContentBlockedMessage,
+	nexusContentBlockingURL,
 	nexusInstallStep,
 	nexusModPageURL,
 	parseNexusModPageInput,
 } from "./nexusPresentation";
+import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type InstallFromNexusDialogProps = {
 	onReady: (modId: number, fileId: number) => void;
@@ -135,6 +137,7 @@ export function InstallFromNexusDialog({
 
 	const files = link?.files ?? [];
 	const grouped = groupNexusFiles(files);
+	const adultBlocked = errorMessage === nexusAdultContentBlockedMessage;
 
 	return (
 		<div className="mutation-dialog-backdrop">
@@ -268,6 +271,14 @@ export function InstallFromNexusDialog({
 							>
 								Cancel
 							</button>
+							{adultBlocked ? (
+								<button
+									type="button"
+									onClick={() => BrowserOpenURL(nexusContentBlockingURL)}
+								>
+									Open Content Blocking
+								</button>
+							) : null}
 							<button
 								type="submit"
 								disabled={busy || (step === "pick-file" && selectedFileId === null)}

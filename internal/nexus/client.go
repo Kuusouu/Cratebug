@@ -14,7 +14,15 @@ import (
 	"time"
 )
 
-const cacheKeyValidate = "validate"
+const (
+	cacheKeyValidate    = "validate"
+	cacheKeyPreferences = "preferences"
+	preferencesQuery    = "query { preferences { adult isBlockingContent } }"
+	adultContentBlocked = "ADULT_CONTENT_BLOCKED"
+	// Looks up one mod by domain and id. Do not pass viewAdultContent: that
+	// overrides the signed-in account's Content Blocking setting.
+	modAdultQuery = `query AdultCheck($ids: [CompositeDomainWithIdInput!]!) { legacyModsByDomain(ids: $ids) { nodes { modId adult adultContent } } }`
+)
 
 type downloadMode int
 
@@ -32,6 +40,40 @@ type cacheEntry struct {
 
 type filesResponse struct {
 	Files []FileInfo `json:"files"`
+}
+
+type graphqlRequest struct {
+	Query     string `json:"query"`
+	Variables any    `json:"variables,omitempty"`
+}
+
+type graphqlPreferencesResponse struct {
+	Data struct {
+		Preferences *Preferences `json:"preferences"`
+	} `json:"data"`
+	Errors []graphqlError `json:"errors"`
+}
+
+type graphqlError struct {
+	Message    string `json:"message"`
+	Extensions struct {
+		Code string `json:"code"`
+	} `json:"extensions"`
+}
+
+type graphqlModAdultNode struct {
+	ModID        int  `json:"modId"`
+	Adult        bool `json:"adult"`
+	AdultContent bool `json:"adultContent"`
+}
+
+type graphqlModAdultResponse struct {
+	Data struct {
+		LegacyModsByDomain *struct {
+			Nodes []graphqlModAdultNode `json:"nodes"`
+		} `json:"legacyModsByDomain"`
+	} `json:"data"`
+	Errors []graphqlError `json:"errors"`
 }
 
 // Talks to api.nexusmods.com. APIKey is read at call time and must never
@@ -166,6 +208,83 @@ func (c *Client) DownloadLinks(ctx context.Context, modID, fileID int, secrets D
 	return links, nil
 }
 
+// Loads the signed-in user's adult-content preference. Cached for five
+// minutes. Does not send viewAdultContent; that would override the account.
+func (c *Client) Preferences(ctx context.Context) (Preferences, error) {
+	if v, ok := c.cacheGet(cacheKeyPreferences); ok {
+		return v.(Preferences), nil
+	}
+
+	var payload graphqlPreferencesResponse
+	if err := c.postJSON(ctx, "/v2/graphql", graphqlRequest{Query: preferencesQuery}, &payload); err != nil {
+		return Preferences{}, err
+	}
+	if payload.Data.Preferences == nil {
+		if len(payload.Errors) > 0 {
+			return Preferences{}, fmt.Errorf("nexus: preferences: %s", redactErrorBody(c.APIKey, payload.Errors[0].Message))
+		}
+		return Preferences{}, fmt.Errorf("nexus: preferences: missing data")
+	}
+	prefs := *payload.Data.Preferences
+	c.cachePut(cacheKeyPreferences, prefs, metadataCacheTTL)
+	return prefs, nil
+}
+
+// Asks GraphQL whether this Marvel Rivals mod is visible and adult, without
+// overriding Content Blocking. REST and signed nxm:// downloads still
+// return adult files when the website hides the page.
+func (c *Client) graphQLModAdult(ctx context.Context, modID int) (found, adult bool, err error) {
+	if err := requirePositiveID("mod id", modID); err != nil {
+		return false, false, err
+	}
+	key := fmt.Sprintf("modAdult:%d", modID)
+	if v, ok := c.cacheGet(key); ok {
+		node := v.(graphqlModAdultNode)
+		return true, node.Adult || node.AdultContent, nil
+	}
+
+	var payload graphqlModAdultResponse
+	req := graphqlRequest{
+		Query: modAdultQuery,
+		Variables: map[string]any{
+			"ids": []map[string]any{
+				{"gameDomain": GameDomain, "modId": modID},
+			},
+		},
+	}
+	if err := c.postJSON(ctx, "/v2/graphql", req, &payload); err != nil {
+		return false, false, err
+	}
+	if graphqlAdultBlocked(payload.Errors) {
+		return false, false, ErrAdultContentBlocked
+	}
+	if payload.Data.LegacyModsByDomain != nil {
+		nodes := payload.Data.LegacyModsByDomain.Nodes
+		if len(nodes) == 0 {
+			return false, false, nil
+		}
+		node := nodes[0]
+		c.cachePut(key, node, metadataCacheTTL)
+		return true, node.Adult || node.AdultContent, nil
+	}
+	if len(payload.Errors) > 0 {
+		return false, false, fmt.Errorf("nexus: mod adult: %s", redactErrorBody(c.APIKey, payload.Errors[0].Message))
+	}
+	return false, false, fmt.Errorf("nexus: mod adult: missing data")
+}
+
+func graphqlAdultBlocked(errs []graphqlError) bool {
+	for _, err := range errs {
+		if strings.EqualFold(err.Extensions.Code, adultContentBlocked) {
+			return true
+		}
+		if strings.Contains(strings.ToLower(err.Message), "adult content blocked") {
+			return true
+		}
+	}
+	return false
+}
+
 // A copy of the most recently observed rate-limit headers.
 func (c *Client) RateLimit() RateLimit {
 	c.mu.Lock()
@@ -174,6 +293,18 @@ func (c *Client) RateLimit() RateLimit {
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values, mode downloadMode, dest any) error {
+	return c.do(ctx, http.MethodGet, path, query, nil, mode, dest)
+}
+
+func (c *Client) postJSON(ctx context.Context, path string, payload, dest any) error {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("nexus: encoding %s: %w", path, err)
+	}
+	return c.do(ctx, http.MethodPost, path, nil, encoded, downloadNone, dest)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, query url.Values, body []byte, mode downloadMode, dest any) error {
 	key := c.APIKey
 	if err := validateAPIKey(key); err != nil {
 		return err
@@ -183,7 +314,11 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, mode do
 	}
 
 	rawURL := c.baseURL() + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = strings.NewReader(string(body))
+	}
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, bodyReader)
 	if err != nil {
 		return fmt.Errorf("nexus: building request for %s: %w", redactURL(rawURL), err)
 	}
@@ -199,6 +334,9 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, mode do
 	req.Header.Set("Application-Name", applicationName)
 	req.Header.Set("Application-Version", c.AppVersion)
 	req.Header.Set("User-Agent", fmt.Sprintf("%s/%s (Windows)", applicationName, c.AppVersion))
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	resp, err := c.httpClient().Do(req)
 	if err != nil {
@@ -215,7 +353,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, mode do
 		}
 		return nil
 	case http.StatusUnauthorized:
-		c.invalidateValidateCache()
+		c.invalidateAuthCaches()
 		return ErrInvalidKey
 	case http.StatusForbidden:
 		switch mode {
@@ -342,7 +480,7 @@ func (c *Client) cacheGet(key string) (any, bool) {
 	if !ok {
 		return nil, false
 	}
-	if key == cacheKeyValidate && entry.cachedKey != c.APIKey {
+	if (key == cacheKeyValidate || key == cacheKeyPreferences) && entry.cachedKey != c.APIKey {
 		delete(c.cache, key)
 		return nil, false
 	}
@@ -363,17 +501,18 @@ func (c *Client) cachePut(key string, value any, ttl time.Duration) {
 	if ttl > 0 {
 		entry.expires = c.nowTime().Add(ttl)
 	}
-	if key == cacheKeyValidate {
+	if key == cacheKeyValidate || key == cacheKeyPreferences {
 		entry.cachedKey = c.APIKey
 	}
 	c.cache[key] = entry
 }
 
-func (c *Client) invalidateValidateCache() {
+func (c *Client) invalidateAuthCaches() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.cache != nil {
 		delete(c.cache, cacheKeyValidate)
+		delete(c.cache, cacheKeyPreferences)
 	}
 }
 

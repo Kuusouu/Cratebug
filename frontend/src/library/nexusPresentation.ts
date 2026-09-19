@@ -2,6 +2,10 @@ import { formatBytes, formatWailsError } from "./installPresentation";
 
 export const nexusGameDomain = "marvelrivals";
 export const nexusModsSiteOrigin = "https://www.nexusmods.com";
+export const nexusContentBlockingURL = "https://next.nexusmods.com/settings/content-blocking";
+
+export const nexusAdultContentBlockedMessage =
+	"This mod is marked adult on Nexus Mods, and the connected account has adult content hidden. Change that on Nexus.";
 
 const maxNexusPageURLLength = 2048;
 const nexusModsHosts = new Set(["nexusmods.com", "www.nexusmods.com"]);
@@ -167,7 +171,14 @@ export function formatInstallProgress(progress: InstallProgressView | null): str
 	return "Downloading from Nexus Mods...";
 }
 
+export function isAdultContentBlockedError(error: unknown): boolean {
+	return formatWailsError(error).includes("adult content is blocked");
+}
+
 export function formatNexusInstallError(error: unknown): string {
+	if (isAdultContentBlockedError(error)) {
+		return nexusAdultContentBlockedMessage;
+	}
 	const raw = formatWailsError(error);
 	if (raw.includes("no API key")) {
 		return "Connect a Nexus Mods API key in Settings first.";

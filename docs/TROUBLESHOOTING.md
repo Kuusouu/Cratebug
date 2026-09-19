@@ -44,6 +44,10 @@ Nexus caps how many API requests you can make. Cratebug reads the remaining-requ
 
 Free-account `nxm://` links are short-lived. Click **Mod Manager Download** on the Nexus page again. Cratebug cannot refresh that signed link for you.
 
+## Cratebug refused an adult Nexus mod
+
+The mod is marked adult on Nexus, and the connected account has adult content hidden. Cratebug does not show a name or screenshot for it and does not download it, even if you already have an `nxm://` link. Open [Content Blocking](https://next.nexusmods.com/settings/content-blocking) on Nexus, allow adult content there, then try again. There is no in-app toggle.
+
 ## Another app owns nxm:// links
 
 Vortex, Mod Organizer, or another manager may already be the `nxm://` handler. In **Settings**, Cratebug names that app and asks before taking over. You can turn the switch off later to give it back. Cratebug never takes the handler without that confirmation.
