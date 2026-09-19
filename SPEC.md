@@ -122,6 +122,7 @@ Cratebug should eventually allow users to:
 - Change filename-based priority.
 - Move mods between folders.
 - Create, rename, and organize folders.
+- Open a folder or mod in File Explorer from its context menu.
 - Delete mods through a recoverable Windows deletion mechanism.
 - Install supported local archives.
 - Review installation collisions before replacement.

@@ -40,6 +40,8 @@ import {
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
+	OpenFolderInExplorer,
+	OpenModInExplorer,
 	RenameFolder,
 	RenameMod,
 	RenameTag,
@@ -1880,57 +1882,108 @@ export function LibraryScreen() {
 
 	const endDrag = useCallback(() => setDraggedItem(null), []);
 
+	const openFolderInExplorer = useCallback(
+		async (folder: string) => {
+			if (!libraryRoot) {
+				showMutationFeedback(
+					"error",
+					"Set a mod library folder before opening File Explorer.",
+				);
+				return;
+			}
+			try {
+				await OpenFolderInExplorer(libraryRoot, folder);
+			} catch (error) {
+				showMutationFeedback(
+					"error",
+					`Could not open File Explorer: ${errorMessage(error)}`,
+				);
+			}
+		},
+		[libraryRoot, showMutationFeedback],
+	);
+
+	const openModInExplorer = useCallback(
+		async (entryID: string) => {
+			if (!libraryRoot) {
+				showMutationFeedback(
+					"error",
+					"Set a mod library folder before opening File Explorer.",
+				);
+				return;
+			}
+			try {
+				await OpenModInExplorer(libraryRoot, entryID);
+			} catch (error) {
+				showMutationFeedback(
+					"error",
+					`Could not open File Explorer: ${errorMessage(error)}`,
+				);
+			}
+		},
+		[libraryRoot, showMutationFeedback],
+	);
+
 	// Lets a folder's actions reach it without first navigating into it.
-	const openFolderContextMenu = useCallback((folder: string, event: MouseEvent) => {
-		const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
-		if (!container) return;
+	const openFolderContextMenu = useCallback(
+		(folder: string, event: MouseEvent) => {
+			const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
+			if (!container) return;
 
-		const isRoot = folder === "";
-		const items: ContextMenuItem[] = [
-			{
-				label: "New folder",
-				onSelect: () => {
-					setFolderDialogTarget(folder);
-					setActiveFolderDialog("create");
-				},
-			},
-		];
-
-		if (!isRoot) {
-			items.push(
+			const isRoot = folder === "";
+			const items: ContextMenuItem[] = [
 				{
-					label: "Rename folder",
+					label: "Open in File Explorer",
 					onSelect: () => {
-						setFolderDialogTarget(folder);
-						setActiveFolderDialog("rename");
+						void openFolderInExplorer(folder);
 					},
 				},
 				{
-					label: "Move to...",
+					label: "New folder",
 					onSelect: () => {
 						setFolderDialogTarget(folder);
-						setActiveFolderDialog("move");
+						setActiveFolderDialog("create");
 					},
 				},
-				{
-					label: "Delete folder...",
-					onSelect: () => {
-						setFolderDialogTarget(folder);
-						setActiveFolderDialog("delete");
-					},
-					destructive: true,
-				},
-			);
-		}
+			];
 
-		setContextMenu({
-			x: event.clientX,
-			y: event.clientY,
-			container,
-			title: isRoot ? "Library root" : folder,
-			items,
-		});
-	}, []);
+			if (!isRoot) {
+				items.push(
+					{
+						label: "Rename folder",
+						onSelect: () => {
+							setFolderDialogTarget(folder);
+							setActiveFolderDialog("rename");
+						},
+					},
+					{
+						label: "Move to...",
+						onSelect: () => {
+							setFolderDialogTarget(folder);
+							setActiveFolderDialog("move");
+						},
+					},
+					{
+						label: "Delete folder...",
+						onSelect: () => {
+							setFolderDialogTarget(folder);
+							setActiveFolderDialog("delete");
+						},
+						destructive: true,
+					},
+				);
+			}
+
+			setContextMenu({
+				x: event.clientX,
+				y: event.clientY,
+				container,
+				title: isRoot ? "Library root" : folder,
+				items,
+			});
+		},
+		[openFolderInExplorer],
+	);
 
 	// Selects the mod under the pointer so its actions and the panel agree on the target.
 	const openModContextMenu = useCallback(
@@ -1938,12 +1991,18 @@ export function LibraryScreen() {
 			const organizable = canOrganizeMod(entry);
 			const deletable = canDeleteMod(entry);
 			const taggable = canTagMod(entry);
-			if (!organizable && !deletable && !taggable) return;
 
 			const container = (event.target as HTMLElement).closest<HTMLElement>(".app-shell");
 			if (!container) return;
 
-			const items: ContextMenuItem[] = [];
+			const items: ContextMenuItem[] = [
+				{
+					label: "Open in File Explorer",
+					onSelect: () => {
+						void openModInExplorer(entry.id);
+					},
+				},
+			];
 			if (organizable) {
 				items.push(
 					{ label: "Rename", onSelect: () => setActiveDialog("rename") },
@@ -1981,7 +2040,7 @@ export function LibraryScreen() {
 				items,
 			});
 		},
-		[checkedEntryIDs],
+		[checkedEntryIDs, openModInExplorer],
 	);
 
 	// Runs one auto-detection attempt against the active provider and routes

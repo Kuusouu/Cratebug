@@ -146,6 +146,14 @@ export function NexusProtocolStatus() {
   return window['go']['main']['App']['NexusProtocolStatus']();
 }
 
+export function OpenFolderInExplorer(arg1, arg2) {
+  return window['go']['main']['App']['OpenFolderInExplorer'](arg1, arg2);
+}
+
+export function OpenModInExplorer(arg1, arg2) {
+  return window['go']['main']['App']['OpenModInExplorer'](arg1, arg2);
+}
+
 export function PrepareInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['PrepareInstall'](arg1, arg2, arg3);
 }

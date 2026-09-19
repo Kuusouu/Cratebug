@@ -83,6 +83,10 @@ export function NexusKeyState():Promise<main.NexusKeyState>;
 
 export function NexusProtocolStatus():Promise<main.NexusProtocolState>;
 
+export function OpenFolderInExplorer(arg1:string,arg2:string):Promise<void>;
+
+export function OpenModInExplorer(arg1:string,arg2:string):Promise<void>;
+
 export function PrepareInstall(arg1:string,arg2:Array<string>,arg3:string):Promise<install.PreviewResult>;
 
 export function PrepareNexusInstall(arg1:string,arg2:number,arg3:number,arg4:string):Promise<install.PreviewResult>;

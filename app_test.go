@@ -143,6 +143,24 @@ func TestScanLibrary(t *testing.T) {
 	}
 }
 
+func TestOpenInExplorerRejectsMissingTargets(t *testing.T) {
+	// Arrange
+	app := testApp(t, false)
+	root := t.TempDir()
+
+	// Act
+	folderErr := app.OpenFolderInExplorer(root, "missing")
+	modErr := app.OpenModInExplorer(root, "mod::missing")
+
+	// Assert
+	if folderErr == nil {
+		t.Fatal("OpenFolderInExplorer succeeded, want error")
+	}
+	if modErr == nil {
+		t.Fatal("OpenModInExplorer succeeded, want error")
+	}
+}
+
 func TestSetModEnabled(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
