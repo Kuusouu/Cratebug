@@ -514,6 +514,7 @@ export function InstallPreviewDialog({
 												<span>Destination folder</span>
 												<select
 													id={`mod-folder-${item.id}`}
+													className="scroll-y"
 													value={config.destinationFolder}
 													disabled={!isSelected || phase === "applying"}
 													onChange={(event) =>
