@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
@@ -21,6 +22,7 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/update"
 	"github.com/Kuusouu/Cratebug/internal/urlscheme"
+	"github.com/Kuusouu/Cratebug/internal/watcher"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -52,6 +54,8 @@ type App struct {
 	encryptCancel         chan struct{}
 	companionMu           sync.Mutex
 	companionCancel       chan struct{}
+	companionCache        *mutation.CompanionCache
+	watcher               *watcher.Watcher
 
 	secretStore secret.Store
 
@@ -86,6 +90,7 @@ func NewApp() (*App, error) {
 		app.protocol = urlscheme.New(urlscheme.SchemeNXM, exe)
 	}
 	app.allowProtocol = AppVersion != "dev" && looksLikeInstalledBuild()
+	app.initWatcher()
 	return app, nil
 }
 
@@ -115,12 +120,35 @@ func newApp(
 		detector:              gamedetect.NewDefaultRegistry(),
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
+		companionCache:        mutation.NewCompanionCache(),
 	}
 	if characterTable != nil {
 		app.characterTable = *characterTable
 		app.tableLoaded = true
 	}
 	return app
+}
+
+func (a *App) initWatcher() {
+	w, err := watcher.New(watcher.Options{
+		Debounce: 300 * time.Millisecond,
+		OnChange: func() {
+			if a.ctx != nil {
+				wailsRuntime.EventsEmit(a.ctx, "library:fs-changed")
+			}
+		},
+	})
+	if err == nil {
+		a.watcher = w
+	}
+}
+
+func suppressWatcherResult[T any](a *App, fn func() (T, error)) (T, error) {
+	if a != nil && a.watcher != nil {
+		a.watcher.Pause()
+		defer a.watcher.Resume()
+	}
+	return fn()
 }
 
 // Confirms that the frontend can reach the Go application.
@@ -141,6 +169,9 @@ func (a *App) ClassificationType() modtype.Identity {
 
 // Returns the read-only catalog discovered beneath modRoot.
 func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
+	if a.watcher != nil && a.watcher.Root() != modRoot {
+		_ = a.watcher.SetRoot(modRoot)
+	}
 	return discovery.Scan(modRoot)
 }
 
@@ -344,8 +375,10 @@ func (a *App) updateContext() context.Context {
 // Changes one current scanner entry to the requested enabled state.
 // The entry ID is scanner-issued, never an arbitrary filesystem path.
 func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Result, error) {
-	operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
-	return a.mutationExecutor.Execute(operation)
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
+		return a.mutationExecutor.Execute(operation)
+	})
 }
 
 // EncryptionType anchors mutation.EncryptionBatchResult so Wails emits its TypeScript model into models.ts.
@@ -357,39 +390,41 @@ func (a *App) EncryptionType() mutation.EncryptionBatchResult {
 // The Marvel Rivals AES key stays in Go. The frontend receives only the
 // encrypted flag after the next classify. Emits encrypt:progress events.
 func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) (mutation.EncryptionBatchResult, error) {
-	if a.gameRunningChecker != nil {
-		running, err := a.gameRunningChecker.IsGameRunning()
-		if err != nil {
-			return mutation.EncryptionBatchResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
+	return suppressWatcherResult(a, func() (mutation.EncryptionBatchResult, error) {
+		if a.gameRunningChecker != nil {
+			running, err := a.gameRunningChecker.IsGameRunning()
+			if err != nil {
+				return mutation.EncryptionBatchResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
+			}
+			if running {
+				return mutation.EncryptionBatchResult{}, mutation.ErrGameRunning
+			}
 		}
-		if running {
-			return mutation.EncryptionBatchResult{}, mutation.ErrGameRunning
-		}
-	}
 
-	a.encryptMu.Lock()
-	a.encryptCancel = make(chan struct{})
-	cancel := a.encryptCancel
-	a.encryptMu.Unlock()
-	defer func() {
 		a.encryptMu.Lock()
-		a.encryptCancel = nil
+		a.encryptCancel = make(chan struct{})
+		cancel := a.encryptCancel
 		a.encryptMu.Unlock()
-	}()
+		defer func() {
+			a.encryptMu.Lock()
+			a.encryptCancel = nil
+			a.encryptMu.Unlock()
+		}()
 
-	launch := func() (mutation.ArchiveCaller, func(), error) {
-		worker, err := uassettool.NewWriteWorker(nil)
-		if err != nil {
-			return nil, nil, err
+		launch := func() (mutation.ArchiveCaller, func(), error) {
+			worker, err := uassettool.NewWriteWorker(nil)
+			if err != nil {
+				return nil, nil, err
+			}
+			return worker, func() { _ = worker.Close() }, nil
 		}
-		return worker, func() { _ = worker.Close() }, nil
-	}
 
-	return mutation.SetModEncryptionPooled(modRoot, entryIDs, encrypt, launch, func(progress mutation.EncryptionProgress) {
-		if a.ctx != nil {
-			wailsRuntime.EventsEmit(a.ctx, "encrypt:progress", progress)
-		}
-	}, cancel)
+		return mutation.SetModEncryptionPooled(modRoot, entryIDs, encrypt, launch, func(progress mutation.EncryptionProgress) {
+			if a.ctx != nil {
+				wailsRuntime.EventsEmit(a.ctx, "encrypt:progress", progress)
+			}
+		}, cancel)
+	})
 }
 
 // Stops an in-progress SetModEncryption after in-flight pool jobs finish.
@@ -434,42 +469,44 @@ func (a *App) FindUnsupportedCompanionPaks(modRoot string) ([]string, error) {
 		return nil, err
 	}
 	defer worker.Close()
-	return mutation.FindUnsupportedCompanionPaks(modRoot, worker)
+	return mutation.FindUnsupportedCompanionPaksWithCache(modRoot, worker, a.companionCache)
 }
 
 // Rewrites each dirty companion PAK one at a time. Emits companion:progress.
 func (a *App) StripCompanionPaks(modRoot string, entryIDs []string) (mutation.CompanionCleanupResult, error) {
-	if a.gameRunningChecker != nil {
-		running, err := a.gameRunningChecker.IsGameRunning()
+	return suppressWatcherResult(a, func() (mutation.CompanionCleanupResult, error) {
+		if a.gameRunningChecker != nil {
+			running, err := a.gameRunningChecker.IsGameRunning()
+			if err != nil {
+				return mutation.CompanionCleanupResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
+			}
+			if running {
+				return mutation.CompanionCleanupResult{}, mutation.ErrGameRunning
+			}
+		}
+
+		worker, err := uassettool.NewWriteWorker(nil)
 		if err != nil {
-			return mutation.CompanionCleanupResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
+			return mutation.CompanionCleanupResult{}, err
 		}
-		if running {
-			return mutation.CompanionCleanupResult{}, mutation.ErrGameRunning
-		}
-	}
+		defer worker.Close()
 
-	worker, err := uassettool.NewWriteWorker(nil)
-	if err != nil {
-		return mutation.CompanionCleanupResult{}, err
-	}
-	defer worker.Close()
-
-	a.companionMu.Lock()
-	a.companionCancel = make(chan struct{})
-	cancel := a.companionCancel
-	a.companionMu.Unlock()
-	defer func() {
 		a.companionMu.Lock()
-		a.companionCancel = nil
+		a.companionCancel = make(chan struct{})
+		cancel := a.companionCancel
 		a.companionMu.Unlock()
-	}()
+		defer func() {
+			a.companionMu.Lock()
+			a.companionCancel = nil
+			a.companionMu.Unlock()
+		}()
 
-	return mutation.StripCompanionPaks(modRoot, entryIDs, worker, func(progress mutation.CompanionCleanupProgress) {
-		if a.ctx != nil {
-			wailsRuntime.EventsEmit(a.ctx, "companion:progress", progress)
-		}
-	}, cancel)
+		return mutation.StripCompanionPaks(modRoot, entryIDs, worker, func(progress mutation.CompanionCleanupProgress) {
+			if a.ctx != nil {
+				wailsRuntime.EventsEmit(a.ctx, "companion:progress", progress)
+			}
+		}, cancel)
+	})
 }
 
 // Stops an in-progress StripCompanionPaks after the current bundle finishes.
@@ -502,32 +539,42 @@ func (a *App) MoveMod(modRoot, entryID, destinationFolder string) (mutation.Resu
 
 // Creates one folder beneath the root or an existing scanner-known folder.
 func (a *App) CreateFolder(modRoot, parentFolder, name string) (mutation.Result, error) {
-	operation := mutation.NewCreateFolderOperation(modRoot, parentFolder, name)
-	return a.mutationExecutor.Execute(operation)
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		operation := mutation.NewCreateFolderOperation(modRoot, parentFolder, name)
+		return a.mutationExecutor.Execute(operation)
+	})
 }
 
 // Renames one scanner-known physical folder.
 func (a *App) RenameFolder(modRoot, folder, name string) (mutation.Result, error) {
-	operation := mutation.NewRenameFolderOperation(modRoot, folder, name)
-	return a.mutationExecutor.Execute(operation)
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		operation := mutation.NewRenameFolderOperation(modRoot, folder, name)
+		return a.mutationExecutor.Execute(operation)
+	})
 }
 
 // Moves one scanner-known physical folder beneath the root or another scanner-known folder.
 func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Result, error) {
-	operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
-	return a.mutationExecutor.Execute(operation)
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
+		return a.mutationExecutor.Execute(operation)
+	})
 }
 
 // Deletes one current scanner entry through the Windows Recycle Bin.
 func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Result, error) {
-	operation := mutation.NewDeleteModOperation(modRoot, entryID, confirmed)
-	return a.mutationExecutor.Execute(operation)
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		operation := mutation.NewDeleteModOperation(modRoot, entryID, confirmed)
+		return a.mutationExecutor.Execute(operation)
+	})
 }
 
 // Deletes one scanner-known physical folder and its contents through the Windows Recycle Bin.
 func (a *App) DeleteFolder(modRoot, folder string, confirmed bool) (mutation.Result, error) {
-	operation := mutation.NewDeleteFolderOperation(modRoot, folder, confirmed)
-	return a.mutationExecutor.Execute(operation)
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		operation := mutation.NewDeleteFolderOperation(modRoot, folder, confirmed)
+		return a.mutationExecutor.Execute(operation)
+	})
 }
 
 // Reports whether one scanner-known physical folder holds no entries at all.
@@ -546,22 +593,24 @@ func (a *App) IsFolderEmpty(modRoot, folder string) (bool, error) {
 // reconciled; this matches the existing frontend limitation described in
 // docs/reviews/phase-4-review.md.
 func (a *App) executeAndReconcile(operation mutation.Operation) (mutation.Result, error) {
-	result, err := a.mutationExecutor.Execute(operation)
-	if err != nil {
-		return result, err
-	}
-	if result.PreviousID == "" || result.PreviousID == result.ID {
-		return result, nil
-	}
+	return suppressWatcherResult(a, func() (mutation.Result, error) {
+		result, err := a.mutationExecutor.Execute(operation)
+		if err != nil {
+			return result, err
+		}
+		if result.PreviousID == "" || result.PreviousID == result.ID {
+			return result, nil
+		}
 
-	doc := a.loadMetadataDocument()
-	if !doc.ReconcileMod(result.PreviousID, result.ID) {
+		doc := a.loadMetadataDocument()
+		if !doc.ReconcileMod(result.PreviousID, result.ID) {
+			return result, nil
+		}
+		if err := a.metadataStore.Save(doc); err != nil {
+			return result, fmt.Errorf("reconcile mod metadata: %w", err)
+		}
 		return result, nil
-	}
-	if err := a.metadataStore.Save(doc); err != nil {
-		return result, fmt.Errorf("reconcile mod metadata: %w", err)
-	}
-	return result, nil
+	})
 }
 
 // MetadataState is the persisted document plus whether it had to be
@@ -595,6 +644,9 @@ func (a *App) loadMetadataDocument() metadata.Document {
 func (a *App) SetModRoot(modRoot string) error {
 	doc := a.loadMetadataDocument()
 	doc.Settings.ModRoot = modRoot
+	if a.watcher != nil {
+		_ = a.watcher.SetRoot(modRoot)
+	}
 	return a.metadataStore.Save(doc)
 }
 
@@ -726,6 +778,10 @@ func (a *App) startup(ctx context.Context) {
 		a.emitNexusLink(*pending)
 	}
 	a.ensureNexusProtocol()
+	doc := a.loadMetadataDocument()
+	if doc.Settings.ModRoot != "" && a.watcher != nil {
+		_ = a.watcher.SetRoot(doc.Settings.ModRoot)
+	}
 }
 
 // SelectFilesForInstall opens a native multiple-file dialog to select mod archives or direct bundles.
@@ -821,40 +877,42 @@ func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder 
 
 // ApplyInstall applies the approved installation items and cleans up the staging session.
 func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.ApplyItem) (install.ApplyResult, error) {
-	session := a.installSessionManager.GetSession(sessionID)
-	if session == nil {
-		return install.ApplyResult{}, fmt.Errorf("install staging session %q not found or expired", sessionID)
-	}
-	defer func() {
-		_ = a.installSessionManager.RemoveSession(sessionID)
-	}()
+	return suppressWatcherResult(a, func() (install.ApplyResult, error) {
+		session := a.installSessionManager.GetSession(sessionID)
+		if session == nil {
+			return install.ApplyResult{}, fmt.Errorf("install staging session %q not found or expired", sessionID)
+		}
+		defer func() {
+			_ = a.installSessionManager.RemoveSession(sessionID)
+		}()
 
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
+		ctx := a.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
 
-	worker, err := uassettool.NewWriteWorker(nil)
-	if err != nil {
-		return install.ApplyResult{}, err
-	}
-	defer worker.Close()
-	if err := stripStagedCompanionPaks(session, items, worker); err != nil {
-		return install.ApplyResult{}, err
-	}
+		worker, err := uassettool.NewWriteWorker(nil)
+		if err != nil {
+			return install.ApplyResult{}, err
+		}
+		defer worker.Close()
+		if err := stripStagedCompanionPaks(session, items, worker); err != nil {
+			return install.ApplyResult{}, err
+		}
 
-	result, err := install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
-	if err != nil {
-		return result, err
-	}
+		result, err := install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
+		if err != nil {
+			return result, err
+		}
 
-	if err := a.recordInstalledModMetadata(result); err != nil {
-		// Files are already in the library. Wails rejects the JS promise when
-		// the error is non-nil and discards ApplyResult, so the preview would
-		// show a failed install and skip the library refresh.
+		if err := a.recordInstalledModMetadata(result); err != nil {
+			// Files are already in the library. Wails rejects the JS promise when
+			// the error is non-nil and discards ApplyResult, so the preview would
+			// show a failed install and skip the library refresh.
+			return result, nil
+		}
 		return result, nil
-	}
-	return result, nil
+	})
 }
 
 func (a *App) recordInstalledModMetadata(result install.ApplyResult) error {
@@ -886,6 +944,9 @@ func (a *App) CancelInstall(sessionID string) error {
 // shutdown is called by Wails when the application is closing, ensuring
 // any session-held workers or background resources are cleanly closed.
 func (a *App) shutdown(_ context.Context) {
+	if a.watcher != nil {
+		_ = a.watcher.Close()
+	}
 	a.CancelNexusDownload()
 	if a.classifier != nil {
 		_ = a.classifier.Close()

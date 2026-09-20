@@ -808,3 +808,29 @@ func TestApplyUpdate_RejectsMissingInstallerFile(t *testing.T) {
 		t.Fatal("ApplyUpdate succeeded for an installer file that does not exist, want an error")
 	}
 }
+
+func TestAppWatcherIntegration(t *testing.T) {
+	app := testApp(t, false)
+	app.initWatcher()
+	if app.watcher == nil {
+		t.Fatal("initWatcher() did not create watcher")
+	}
+	defer app.watcher.Close()
+
+	dir := t.TempDir()
+	if _, err := app.ScanLibrary(dir); err != nil {
+		t.Fatalf("ScanLibrary() error = %v", err)
+	}
+	if app.watcher.Root() != dir {
+		t.Errorf("watcher.Root() = %q, want %q", app.watcher.Root(), dir)
+	}
+
+	// Setting mod root updates watcher root
+	dir2 := t.TempDir()
+	if err := app.SetModRoot(dir2); err != nil {
+		t.Fatalf("SetModRoot() error = %v", err)
+	}
+	if app.watcher.Root() != dir2 {
+		t.Errorf("watcher.Root() = %q, want %q", app.watcher.Root(), dir2)
+	}
+}
