@@ -13,6 +13,25 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.09.20]
+
+### Watching the crates live
+
+- Drop a mod into your folder, rename it in Windows Explorer, or delete a whole batch—Cratebug catches it right away. No manual refresh button and no restarting required.
+- If a new mod needs IoStore encryption or has leftover companion files (`chunknames`), Cratebug notices on the fly and offers the fix.
+- Your search query, active folder, and checked cards stay right where you left them while the library reloads.
+
+### Finding your crates
+
+- You can now open any mod or folder directly in File Explorer straight from Cratebug.
+
+### Settling in
+
+- Warnings now show up in yellow, saving red alerts for actual errors.
+- Popups have more breathing room and shorter, punchier text.
+- Dropdown menus and scrollbars dress in dark theme so they stop blinding you.
+- Added more hero portraits and skin assets for your catalog.
+
 ## [2026.09.18]
 
 ### Getting new crates in
