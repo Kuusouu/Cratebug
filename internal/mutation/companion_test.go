@@ -402,4 +402,3 @@ func (c *testCountingCaller) Call(action string, params map[string]any, result a
 	*c.calls++
 	return c.inner.Call(action, params, result)
 }
-
