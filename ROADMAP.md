@@ -464,6 +464,8 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 18 - Linux distribution
 
+**Status:** Active
+
 **Outcome:** Cratebug runs on Linux as a first-class build. Marvel Rivals is playable on Linux through Proton with its anti-cheat working, so the mods a Linux player manages are the same Windows bundles in the same Steam library layout. The work is making Cratebug itself portable, not changing what a mod is.
 
 **Includes:**
