@@ -442,8 +442,8 @@ export function LibraryScreen() {
 	const externalDragDepthRef = useRef(0);
 	const activeLibraryRootRef = useRef<string | null>(null);
 	const classificationRequestIDRef = useRef(0);
-	const offeredCompanionCleanupRootsRef = useRef(new Set<string>());
-	const offeredRequiredEncryptionRootsRef = useRef(new Set<string>());
+	const dismissedCompanionIDsRef = useRef(new Set<string>());
+	const dismissedRequiredEncryptionIDsRef = useRef(new Set<string>());
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
@@ -2114,21 +2114,17 @@ export function LibraryScreen() {
 	}
 
 	const maybeOfferCompanionCleanup = useCallback(async (root: string) => {
-		const key = root.toLowerCase();
-		if (offeredCompanionCleanupRootsRef.current.has(key)) {
-			setCompanionOfferSettled(true);
-			return;
-		}
 		try {
 			const found = await FindUnsupportedCompanionPaks(root);
 			if (activeLibraryRootRef.current !== root) return;
-			offeredCompanionCleanupRootsRef.current.add(key);
-			if (!found?.length) return;
-			setCompanionCleanupIDs(found);
+			const unoffered = (found ?? []).filter(
+				(id) => !dismissedCompanionIDsRef.current.has(id),
+			);
+			if (!unoffered.length) return;
+			setCompanionCleanupIDs(unoffered);
 			setCompanionCleanupOpen(true);
 		} catch {
-			// First-load warning is best-effort. A failed listing can retry on
-			// the next user-initiated scan.
+			// First-load or rescan warning is best-effort.
 		} finally {
 			if (activeLibraryRootRef.current === root) {
 				setCompanionOfferSettled(true);
@@ -2137,21 +2133,45 @@ export function LibraryScreen() {
 	}, []);
 
 	const maybeOfferRequiredEncryption = useCallback(async (root: string) => {
-		const key = root.toLowerCase();
-		if (offeredRequiredEncryptionRootsRef.current.has(key)) return;
 		try {
 			const found = await FindModsNeedingEncryption(root);
 			if (activeLibraryRootRef.current !== root) return;
-			if (!found?.length) {
-				offeredRequiredEncryptionRootsRef.current.add(key);
-				return;
-			}
-			setPendingRequiredEncryptionIDs(found);
+			const unoffered = (found ?? []).filter(
+				(id) => !dismissedRequiredEncryptionIDsRef.current.has(id),
+			);
+			if (!unoffered.length) return;
+			setPendingRequiredEncryptionIDs(unoffered);
 		} catch {
-			// First-load warning is best-effort. A failed classify can retry on
-			// the next user-initiated scan.
+			// First-load or rescan warning is best-effort.
 		}
 	}, []);
+
+	const handleFilesystemChange = useCallback(async () => {
+		if (isFolderMutatingRef.current || isMutationLocked) return;
+		if (!libraryRoot || libraryState === "loading") return;
+
+		const result = await reloadLibrary();
+		if (!result || result.entries.length === 0) return;
+
+		if (!activeDialog) {
+			void maybeOfferCompanionCleanup(libraryRoot);
+			void maybeOfferRequiredEncryption(libraryRoot);
+		}
+	}, [
+		activeDialog,
+		isMutationLocked,
+		libraryRoot,
+		libraryState,
+		maybeOfferCompanionCleanup,
+		maybeOfferRequiredEncryption,
+		reloadLibrary,
+	]);
+
+	useEffect(() => {
+		return EventsOn("library:fs-changed", () => {
+			void handleFilesystemChange();
+		});
+	}, [handleFilesystemChange]);
 
 	const stripCompanionPaks = useCallback(async (): Promise<boolean> => {
 		if (!libraryRoot || isFolderMutatingRef.current) return false;
@@ -2163,6 +2183,9 @@ export function LibraryScreen() {
 		try {
 			const result = await StripCompanionPaks(libraryRoot, ids);
 			if (activeLibraryRootRef.current !== libraryRoot) return false;
+			for (const id of result.succeeded ?? []) {
+				dismissedCompanionIDsRef.current.delete(id);
+			}
 			await reloadLibrary();
 			const succeeded = result.succeeded?.length ?? 0;
 			const failed = result.failed?.length ?? 0;
@@ -2209,6 +2232,9 @@ export function LibraryScreen() {
 		try {
 			const result = await SetModEncryption(libraryRoot, ids, true);
 			if (activeLibraryRootRef.current !== libraryRoot) return false;
+			for (const id of result.succeeded ?? []) {
+				dismissedRequiredEncryptionIDsRef.current.delete(id);
+			}
 			await reloadLibrary();
 			const succeeded = result.succeeded?.length ?? 0;
 			const failed = result.failed?.length ?? 0;
@@ -2248,9 +2274,6 @@ export function LibraryScreen() {
 		if (!companionOfferSettled) return;
 		if (companionCleanupOpen || companionProgress) return;
 		if (pendingRequiredEncryptionIDs.length === 0) return;
-		if (libraryRoot) {
-			offeredRequiredEncryptionRootsRef.current.add(libraryRoot.toLowerCase());
-		}
 		setRequiredEncryptionIDs(pendingRequiredEncryptionIDs);
 		setRequiredEncryptionOpen(true);
 		setPendingRequiredEncryptionIDs([]);
@@ -2258,7 +2281,6 @@ export function LibraryScreen() {
 		companionCleanupOpen,
 		companionOfferSettled,
 		companionProgress,
-		libraryRoot,
 		pendingRequiredEncryptionIDs,
 	]);
 
@@ -2822,7 +2844,12 @@ export function LibraryScreen() {
 				<CompanionPakDialog
 					count={companionCleanupIDs.length}
 					isMutating={isMutationLocked}
-					onClose={() => setCompanionCleanupOpen(false)}
+					onClose={() => {
+						for (const id of companionCleanupIDs) {
+							dismissedCompanionIDsRef.current.add(id);
+						}
+						setCompanionCleanupOpen(false);
+					}}
 					onConfirm={stripCompanionPaks}
 					skipConfirmDelay={skipConfirmDelay}
 				/>
@@ -2834,7 +2861,12 @@ export function LibraryScreen() {
 					<EncryptionRequiredDialog
 						entries={requiredEncryptionEntries}
 						isMutating={isMutationLocked}
-						onClose={() => setRequiredEncryptionOpen(false)}
+						onClose={() => {
+							for (const id of requiredEncryptionIDs) {
+								dismissedRequiredEncryptionIDsRef.current.add(id);
+							}
+							setRequiredEncryptionOpen(false);
+						}}
 						onConfirm={encryptRequiredMods}
 						skipConfirmDelay={skipConfirmDelay}
 					/>
