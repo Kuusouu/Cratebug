@@ -3,7 +3,7 @@ package main
 const (
 	preferredWindowWidth  = 1400
 	preferredWindowHeight = 950
-	minWindowWidth        = 1000
+	minWindowWidth        = 1350
 	minWindowHeight       = 650
 )
 
