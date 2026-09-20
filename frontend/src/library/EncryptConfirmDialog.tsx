@@ -62,12 +62,9 @@ export function EncryptConfirmDialog({
 				</div>
 				<p className="delete-confirm-summary">
 					Rebuilds {listed} by extracting and recreating each complete IoStore bundle.
-					This is not a bit-flip. Large mods can take several minutes. Disabled primaries
-					keep their disabled filename.
 				</p>
 				<p className="mutation-dialog-warning" role="status">
-					A failed rebuild leaves that mod as it was. Already-finished mods in this batch
-					stay {encrypt ? "encrypted" : "decrypted"}.
+					A failed rebuild leaves that mod as it was.
 				</p>
 				<div className="mutation-dialog-actions">
 					<button

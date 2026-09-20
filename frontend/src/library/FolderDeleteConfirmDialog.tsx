@@ -66,8 +66,8 @@ export function FolderDeleteConfirmDialog({
 		isEmpty === null
 			? "Checking the folder's contents..."
 			: isEmpty
-				? `Sends the empty folder ${folderName} to the Recycle Bin. You can restore it from there until the Recycle Bin is emptied.`
-				: `The folder ${folderName} is not empty. All of its contents will be deleted with it. The entire folder can be restored from the Recycle Bin until it is emptied.`;
+				? `Sends the empty folder ${folderName} to the Recycle Bin. You can restore it from there.`
+				: `The folder ${folderName} is not empty. All of its contents will be deleted with it. The entire folder can be restored from the Recycle Bin.`;
 
 	return (
 		<div className="mutation-dialog-backdrop">

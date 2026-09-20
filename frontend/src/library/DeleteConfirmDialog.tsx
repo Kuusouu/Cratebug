@@ -75,7 +75,7 @@ export function DeleteConfirmDialog({
 				<p className="delete-confirm-summary">
 					Sends {entries.length === 1 ? bundleFiles.join(", ") : `${entries.length} mods`}{" "}
 					to the Recycle Bin. You can restore {entries.length === 1 ? "it" : "them"} from
-					there until the Recycle Bin is emptied.
+					there.
 				</p>
 				{missingSidecar && (
 					<p className="delete-confirm-warning" role="alert">

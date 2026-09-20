@@ -74,7 +74,7 @@ export function DetectLibraryDialog({
 				role="dialog"
 				tabIndex={-1}
 			>
-				<div>
+				<div className={styles["detect-dialog-content"]}>
 					<p className="eyebrow">
 						<Logo className={styles["detect-dialog-logo"] ?? ""} /> {label}
 					</p>

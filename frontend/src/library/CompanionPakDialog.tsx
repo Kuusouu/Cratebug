@@ -57,10 +57,6 @@ export function CompanionPakDialog({
 					entries in a companion .pak cause anti-cheat crashes. {modsLabel} contain one or
 					both. Rewrite the affected .pak file(s)?
 				</p>
-				<p className="mutation-dialog-warning" role="status">
-					The IoStore .utoc and .ucas files will not be rebuilt. A failed rewrite leaves
-					that mod as it was.
-				</p>
 				<div className="mutation-dialog-actions">
 					<button
 						ref={cancelRef}

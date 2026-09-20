@@ -63,8 +63,8 @@ export function EncryptionRequiredDialog({
 					{entries.length === 1 ? "needs" : "need"} encryption.
 				</p>
 				<p className="mutation-dialog-warning" role="status">
-					This rebuilds each complete IoStore bundle. Large mods can take several minutes.
-					Close Marvel Rivals first. A failed rebuild leaves that mod as it was.
+					This rebuilds each complete IoStore bundle. Close Marvel Rivals first. A failed
+					rebuild leaves that mod as it was.
 				</p>
 				<div className="mutation-dialog-actions">
 					<button
