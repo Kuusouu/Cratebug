@@ -8,6 +8,7 @@
 	--accent: #d9a066;
 	--accent-ink: #231509;
 	--good: #74d29b;
+	--warn: #eed468;
 	--bad: #ee8d83;
 
 	display: flex;
@@ -29,6 +30,7 @@
 	--accent: #9c6b2f;
 	--accent-ink: #ffffff;
 	--good: #23834c;
+	--warn: #946800;
 	--bad: #bd3d37;
 
 	background: radial-gradient(circle at 0 0, #dceaff 0, transparent 31rem), var(--page);
@@ -45,6 +47,7 @@
 		--accent: #9c6b2f;
 		--accent-ink: #ffffff;
 		--good: #23834c;
+		--warn: #946800;
 		--bad: #bd3d37;
 
 		background: radial-gradient(circle at 0 0, #dceaff 0, transparent 31rem), var(--page);
@@ -418,6 +421,14 @@ button:disabled {
 .mutation-dialog-error {
 	margin: 0;
 	color: var(--bad);
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.4;
+}
+
+.mutation-dialog-warning {
+	margin: 0;
+	color: var(--warn);
 	font-size: 0.8rem;
 	font-weight: 650;
 	line-height: 1.4;

@@ -209,24 +209,41 @@
 	}
 }
 
-.install-collision-banner {
+.install-collision-banner,
+.install-warning-banner {
 	display: flex;
 	align-items: flex-start;
 	gap: 0.6rem;
 	padding: 0.65rem 0.75rem;
 	border-radius: 0.5rem;
-	background: color-mix(in srgb, var(--bad), transparent 90%);
-	border: 1px solid color-mix(in srgb, var(--bad), transparent 65%);
 	color: var(--text);
 	font-size: 0.8rem;
 }
 
-.install-collision-banner svg {
+.install-collision-banner {
+	background: color-mix(in srgb, var(--bad), transparent 90%);
+	border: 1px solid color-mix(in srgb, var(--bad), transparent 65%);
+}
+
+.install-warning-banner {
+	background: color-mix(in srgb, var(--warn), transparent 90%);
+	border: 1px solid color-mix(in srgb, var(--warn), transparent 65%);
+}
+
+.install-collision-banner svg,
+.install-warning-banner svg {
 	width: 1.1rem;
 	height: 1.1rem;
 	flex-shrink: 0;
-	color: var(--bad);
 	margin-top: 0.1rem;
+}
+
+.install-collision-banner svg {
+	color: var(--bad);
+}
+
+.install-warning-banner svg {
+	color: var(--warn);
 }
 
 .install-collision-content {
@@ -315,6 +332,14 @@
 }
 
 .install-footer-warning {
+	margin: 0;
+	color: var(--warn);
+	font-size: 0.8rem;
+	font-weight: 650;
+	text-align: right;
+}
+
+.install-footer-error {
 	margin: 0;
 	color: var(--bad);
 	font-size: 0.8rem;

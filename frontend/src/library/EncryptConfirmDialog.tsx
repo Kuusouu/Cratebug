@@ -65,7 +65,7 @@ export function EncryptConfirmDialog({
 					This is not a bit-flip. Large mods can take several minutes. Disabled primaries
 					keep their disabled filename.
 				</p>
-				<p className="delete-confirm-warning" role="alert">
+				<p className="mutation-dialog-warning" role="status">
 					A failed rebuild leaves that mod as it was. Already-finished mods in this batch
 					stay {encrypt ? "encrypted" : "decrypted"}.
 				</p>

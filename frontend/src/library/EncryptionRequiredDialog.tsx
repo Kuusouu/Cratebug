@@ -62,7 +62,7 @@ export function EncryptionRequiredDialog({
 					load unless the IoStore container is encrypted with the game key. {listed}{" "}
 					{entries.length === 1 ? "needs" : "need"} encryption.
 				</p>
-				<p className="delete-confirm-warning" role="alert">
+				<p className="mutation-dialog-warning" role="status">
 					This rebuilds each complete IoStore bundle. Large mods can take several minutes.
 					Close Marvel Rivals first. A failed rebuild leaves that mod as it was.
 				</p>

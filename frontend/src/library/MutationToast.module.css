@@ -31,7 +31,7 @@
 }
 
 .mutation-toast.warning {
-	border-color: color-mix(in srgb, var(--accent), transparent 38%);
+	border-color: color-mix(in srgb, var(--warn), transparent 38%);
 }
 
 .mutation-toast > svg {
@@ -50,7 +50,7 @@
 }
 
 .mutation-toast.warning > svg {
-	color: var(--accent);
+	color: var(--warn);
 }
 
 .mutation-toast p {

@@ -540,7 +540,7 @@ export function InstallPreviewDialog({
 
 										{isSelected && item.unsupportedCompanionPak && (
 											<div
-												className={styles["install-collision-banner"]}
+												className={styles["install-warning-banner"]}
 												role="status"
 											>
 												<TriangleAlert aria-hidden="true" />
@@ -683,23 +683,23 @@ export function InstallPreviewDialog({
 								</p>
 							)}
 							{blockingIssues && (
-								<p className={styles["install-footer-warning"]} role="alert">
+								<p className={styles["install-footer-error"]} role="alert">
 									Exclude any mod with a staging issue before installing.
 								</p>
 							)}
 							{hasBatchCollisions && (
-								<p className={styles["install-footer-warning"]} role="alert">
+								<p className={styles["install-footer-error"]} role="alert">
 									Multiple selected mods target the same name and destination
 									folder.
 								</p>
 							)}
 							{unresolvedCollisions && (
-								<p className={styles["install-footer-warning"]} role="alert">
+								<p className={styles["install-footer-error"]} role="alert">
 									Resolve all collisions before installing.
 								</p>
 							)}
 							{selectedItems.length === 0 && (
-								<p className={styles["install-footer-warning"]} role="alert">
+								<p className={styles["install-footer-error"]} role="alert">
 									Select at least 1 mod to install.
 								</p>
 							)}
