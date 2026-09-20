@@ -401,6 +401,8 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 16 - Nexus Mods integration (BYOK)
 
+**Status:** Complete. Review approved 2026-09-13; see `CHANGELOG.md`.
+
 **Outcome:** Users install Marvel Rivals mods from Nexus Mods with their own API key. Premium accounts download through the API. Free accounts start the download from the Nexus website via an `nxm://` link that Cratebug can own. The generic "Install from URL" path is removed.
 
 **Supersedes:** Phase 10's user-typed URL download (`App.InstallFromURL`, `InstallFromUrlDialog`, `internal/install/download.go`). Streaming, stall, and progress mechanics move into `internal/nexus`. No code path accepts an arbitrary user-typed download URL.
@@ -429,7 +431,36 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Generic URL install is gone.
 - Canonical checks pass. Running-app states are screenshotted and reviewed.
 
-## Phase 17 - Linux distribution
+## Phase 17 - Filesystem watching and live library reconciliation
+
+**Outcome:** Cratebug watches the active mod root recursively and reconciles library state automatically. External additions, deletions, renames, and moves appear in the catalog without a manual refresh. Newly added dirty companion PAKs and IoStore mods requiring encryption trigger their respective warning and cleanup dialogs promptly.
+
+**Includes:**
+
+- `internal/watcher`: recursive filesystem watcher with debouncing and noise filtering
+- Suppress watcher triggers during Cratebug's internal mutations
+- Emit `library:fs-changed` Wails runtime event on external modifications
+- Instant library reload preserving search query and valid folder selections
+- In-memory companion PAK cleanup inspection cache to keep rescans fast
+- Mod-level session dismissal tracking for companion cleanup and required encryption popups
+- Automatic dialog presentation when newly added mods require action
+
+**Excludes:**
+
+- File watching outside the configured mod root
+- Incremental partial-tree library diffing (full metadata scan is sub-10ms)
+- Background file watching when Cratebug is closed
+
+**Exit criteria:**
+
+- Unit tests for watcher debouncing, recursive folder registration, and mutation suppression pass.
+- Modifying files externally refreshes the catalog within the debounce window.
+- Dropping a dirty companion PAK externally triggers the companion cleanup dialog.
+- Dropping an unencrypted mod with non-character assets triggers the encryption dialog.
+- Internal Cratebug actions do not trigger duplicate scans or dialog loops.
+- All Go and frontend tests pass.
+
+## Phase 18 - Linux distribution
 
 **Outcome:** Cratebug runs on Linux as a first-class build. Marvel Rivals is playable on Linux through Proton with its anti-cheat working, so the mods a Linux player manages are the same Windows bundles in the same Steam library layout. The work is making Cratebug itself portable, not changing what a mod is.
 
@@ -464,6 +495,6 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Deferred post-release work
 
-Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, filesystem watching, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
+Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
 
 These require separate specification and roadmap decisions.

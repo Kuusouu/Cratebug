@@ -1,110 +1,74 @@
 # Cratebug Active Tasks
 
-**Phase:** 16 - Nexus Mods integration (BYOK)
+**Phase:** 17 - Filesystem watching and live library reconciliation
 **Status:** Active
 
 This file contains only the active work. Do not start the next phase.
 
 ## Objective
 
-Make Nexus Mods a first-class install source. Each user pastes their own personal API key (BYOK). Premium accounts download through the Nexus API. Free accounts must click Mod Manager Download on the Nexus website; Cratebug catches the `nxm://` link and uses its signed parameters. The generic "Install from URL" path is removed. Downloaded archives enter the existing Phase 8 staged preview and apply pipeline unchanged.
+Watch the active Marvel Rivals mod directory recursively. Reconcile catalog state automatically when external additions, edits, or removals occur. Retain current folder filter, search term, and valid checked selections across live reloads. Check newly discovered or modified mods for unsupported companion PAK entries (`chunknames` / `patched_files`) and required IoStore encryption, offering their respective warning popups without requiring an application restart.
 
 ## Design decisions
 
-* **BYOK, local only.** The user pastes a personal Nexus API key. No SSO, no shared application credential. The key never leaves the machine except as the `apikey` header on user-initiated Nexus API calls.
-* **Key stays out of `metadata.json`.** `LoadMetadata` returns the whole document to the WebView. Store the key at `%AppData%\Cratebug\nexus.key` via DPAPI (`internal/secret`). There is no `GetNexusAPIKey`.
-* **`nxm://` prompt only if taken.** The setting defaults to on. Register silently when nothing owns the scheme. If another app owns it, show a one-time dialog naming that owner and ask before taking over. Record the displaced command so unregister restores it. Never a silent grab.
-* **Runtime owns registration, not the installer.** The Wails `CUSTOM_PROTOCOL_ASSOCIATE` macro starts with an unconditional `DeleteRegKey`, which would hijack without consent and destroy the previous owner. Leave `wails.json` alone. The uninstaller runs `--uninstall-cleanup` and only deletes `HKCU\Software\Classes\nxm` if it still points inside `$INSTDIR`.
-* **Install from URL is gone.** `App.InstallFromURL`, `InstallFromUrlDialog`, the toolbar Link button, and `internal/install/download.go` are removed. Streaming, stall, and progress mechanics move into `internal/nexus`. No code path accepts a user-typed download URL.
-* **Install only.** No in-app browsing, search, endorsements, tracked mods, or update checking. Persist `NexusModID` / `NexusFileID` / `NexusVersion` on the installed mod so a later phase can check for updates.
-* **Free-user click is a product constraint.** Do not scrape Nexus, drive a browser, or synthesise a download key. A free account that pastes a mod URL opens the page and parks until an `nxm://` link arrives.
-* **File picker when the URL has no `file_id`.** Show MAIN and OPTIONAL files, pre-selecting the primary. Do not auto-install.
-* **Secrets never cross the Wails boundary.** Signed `key` / `expires` stay in Go (`linkSecrets`). The frontend sees identifiers and display metadata only.
-* **Header-driven rate limits.** Read `X-RL-*` headers. Never hardcode published numbers. Pre-flight refuse when remaining is zero and reset is still in the future.
-* **Dev builds do not register.** Skip `nxm://` registration when `AppVersion` is `dev` or the executable is not under the install directory.
-* **Adult content follows the Nexus account.** Honor `contains_adult_content` and GraphQL `preferences.adult` / `isBlockingContent`. Fail closed. No in-app override. Signed `nxm://` links are gated the same way as page URLs.
+* **Full directory scan over incremental patching.** `discovery.Scan` performs metadata-only traversal via `filepath.WalkDir` taking under 10 ms. Classification results and asset path listings are cached in memory by `(entryID, mtime)`. Companion PAK inspections are cached by `(pakPath, mtime, size)`. Incremental file patching adds high complexity and failure modes with no meaningful performance benefit.
+* **Go owns the watcher.** Following repository rules, filesystem operations belong in Go, not React. `internal/watcher` wraps `fsnotify` and manages recursive directories and debouncing.
+* **Trailing quiet-window debounce.** Rapid bursts of filesystem events (such as extracting archives or copying multi-gigabyte IoStore containers) are coalesced into a single notification after a 300 ms quiet period.
+* **Noise filtering.** Non-mod file extensions and hidden files (such as `.tmp`, `.crdownload`, `desktop.ini`, and metadata stores) do not trigger catalog rescans.
+* **Internal mutation suppression.** Cratebug operations (Enable, Disable, Rename, Move, Delete, Encrypt, Strip Companion, and Install) pause or suppress watcher notifications so Cratebug's own changes do not trigger duplicate scans or feedback loops.
+* **Session dismissal tracking per mod ID.** Popups track dismissed entry IDs rather than only library root paths. A user who declines fixing Mod A will not be re-prompted for Mod A, but dropping dirty Mod B will prompt for Mod B.
+* **Ordered popup queue.** Newly detected required encryption dialogs queue behind companion cleanup dialogs, preserving Phase 15 priority order.
 
 ## Out of scope
 
-* In-app Nexus browsing, search, endorsements, tracked mods, or update checking
-* Browser-extension intake
-* Automating the free-user website click
-* Nexus application registration (the maintainer handles that separately)
-* Silent takeover of another app's `nxm://` handler
-* Arbitrary-URL remote install
-* Windows Credential Manager (DPAPI is the chosen store)
-* In-app adult toggle, tag/author content blocks, OAuth, or dropping personal API keys
+* File watching outside the active mod root
+* Watching when Cratebug is closed
+* Incremental diff patching of the `discovery.Library` struct
 
-## 16.1 Docs
+## 17.1 Docs and design decisions
 
-Write the ROADMAP Phase 16 entry (with the Supersedes line), this TASKS file, SPEC additions (§6 workflows, §17 privacy/Nexus, §18 non-goal narrowing), the ROADMAP deferred-list edit, and `docs/decisions/0007-nexus-mods-integration.md`.
+Update ROADMAP and TASKS to define Phase 17. Document design decisions for watcher debouncing, scan strategy, and popup session tracking.
 
-**Verify:** ROADMAP names Phase 16 and carries Supersedes. SPEC no longer lists deep-link intake as a non-goal. 0007 states the two download paths.
+**Verify:** `ROADMAP.md` reflects Phase 17, and `TASKS.md` contains Phase 17 active tasks.
 
-## 16.2 Secret storage
+## 17.2 Filesystem watcher package
 
-`internal/secret` — neutral `secret.go`, `protect_windows.go`, `protect_other.go`, injectable seam.
+Implement `internal/watcher`:
+- `Watcher` wrapping `github.com/fsnotify/fsnotify`
+- Recursive subfolder discovery and dynamic addition/removal on directory create/delete events
+- Trailing debounce (300 ms)
+- Extension and file noise filtering
+- Pause, Resume, and SetRoot methods
 
-**Verify:** `go test ./internal/secret/ -count=1`. Neutral tests with a fake protector under `t.TempDir()`: round-trip; missing file → `ErrNotConfigured`; `Configured()` false→true→false; `Clear` on absent → nil; corrupted ciphertext errors rather than panics; empty rejected; atomic write leaves no temp file; mode `0600`. Windows tests exercise real DPAPI in memory only (protect→unprotect equal; wrong entropy fails; truncated ciphertext fails) — no filesystem, no residue.
+**Verify:** `go test ./internal/watcher/ -count=1`. Unit tests under `t.TempDir()` covering directory creation, file creation, debounced burst events, noise filtering, and pause/resume suppression.
 
-## 16.3 Nexus API client
+## 17.3 Companion inspection cache
 
-`internal/nexus`: `Client` with `Validate`, `Mod`, `Files`, `File`, `DownloadLinks`; rate-limit capture and pre-flight refusal; the TTL cache; typed sentinels; header-injection rejection on the key.
+Implement in-memory inspection caching in `internal/mutation` for companion PAK scans:
+- Keyed by `(pakAbs, mtimeNs, size)`
+- Avoid redundant worker calls during rescans when `.pak` files have not changed
 
-**Verify:** `go test ./internal/nexus/ -count=1` against `httptest`. Cover each status → sentinel mapping, header parsing, cache hit/miss, pre-flight rate-limit refusal, and that no error string contains an API key or a `key=` parameter.
+**Verify:** `go test ./internal/mutation/ -run TestFindUnsupportedCompanionPaks -count=1`. Verify cache hit avoids caller invocations on unchanged files.
 
-## 16.4 Link parsing and redaction
+## 17.4 App layer wiring and suppression
 
-`ParseDownloadURL`, `ParseModPageURL`, `FirstDownloadURL`, `redactURL` in `internal/nexus/url.go`. All pure.
+Wire `internal/watcher` into `App` (`app.go`):
+- Start watcher when mod root is loaded or updated
+- Emit `library:fs-changed` Wails event when changes settle
+- Suppress watcher triggers during internal mutations in `ExecuteMutation`, `StripCompanionPaks`, `EncryptMods`, and mod installs
 
-**Verify:** Table tests — premium link, free link with `key`/`expires`, wrong scheme, wrong game, collections/oauth/premium hosts, missing segments, non-numeric IDs, absurd length, an embedded `"`; both site URL shapes with and without `file_id`; `FirstDownloadURL` over empty / one / not-at-index-0 / two / a Windows path / `--uninstall-cleanup`. `redactURL` on unparseable input returns the literal placeholder.
+**Verify:** `go test ./... -count=1`. Unit tests confirming watcher suppression during mutations and event emission.
 
-## 16.5 Nexus download; retire the generic URL download
+## 17.5 Frontend live refresh and popup triggering
 
-Move `internal/install/download.go` → `internal/nexus/download.go` with Nexus-scoped URL provenance, `FileInfo.file_name`, HTTPS-only redirects, size check, throttled progress, and `redactURL` on every error path. Delete `internal/install/download.go` and `download_test.go`. Export `install.IsSupportedInstallFile`. Port the eight existing download tests and add redirect-downgrade, size-mismatch, caller-cancellation, and `TestDownloadErrorsRedactQueryParameters`.
+Update `LibraryScreen.tsx`:
+- Listen to `library:fs-changed` event
+- Call `reloadLibrary()` while preserving active folder and search query
+- Track dismissed companion cleanup and encryption entry IDs
+- Trigger `CompanionPakDialog` and `RequiredEncryptionDialog` when new dirty mods are detected
 
-**Verify:** `go test ./internal/nexus/ ./internal/install/ -count=1`. Confirm no remaining reference to `DownloadRemoteFile` anywhere in the tree.
+**Verify:** `bun run check` and `bun test`.
 
-## 16.6 Metadata additions
+## 17.6 Verification
 
-Add the `NexusProtocol` snapshot struct to `metadata.Settings` with a `Set*` validator, and `NexusModID` / `NexusFileID` / `NexusVersion` (all `omitempty`) to `metadata.ModRecord`. Confirm the install path actually reaches `EnsureMod` for a freshly installed mod before wiring the write; if it does not, add it here.
-
-**Verify:** `go test ./internal/metadata/ -count=1` — reject / accept / round-trip / loads-as-empty, matching `settings_test.go`. `CurrentSchemaVersion` stays at 1; assert a schema-1 document with no `nexusProtocol` field loads clean.
-
-## 16.7 App layer
-
-`app_nexus.go` with the bound methods, the `pendingURLMu`-guarded buffer, `linkSecrets`, `ctxReady`, the download cancel func, and the `nexus:link` event. Remove `App.InstallFromURL`. Regenerate and commit `frontend/wailsjs/**`.
-
-A working premium download is reachable here from DevTools before any UI exists. Ask before running live-API checks.
-
-**Verify:** `go test ./... -count=1`, including `-race`. New `app_nexus_test.go`: key set/reject (empty, whitespace-only, control characters), `NexusKeyState` false→true→false against a `t.TempDir()` store, buffer take-once semantics, concurrent Set/Take under `-race`, and the SENTINEL leak test (`nexus:link` JSON must not contain `SENTINEL`). Bindings regenerated and committed.
-
-## 16.8 Protocol registration, single instance, uninstall cleanup
-
-`internal/urlscheme`. `main.go`: `singleInstanceID`, `SingleInstanceLock`, `parseLaunchArgs`, the `--uninstall-cleanup` branch. `project.nsi` uninstall additions.
-
-**Verify:** Go unit tests against a fake registry, runnable anywhere — `Status` for none/self/selfStale/other/other-with-UserChoice/machine-wide-only; `commandExecutablePath` for quoted-with-spaces, bare, quoted-with-flags, empty, unbalanced quote; `Register` records the exact `Snapshot` including a previous owner with extra subkeys; `Unregister` with a foreign owner in place is a no-op; `Unregister` restores value-for-value; the produced command is exactly `"<exe>" "%1"` for a path with a space; `deleteKeyTree` visits deepest-first. Plus an integration test against a test-only scheme (`cratebug-test-<random>`) with `t.Cleanup` — never `nxm`. Plus `main_test.go` for `parseLaunchArgs`, and `onSecondInstanceLaunch` with `ctxReady == false`.
-
-**Manual:** cold `nxm://` click with Cratebug closed; warm click with it open; with it minimised; two clicks within ~200 ms (a second window is possible — the `FindWindowW` race); plain second double-click (foregrounds, no new window); take-over of a foreign handler and unregister restoring it; confirm a `wails dev` session does not register; confirm `os.Args[1]` carries the URL.
-
-## 16.9 Settings UI
-
-The Settings "Nexus Mods" section: paste-only masked key, connected state (name, Premium/Free), link to the Nexus API-key page, Disconnect, the `nxm://` handler switch (`role="switch"`), remaining-requests line, take-over confirmation, and the UserChoice warning.
-
-**Verify:** `bun run check`, `bun test`. Screenshot each account state.
-
-## 16.10 Install UI
-
-Delete `InstallFromUrlDialog.tsx` and every Install-from-URL reference. Add `InstallFromNexusDialog.tsx` and `NexusLinkDialog.tsx`. Change `InstallSource`'s remote arm to `{ kind: "nexus"; modId: number; fileId: number }`. Swap the toolbar `Link` icon for `Download`. Add `nexusPresentation.ts` + tests. Add the `install:progress` and `nexus:link` listeners and the mount-effect `TakePendingNexusLink()` call.
-
-**Verify:** `bun run check`, `bun test`. Screenshots: not-connected, connected-free, connected-premium, paste dialog, file picker, nxm confirm, download progress, free-user-needs-website-click, and each error state.
-
-## 16.11 Adult content gate
-
-Refuse adult Nexus mods when the signed-in account has adult content off. Decode `contains_adult_content`, read GraphQL `preferences.adult`, fail closed, no in-app override. Gate `resolveDownloadRequest` (before metadata) and `PrepareNexusInstall` (before File/DownloadLinks). Map the error in the paste and nxm dialogs with an **Open Content Blocking** button to `https://next.nexusmods.com/settings/content-blocking`.
-
-**Verify:** `go test ./internal/nexus/ ./ -count=1` (and `-race` on the app tests that grow). Table tests for `AllowAdultContent`. Client tests: GraphQL decode, cache, rate-limit, no API key in error strings. App tests: `ResolveNexusModPage` / `TakePendingNexusLink` / `PrepareNexusInstall` against httptest (adult + preference off is blocked with empty metadata; adult + preference on is allowed). `bun test` for the error string.
-
-## 16.12 Verify
-
-`.\check.ps1`, `go test ./... -count=1 -race`, `bun test`. Update `docs/USER_GUIDE.md` (getting an API key, what the handler toggle does, the free-user click) and `docs/TROUBLESHOOTING.md` (key rejected, rate limited, link expired, another app owns `nxm://`, a Windows default-apps override). Screenshots to `docs/screenshots/phase-16/task-<n>-<state>.png`. Run a real uninstall and confirm the handler is restored and `nexus.key` is gone. Stop at the review gate.
+Run canonical checks: `go test ./... -count=1`, `bun run check`, `bun test`.
