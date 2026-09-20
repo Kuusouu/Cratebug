@@ -44,6 +44,7 @@ type Watcher struct {
 	closed       bool
 	paused       bool
 	ignoredUntil time.Time
+	generation   uint64
 }
 
 // New creates a new filesystem watcher.
@@ -78,10 +79,9 @@ func (w *Watcher) SetRoot(root string) error {
 		return fmt.Errorf("watcher is closed")
 	}
 
-	w.clearWatchesLocked()
-
 	cleanRoot := strings.TrimSpace(root)
 	if cleanRoot == "" {
+		w.clearWatchesLocked()
 		w.root = ""
 		return nil
 	}
@@ -90,6 +90,12 @@ func (w *Watcher) SetRoot(root string) error {
 	if err != nil {
 		return fmt.Errorf("resolve watch root: %w", err)
 	}
+
+	if absRoot == w.root {
+		return nil
+	}
+
+	w.clearWatchesLocked()
 
 	info, err := os.Stat(absRoot)
 	if err != nil {
@@ -119,6 +125,7 @@ func (w *Watcher) Pause() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.paused = true
+	w.generation++
 	if w.timer != nil {
 		w.timer.Stop()
 		w.timer = nil
@@ -136,6 +143,7 @@ func (w *Watcher) ResumeAfter(quietDelay time.Duration) {
 	defer w.mu.Unlock()
 	w.paused = false
 	w.ignoredUntil = time.Now().Add(quietDelay)
+	w.generation++
 	if w.timer != nil {
 		w.timer.Stop()
 		w.timer = nil
@@ -157,6 +165,7 @@ func (w *Watcher) Close() error {
 		return nil
 	}
 	w.closed = true
+	w.generation++
 	if w.timer != nil {
 		w.timer.Stop()
 		w.timer = nil
@@ -167,6 +176,7 @@ func (w *Watcher) Close() error {
 }
 
 func (w *Watcher) clearWatchesLocked() {
+	w.generation++
 	for dir := range w.trackedDirs {
 		_ = w.fsWatcher.Remove(dir)
 	}
@@ -215,39 +225,66 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed || w.paused || w.root == "" {
-		return
-	}
-	if time.Now().Before(w.ignoredUntil) {
+	if w.closed || w.root == "" {
 		return
 	}
 
 	path := event.Name
-	base := filepath.Base(path)
-	if shouldIgnoreName(base) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return
+	}
+	cleanPath := filepath.Clean(absPath)
+	rel, err := filepath.Rel(w.root, cleanPath)
+	if err != nil || strings.HasPrefix(rel, "..") {
 		return
 	}
 
-	// Dynamic directory handling
+	base := filepath.Base(cleanPath)
+	if shouldIgnoreName(base) || shouldIgnoreDirName(base) {
+		return
+	}
+
+	// Always track directories dynamically, even when paused or in quiet window.
+	// This ensures directories created during internal mutations are tracked immediately.
+	isDirChange := false
 	if event.Op&(fsnotify.Create|fsnotify.Rename) != 0 {
-		if info, err := os.Stat(path); err == nil && info.IsDir() {
-			_ = w.watchSubtreeLocked(path)
-			w.scheduleDebounceLocked()
-			return
+		if info, err := os.Stat(cleanPath); err == nil && info.IsDir() {
+			_ = w.watchSubtreeLocked(cleanPath)
+			isDirChange = true
 		}
 	}
 
-	if event.Op&(fsnotify.Remove) != 0 {
-		if _, tracked := w.trackedDirs[path]; tracked {
-			delete(w.trackedDirs, path)
-			_ = w.fsWatcher.Remove(path)
-			w.scheduleDebounceLocked()
-			return
+	if event.Op&(fsnotify.Remove|fsnotify.Rename) != 0 {
+		if _, tracked := w.trackedDirs[cleanPath]; tracked {
+			if info, err := os.Stat(cleanPath); err != nil || !info.IsDir() {
+				delete(w.trackedDirs, cleanPath)
+				_ = w.fsWatcher.Remove(cleanPath)
+				isDirChange = true
+
+				prefix := cleanPath + string(filepath.Separator)
+				for trackedDir := range w.trackedDirs {
+					if strings.HasPrefix(trackedDir, prefix) {
+						delete(w.trackedDirs, trackedDir)
+						_ = w.fsWatcher.Remove(trackedDir)
+					}
+				}
+			}
 		}
 	}
 
-	// Check if this is a recognized mod file or an operation on a tracked directory
-	if _, tracked := w.trackedDirs[path]; tracked {
+	// If paused or in suppression window, do not schedule notifications.
+	if w.paused || time.Now().Before(w.ignoredUntil) {
+		return
+	}
+
+	if isDirChange {
+		w.scheduleDebounceLocked()
+		return
+	}
+
+	// Check if this is an operation on a tracked directory or recognized mod file
+	if _, tracked := w.trackedDirs[cleanPath]; tracked {
 		w.scheduleDebounceLocked()
 		return
 	}
@@ -258,12 +295,14 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 }
 
 func (w *Watcher) scheduleDebounceLocked() {
+	w.generation++
+	gen := w.generation
 	if w.timer != nil {
 		w.timer.Stop()
 	}
 	w.timer = time.AfterFunc(w.debounce, func() {
 		w.mu.Lock()
-		if w.closed || w.paused || time.Now().Before(w.ignoredUntil) {
+		if w.closed || w.paused || time.Now().Before(w.ignoredUntil) || w.generation != gen {
 			w.mu.Unlock()
 			return
 		}

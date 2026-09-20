@@ -446,6 +446,7 @@ export function LibraryScreen() {
 	const dismissedRequiredEncryptionIDsRef = useRef(new Set<string>());
 	const mutatingEntryIDsRef = useRef(new Set<string>());
 	const isFolderMutatingRef = useRef(false);
+	const isReloadingRef = useRef(false);
 	const nextMutationFeedbackIDRef = useRef(0);
 	const hasLoadedInitialMetadataRef = useRef(false);
 	const hasCheckedWhatsNewRef = useRef(false);
@@ -910,6 +911,12 @@ export function LibraryScreen() {
 
 			setLibrary(result);
 			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+			setSelectedFolder((current) => {
+				if (current !== "all" && current !== "" && !result.folders.includes(current)) {
+					return "all";
+				}
+				return current;
+			});
 			setCheckedEntryIDs((current) =>
 				retainCheckedIDs(current, new Set(result.entries.map((entry) => entry.id))),
 			);
@@ -2114,13 +2121,18 @@ export function LibraryScreen() {
 	}
 
 	const maybeOfferCompanionCleanup = useCallback(async (root: string) => {
+		setCompanionOfferSettled(false);
 		try {
 			const found = await FindUnsupportedCompanionPaks(root);
 			if (activeLibraryRootRef.current !== root) return;
 			const unoffered = (found ?? []).filter(
 				(id) => !dismissedCompanionIDsRef.current.has(id),
 			);
-			if (!unoffered.length) return;
+			if (!unoffered.length) {
+				setCompanionCleanupOpen(false);
+				setCompanionCleanupIDs([]);
+				return;
+			}
 			setCompanionCleanupIDs(unoffered);
 			setCompanionCleanupOpen(true);
 		} catch {
@@ -2139,7 +2151,12 @@ export function LibraryScreen() {
 			const unoffered = (found ?? []).filter(
 				(id) => !dismissedRequiredEncryptionIDsRef.current.has(id),
 			);
-			if (!unoffered.length) return;
+			if (!unoffered.length) {
+				setRequiredEncryptionOpen(false);
+				setPendingRequiredEncryptionIDs([]);
+				setRequiredEncryptionIDs([]);
+				return;
+			}
 			setPendingRequiredEncryptionIDs(unoffered);
 		} catch {
 			// First-load or rescan warning is best-effort.
@@ -2147,24 +2164,48 @@ export function LibraryScreen() {
 	}, []);
 
 	const handleFilesystemChange = useCallback(async () => {
-		if (isFolderMutatingRef.current || isMutationLocked) return;
+		if (isFolderMutatingRef.current || isReloadingRef.current || isMutationLocked) return;
 		if (!libraryRoot || libraryState === "loading") return;
 
-		const result = await reloadLibrary();
-		if (!result || result.entries.length === 0) return;
+		isReloadingRef.current = true;
+		try {
+			const result = await reloadLibrary();
+			if (!result || result.entries.length === 0) {
+				setCompanionCleanupOpen(false);
+				setCompanionCleanupIDs([]);
+				setRequiredEncryptionOpen(false);
+				setPendingRequiredEncryptionIDs([]);
+				setRequiredEncryptionIDs([]);
+				return;
+			}
 
-		if (!activeDialog) {
-			void maybeOfferCompanionCleanup(libraryRoot);
-			void maybeOfferRequiredEncryption(libraryRoot);
+			if (
+				!activeDialog &&
+				!activeFolderDialog &&
+				!detectionDialog &&
+				!installSource &&
+				!settingsOpen
+			) {
+				await maybeOfferCompanionCleanup(libraryRoot);
+				if (activeLibraryRootRef.current === libraryRoot) {
+					await maybeOfferRequiredEncryption(libraryRoot);
+				}
+			}
+		} finally {
+			isReloadingRef.current = false;
 		}
 	}, [
 		activeDialog,
+		activeFolderDialog,
+		detectionDialog,
+		installSource,
 		isMutationLocked,
 		libraryRoot,
 		libraryState,
 		maybeOfferCompanionCleanup,
 		maybeOfferRequiredEncryption,
 		reloadLibrary,
+		settingsOpen,
 	]);
 
 	useEffect(() => {
@@ -2292,6 +2333,8 @@ export function LibraryScreen() {
 
 		const root = (overrideRoot ?? modRoot).trim();
 		if (!root) {
+			dismissedCompanionIDsRef.current.clear();
+			dismissedRequiredEncryptionIDsRef.current.clear();
 			activeLibraryRootRef.current = null;
 			setLibrary(null);
 			setScanError("");
@@ -2314,6 +2357,10 @@ export function LibraryScreen() {
 			return;
 		}
 
+		if (activeLibraryRootRef.current !== root) {
+			dismissedCompanionIDsRef.current.clear();
+			dismissedRequiredEncryptionIDsRef.current.clear();
+		}
 		activeLibraryRootRef.current = root;
 		setLibraryState("loading");
 		setScanError("");
@@ -2857,7 +2904,8 @@ export function LibraryScreen() {
 			{requiredEncryptionOpen &&
 				requiredEncryptionEntries.length > 0 &&
 				!encryptProgress &&
-				!companionProgress && (
+				!companionProgress &&
+				!companionCleanupOpen && (
 					<EncryptionRequiredDialog
 						entries={requiredEncryptionEntries}
 						isMutating={isMutationLocked}

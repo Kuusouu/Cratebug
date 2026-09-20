@@ -3,6 +3,7 @@ module github.com/Kuusouu/Cratebug
 go 1.26.5
 
 require (
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/mholt/archives v0.1.5
 	github.com/wailsapp/wails/v2 v2.13.0
 	golang.org/x/sys v0.44.0
@@ -17,7 +18,6 @@ require (
 	github.com/bodgit/sevenzip v1.6.1 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect

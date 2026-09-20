@@ -169,8 +169,17 @@ func (a *App) ClassificationType() modtype.Identity {
 
 // Returns the read-only catalog discovered beneath modRoot.
 func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
-	if a.watcher != nil && a.watcher.Root() != modRoot {
-		_ = a.watcher.SetRoot(modRoot)
+	if a.watcher != nil {
+		currentRoot := a.watcher.Root()
+		targetRoot := strings.TrimSpace(modRoot)
+		if targetRoot != "" {
+			if abs, err := filepath.Abs(targetRoot); err == nil {
+				targetRoot = abs
+			}
+		}
+		if filepath.Clean(currentRoot) != filepath.Clean(targetRoot) {
+			_ = a.watcher.SetRoot(modRoot)
+		}
 	}
 	return discovery.Scan(modRoot)
 }
@@ -462,14 +471,38 @@ func (a *App) FindModsNeedingEncryption(modRoot string) ([]string, error) {
 	return mutation.FindModsNeedingEncryption(library.Entries, identities, paths), nil
 }
 
+type lazyWorkerCaller struct {
+	mu     sync.Mutex
+	worker *uassettool.Worker
+}
+
+func (l *lazyWorkerCaller) Call(action string, params map[string]any, result any) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.worker == nil {
+		w, err := uassettool.NewWriteWorker(nil)
+		if err != nil {
+			return err
+		}
+		l.worker = w
+	}
+	return l.worker.Call(action, params, result)
+}
+
+func (l *lazyWorkerCaller) Close() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.worker != nil {
+		_ = l.worker.Close()
+		l.worker = nil
+	}
+}
+
 // Lists scanner IDs whose companion PAK still contains chunknames or patched_files.
 func (a *App) FindUnsupportedCompanionPaks(modRoot string) ([]string, error) {
-	worker, err := uassettool.NewWriteWorker(nil)
-	if err != nil {
-		return nil, err
-	}
-	defer worker.Close()
-	return mutation.FindUnsupportedCompanionPaksWithCache(modRoot, worker, a.companionCache)
+	lazy := &lazyWorkerCaller{}
+	defer lazy.Close()
+	return mutation.FindUnsupportedCompanionPaksWithCache(modRoot, lazy, a.companionCache)
 }
 
 // Rewrites each dirty companion PAK one at a time. Emits companion:progress.

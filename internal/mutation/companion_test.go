@@ -311,8 +311,12 @@ func TestStripCompanionPaksKeepsHybridRawFiles(t *testing.T) {
 }
 
 func TestStripCompanionPaksRejectsEmptySelection(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	caller := &scriptedCompanionCaller{}
+
 	// Act
-	_, err := StripCompanionPaks(t.TempDir(), nil, &scriptedCompanionCaller{}, nil, nil)
+	_, err := StripCompanionPaks(root, nil, caller, nil, nil)
 
 	// Assert
 	if err == nil {
@@ -368,28 +372,33 @@ func TestFindUnsupportedCompanionPaksWithCache(t *testing.T) {
 	cache := NewCompanionCache()
 
 	// Act - first scan populates cache
-	found1, err := FindUnsupportedCompanionPaksWithCache(root, countingCaller, cache)
-	if err != nil {
-		t.Fatalf("first scan error = %v", err)
+	found1, err1 := FindUnsupportedCompanionPaksWithCache(root, countingCaller, cache)
+	firstCalls := callCount
+
+	// Assert - first scan results
+	if err1 != nil {
+		t.Fatalf("first scan error = %v", err1)
 	}
 	if len(found1) != 1 {
 		t.Fatalf("found1 len = %d, want 1", len(found1))
 	}
-	firstCalls := callCount
 	if firstCalls == 0 {
 		t.Fatalf("firstCalls = 0, want calls made")
 	}
 
-	// Act - second scan with unchanged files should hit cache completely
-	found2, err := FindUnsupportedCompanionPaksWithCache(root, countingCaller, cache)
-	if err != nil {
-		t.Fatalf("second scan error = %v", err)
+	// Act - second scan with unchanged files hits cache
+	found2, err2 := FindUnsupportedCompanionPaksWithCache(root, countingCaller, cache)
+	secondCalls := callCount
+
+	// Assert - second scan reuses cache without additional calls
+	if err2 != nil {
+		t.Fatalf("second scan error = %v", err2)
 	}
 	if len(found2) != 1 || found2[0] != found1[0] {
 		t.Fatalf("found2 = %v, want %v", found2, found1)
 	}
-	if callCount != firstCalls {
-		t.Fatalf("callCount after cached scan = %d, want %d (zero additional calls)", callCount, firstCalls)
+	if secondCalls != firstCalls {
+		t.Fatalf("callCount after cached scan = %d, want %d (zero additional calls)", secondCalls, firstCalls)
 	}
 }
 

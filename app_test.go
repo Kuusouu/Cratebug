@@ -6,7 +6,9 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
@@ -17,6 +19,7 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/mutation"
 	"github.com/Kuusouu/Cratebug/internal/secret"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
+	"github.com/Kuusouu/Cratebug/internal/watcher"
 )
 
 type staticGameRunningChecker struct {
@@ -750,7 +753,7 @@ func TestAppInstallCancel(t *testing.T) {
 		t.Fatalf("CancelInstall failed: %v", err)
 	}
 
-	// Attempting to apply after cancel should fail because session is removed
+	// Act - attempt apply after cancel
 	applyItems := []install.ApplyItem{
 		{
 			ID:                preview.Items[0].ID,
@@ -760,6 +763,8 @@ func TestAppInstallCancel(t *testing.T) {
 		},
 	}
 	_, err = app.ApplyInstall(modRoot, preview.SessionID, applyItems)
+
+	// Assert - apply fails because session was cancelled
 	if err == nil {
 		t.Fatalf("expected ApplyInstall to fail after CancelInstall, but it succeeded")
 	}
@@ -771,28 +776,43 @@ func TestAppInstallCancel(t *testing.T) {
 // the acceptance path calls update.ApplyUpdate, which spawns a real
 // detached process and isn't something a unit test should trigger.
 func TestApplyUpdate_RejectsPathOutsideExpectedDirectory(t *testing.T) {
+	// Arrange
 	app := testApp(t, false)
-
 	outsidePath := filepath.Join(t.TempDir(), "installer.exe")
-	if err := app.ApplyUpdate(outsidePath); err == nil {
+
+	// Act
+	err := app.ApplyUpdate(outsidePath)
+
+	// Assert
+	if err == nil {
 		t.Fatal("ApplyUpdate succeeded for a path outside the expected download directory, want an error")
 	}
 }
 
 func TestApplyUpdate_RejectsNonExeExtension(t *testing.T) {
+	// Arrange
 	app := testApp(t, false)
-
 	insidePath := filepath.Join(os.TempDir(), updateDownloadDirName, "installer.bat")
-	if err := app.ApplyUpdate(insidePath); err == nil {
+
+	// Act
+	err := app.ApplyUpdate(insidePath)
+
+	// Assert
+	if err == nil {
 		t.Fatal("ApplyUpdate succeeded for a non-.exe path, want an error")
 	}
 }
 
 func TestApplyUpdate_RejectsPathTraversal(t *testing.T) {
+	// Arrange
 	app := testApp(t, false)
-
 	traversalPath := filepath.Join(os.TempDir(), updateDownloadDirName, "..", "..", "System32", "evil.exe")
-	if err := app.ApplyUpdate(traversalPath); err == nil {
+
+	// Act
+	err := app.ApplyUpdate(traversalPath)
+
+	// Assert
+	if err == nil {
 		t.Fatal("ApplyUpdate succeeded for a path traversal attempt, want an error")
 	}
 }
@@ -801,15 +821,108 @@ func TestApplyUpdate_RejectsPathTraversal(t *testing.T) {
 // the helper is launched and the app quits, or a vanished installer (e.g.
 // antivirus quarantine) would close Cratebug with no relaunch and no error.
 func TestApplyUpdate_RejectsMissingInstallerFile(t *testing.T) {
+	// Arrange
 	app := testApp(t, false)
-
 	missingPath := filepath.Join(os.TempDir(), updateDownloadDirName, "missing-installer.exe")
-	if err := app.ApplyUpdate(missingPath); err == nil {
+
+	// Act
+	err := app.ApplyUpdate(missingPath)
+
+	// Assert
+	if err == nil {
 		t.Fatal("ApplyUpdate succeeded for an installer file that does not exist, want an error")
 	}
 }
 
 func TestAppWatcherIntegration(t *testing.T) {
+	// Arrange
+	app := testApp(t, false)
+	app.initWatcher()
+	if app.watcher == nil {
+		t.Fatal("initWatcher() did not create watcher")
+	}
+	defer app.watcher.Close()
+
+	dir := t.TempDir()
+
+	// Act
+	_, scanErr := app.ScanLibrary(dir)
+	gotRoot := app.watcher.Root()
+
+	// Assert
+	if scanErr != nil {
+		t.Fatalf("ScanLibrary() error = %v", scanErr)
+	}
+	if gotRoot != dir {
+		t.Errorf("watcher.Root() = %q, want %q", gotRoot, dir)
+	}
+
+	// Arrange - new directory for SetModRoot
+	dir2 := t.TempDir()
+
+	// Act
+	setErr := app.SetModRoot(dir2)
+	gotRoot2 := app.watcher.Root()
+
+	// Assert
+	if setErr != nil {
+		t.Fatalf("SetModRoot() error = %v", setErr)
+	}
+	if gotRoot2 != dir2 {
+		t.Errorf("watcher.Root() = %q, want %q", gotRoot2, dir2)
+	}
+}
+
+func TestAppWatcherSuppressionAndTracking(t *testing.T) {
+	// Arrange
+	app := testApp(t, false)
+
+	var triggerCount atomic.Int32
+	w, err := watcher.New(watcher.Options{
+		Debounce: 50 * time.Millisecond,
+		OnChange: func() {
+			triggerCount.Add(1)
+		},
+	})
+	if err != nil {
+		t.Fatalf("watcher.New() error = %v", err)
+	}
+	defer w.Close()
+	app.watcher = w
+
+	dir := t.TempDir()
+	if _, err := app.ScanLibrary(dir); err != nil {
+		t.Fatalf("ScanLibrary() error = %v", err)
+	}
+
+	// Act - create folder via internal app mutation
+	if _, err := app.CreateFolder(dir, "", "Subfolder"); err != nil {
+		t.Fatalf("CreateFolder() error = %v", err)
+	}
+
+	time.Sleep(350 * time.Millisecond)
+
+	// Assert - mutation was suppressed
+	if count := triggerCount.Load(); count != 0 {
+		t.Fatalf("triggerCount = %d during mutation suppression, want 0", count)
+	}
+
+	// Act - external file written inside tracked subfolder
+	subMod := filepath.Join(dir, "Subfolder", "External_9999999_P.pak")
+	if err := os.WriteFile(subMod, []byte("pak content"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Assert - external change inside tracked subfolder triggered watcher
+	if count := triggerCount.Load(); count == 0 {
+		t.Fatal("triggerCount = 0 for external file in tracked subfolder, want at least 1")
+	}
+}
+
+func TestAppWatcherScanLibraryNormalizesPaths(t *testing.T) {
+	// Arrange
 	app := testApp(t, false)
 	app.initWatcher()
 	if app.watcher == nil {
@@ -821,16 +934,17 @@ func TestAppWatcherIntegration(t *testing.T) {
 	if _, err := app.ScanLibrary(dir); err != nil {
 		t.Fatalf("ScanLibrary() error = %v", err)
 	}
-	if app.watcher.Root() != dir {
-		t.Errorf("watcher.Root() = %q, want %q", app.watcher.Root(), dir)
-	}
+	initialRoot := app.watcher.Root()
 
-	// Setting mod root updates watcher root
-	dir2 := t.TempDir()
-	if err := app.SetModRoot(dir2); err != nil {
-		t.Fatalf("SetModRoot() error = %v", err)
+	// Act - scan again with trailing slash
+	dirWithSlash := dir + string(filepath.Separator)
+	if _, err := app.ScanLibrary(dirWithSlash); err != nil {
+		t.Fatalf("ScanLibrary() error = %v", err)
 	}
-	if app.watcher.Root() != dir2 {
-		t.Errorf("watcher.Root() = %q, want %q", app.watcher.Root(), dir2)
+	subsequentRoot := app.watcher.Root()
+
+	// Assert - watcher root is unchanged because paths are normalized
+	if subsequentRoot != initialRoot {
+		t.Errorf("watcher.Root() changed from %q to %q for equivalent path", initialRoot, subsequentRoot)
 	}
 }
