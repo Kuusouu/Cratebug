@@ -433,6 +433,8 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 17 - Filesystem watching and live library reconciliation
 
+**Status:** Complete. Review approved 2026-09-20.
+
 **Outcome:** Cratebug watches the active mod root recursively and reconciles library state automatically. External additions, deletions, renames, and moves appear in the catalog without a manual refresh. Newly added dirty companion PAKs and IoStore mods requiring encryption trigger their respective warning and cleanup dialogs promptly.
 
 **Includes:**
