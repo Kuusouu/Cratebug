@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"sync"
+	"time"
+
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 )
@@ -34,6 +37,56 @@ type CompanionCleanupProgress struct {
 	DisplayName string `json:"displayName"`
 }
 
+type companionCacheKey struct {
+	path      string
+	modTimeNs int64
+	size      int64
+}
+
+// CompanionCache provides thread-safe in-memory caching for companion PAK inspection.
+type CompanionCache struct {
+	mu      sync.RWMutex
+	entries map[companionCacheKey]bool
+}
+
+// NewCompanionCache creates an empty in-memory companion inspection cache.
+func NewCompanionCache() *CompanionCache {
+	return &CompanionCache{
+		entries: make(map[companionCacheKey]bool),
+	}
+}
+
+// Get checks whether the given companion PAK is recorded as dirty.
+func (c *CompanionCache) Get(path string, mtime time.Time, size int64) (bool, bool) {
+	if c == nil {
+		return false, false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	dirty, ok := c.entries[companionCacheKey{
+		path:      path,
+		modTimeNs: mtime.UnixNano(),
+		size:      size,
+	}]
+	return dirty, ok
+}
+
+// Put records whether the given companion PAK is dirty.
+func (c *CompanionCache) Put(path string, mtime time.Time, size int64, isDirty bool) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.entries[companionCacheKey{
+		path:      path,
+		modTimeNs: mtime.UnixNano(),
+		size:      size,
+	}] = isDirty
+}
+
 type companionCaller interface {
 	Call(action string, params map[string]any, result any) error
 }
@@ -41,6 +94,16 @@ type companionCaller interface {
 // Lists scanner IDs whose primary PAK still contains chunknames or patched_files.
 // A listing error skips that member so one unreadable PAK cannot hide the rest.
 func FindUnsupportedCompanionPaks(modRoot string, caller companionCaller) ([]string, error) {
+	return FindUnsupportedCompanionPaksWithCache(modRoot, caller, nil)
+}
+
+// Lists scanner IDs whose primary PAK still contains chunknames or patched_files,
+// serving unchanged files from cache when available.
+func FindUnsupportedCompanionPaksWithCache(
+	modRoot string,
+	caller companionCaller,
+	cache *CompanionCache,
+) ([]string, error) {
 	library, err := discovery.Scan(modRoot)
 	if err != nil {
 		return nil, fmt.Errorf("scan mod library before companion PAK inspection: %w", err)
@@ -60,6 +123,21 @@ func FindUnsupportedCompanionPaks(modRoot string, caller companionCaller) ([]str
 		if !pathWithinRoot(root, pakAbs) {
 			continue
 		}
+
+		info, err := os.Stat(pakAbs)
+		if err != nil {
+			continue
+		}
+		mtime := info.ModTime()
+		size := info.Size()
+
+		if isDirty, ok := cache.Get(pakAbs, mtime, size); ok {
+			if isDirty {
+				dirty = append(dirty, entry.ID)
+			}
+			continue
+		}
+
 		utocAbs := ""
 		if entry.Sidecars.UTOC != "" {
 			utocAbs = filepath.Join(root, filepath.FromSlash(entry.Sidecars.UTOC))
@@ -68,7 +146,9 @@ func FindUnsupportedCompanionPaks(modRoot string, caller companionCaller) ([]str
 		if err != nil {
 			continue
 		}
-		if len(uassettool.CompanionPakUnsupportedPaths(listing)) > 0 {
+		isDirty := len(uassettool.CompanionPakUnsupportedPaths(listing)) > 0
+		cache.Put(pakAbs, mtime, size, isDirty)
+		if isDirty {
 			dirty = append(dirty, entry.ID)
 		}
 	}

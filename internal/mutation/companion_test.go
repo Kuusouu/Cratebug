@@ -345,3 +345,61 @@ func TestStripCompanionPaksReportsCancel(t *testing.T) {
 		t.Fatalf("Failed = %v, want the cancelled id", result.Failed)
 	}
 }
+
+func TestFindUnsupportedCompanionPaksWithCache(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeIoStoreBundle(t, root, "", "Dirty_9999999_P", false)
+	writeIoStoreBundle(t, root, "", "Clean_9999999_P", false)
+
+	callCount := 0
+	caller := &scriptedCompanionCaller{
+		listingByPak: map[string]string{
+			"Dirty_9999999_P.pak": metadataListing(),
+			"Clean_9999999_P.pak": `{"files":[{"path":"Audio/sound.bnk","size":4}]}`,
+		},
+	}
+
+	countingCaller := &testCountingCaller{
+		inner: caller,
+		calls: &callCount,
+	}
+
+	cache := NewCompanionCache()
+
+	// Act - first scan populates cache
+	found1, err := FindUnsupportedCompanionPaksWithCache(root, countingCaller, cache)
+	if err != nil {
+		t.Fatalf("first scan error = %v", err)
+	}
+	if len(found1) != 1 {
+		t.Fatalf("found1 len = %d, want 1", len(found1))
+	}
+	firstCalls := callCount
+	if firstCalls == 0 {
+		t.Fatalf("firstCalls = 0, want calls made")
+	}
+
+	// Act - second scan with unchanged files should hit cache completely
+	found2, err := FindUnsupportedCompanionPaksWithCache(root, countingCaller, cache)
+	if err != nil {
+		t.Fatalf("second scan error = %v", err)
+	}
+	if len(found2) != 1 || found2[0] != found1[0] {
+		t.Fatalf("found2 = %v, want %v", found2, found1)
+	}
+	if callCount != firstCalls {
+		t.Fatalf("callCount after cached scan = %d, want %d (zero additional calls)", callCount, firstCalls)
+	}
+}
+
+type testCountingCaller struct {
+	inner companionCaller
+	calls *int
+}
+
+func (c *testCountingCaller) Call(action string, params map[string]any, result any) error {
+	*c.calls++
+	return c.inner.Call(action, params, result)
+}
+
