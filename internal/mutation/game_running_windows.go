@@ -1,15 +1,14 @@
+//go:build windows
+
 package mutation
 
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
-
-const marvelRivalsExecutable = "marvel-win64-shipping.exe"
 
 // Detects Marvel Rivals by its established shipping executable name.
 type WindowsGameRunningChecker struct{}
@@ -42,7 +41,7 @@ func (WindowsGameRunningChecker) IsGameRunning() (bool, error) {
 	}
 }
 
-// Keeps the established executable identity easy to test without a live process.
-func isMarvelRivalsProcess(processName string) bool {
-	return strings.EqualFold(processName, marvelRivalsExecutable)
+// NewGameRunningChecker creates the Windows game-running detector.
+func NewGameRunningChecker() GameRunningChecker {
+	return WindowsGameRunningChecker{}
 }

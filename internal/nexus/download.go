@@ -249,7 +249,8 @@ func (p *progressWriter) Write(chunk []byte) (int, error) {
 
 func sanitizeDownloadFileName(name string) string {
 	name = strings.TrimSpace(name)
-	if name == "" || name == "." || name == "/" || name == "\\" {
+	name = strings.ReplaceAll(name, "\\", "/")
+	if name == "" || name == "." || name == "/" {
 		return ""
 	}
 	return filepath.Base(filepath.FromSlash(name))

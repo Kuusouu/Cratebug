@@ -1,42 +1,18 @@
 package gamedetect
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/sys/windows/registry"
 )
-
-// Steam's install location is recorded in this registry value. Steam writes
-// it with forward slashes, so it passes through filepath.FromSlash before
-// use.
-const steamRegistryKey = `Software\Valve\Steam`
-const steamRegistryValue = "SteamPath"
 
 // steamVDFRelativePath is the Steam library list Steam maintains beneath
 // every install root.
-const steamVDFRelativePath = `steamapps\libraryfolders.vdf`
+var steamVDFRelativePath = filepath.Join("steamapps", "libraryfolders.vdf")
 
 // marvelPaksRelativePath is the game-install shape beneath a Steam library,
 // verified to exist before an install is reported as found.
 var marvelPaksRelativePath = filepath.Join("steamapps", "common", "MarvelRivals", "MarvelGame", "Marvel", "Content", "Paks")
-
-// defaultSteamFallbackRoots are Steam install locations checked when the
-// registry has no answer, covering the common cases Steam itself uses.
-// BentoMod's detection (the behavioral reference) ships the same list.
-var defaultSteamFallbackRoots = []string{
-	`C:\Program Files (x86)\Steam`,
-	`C:\Program Files\Steam`,
-	`D:\Steam`,
-	`D:\Program Files (x86)\Steam`,
-	`D:\Program Files\Steam`,
-	`E:\Steam`,
-	`E:\SteamLibrary`,
-	`F:\Steam`,
-	`F:\SteamLibrary`,
-}
 
 // NewSteamProvider creates the production Steam provider reading the real
 // registry.
@@ -127,21 +103,6 @@ func (p SteamProvider) libraryRoots() []string {
 		}
 	}
 	return roots
-}
-
-// defaultSteamPath reads Steam's install root from the registry.
-func defaultSteamPath() (string, error) {
-	key, err := registry.OpenKey(registry.CURRENT_USER, steamRegistryKey, registry.QUERY_VALUE)
-	if err != nil {
-		return "", fmt.Errorf("open the Steam registry key: %w", err)
-	}
-	defer key.Close()
-
-	value, _, err := key.GetStringValue(steamRegistryValue)
-	if err != nil {
-		return "", fmt.Errorf("read the %s registry value: %w", steamRegistryValue, err)
-	}
-	return filepath.FromSlash(value), nil
 }
 
 // parseSteamLibraryPaths extracts each "path" entry from a

@@ -30,6 +30,7 @@ type NexusProtocolSnapshot struct {
 	Command     string `json:"command,omitempty"`
 	Icon        string `json:"icon,omitempty"`
 	Description string `json:"description,omitempty"`
+	DesktopFile string `json:"desktopFile,omitempty"`
 }
 
 // Settings holds app-level preferences that persist across sessions.

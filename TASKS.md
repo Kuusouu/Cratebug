@@ -27,7 +27,7 @@ Make Cratebug run on Linux as a first-class build. Marvel Rivals runs on Linux t
 
 ---
 
-## 18.1 Portable Go foundation and build tag isolation
+## 18.1 Portable Go foundation and build tag isolation [COMPLETED]
 
 Isolate Windows-specific imports behind `//go:build windows` tags and create portable stubs:
 - Add `window_other.go` with `primaryWorkArea() (int, int)` returning `(0, 0)`.
@@ -35,56 +35,57 @@ Isolate Windows-specific imports behind `//go:build windows` tags and create por
 - Split `internal/uassettool/worker.go` executable naming (`UAssetTool` vs `UAssetTool.exe`) and process attributes (`HideWindow`).
 - Split `internal/mutation/mutation.go` (`moveFileWithoutReplace`) and `internal/mutation/folders.go` (`requireDirectory`).
 - Add `//go:build windows` to `internal/mutation/recycle_windows.go` and `internal/mutation/game_running_windows.go`.
+- Make `internal/gamedetect` portable by splitting Windows registry access into `steam_windows.go` and `steam_other.go`.
 
-**Verify:** `GOOS=linux go vet ./...` passes on Windows without missing symbol or import errors.
+**Verify:** `GOOS=linux go vet ./...` passes without errors. All unit tests pass in WSL2 Linux (`go test ./...`) and Windows (`.\check.ps1`). Completed 2026-09-20.
 
 ---
 
-## 18.2 Linux game detection and running-game process check
+## 18.2 Linux game detection and running-game process check [COMPLETED]
 
 Implement Linux Steam detection and running-game check:
 - Split `internal/gamedetect/steam.go` into `steam_windows.go` and `steam_linux.go`.
 - On Linux, check `~/.local/share/Steam`, `~/.steam/steam`, `~/.steam/root`, and Flatpak Steam paths. Parse `steamapps/libraryfolders.vdf` using the existing parser.
 - Implement `internal/mutation/game_running_linux.go` by inspecting `/proc` for `marvel-win64-shipping.exe`.
 
-**Verify:** `go test ./internal/gamedetect ./internal/mutation -run "TestSteam|TestGameRunning" -count=1` passes with mock filesystem and `/proc` fixtures.
+**Verify:** `go test ./internal/gamedetect ./internal/mutation -run "TestSteam|TestGameRunning" -count=1` passes with mock filesystem and `/proc` fixtures. Completed 2026-09-20.
 
 ---
 
-## 18.3 Linux file operations and desktop integration
+## 18.3 Linux file operations and desktop integration [COMPLETED]
 
 Implement safe Linux file mutations and desktop hooks:
 - Implement `internal/mutation/recycle_linux.go` using `gio trash` with fallback to FreeDesktop trash spec.
 - Implement `internal/reveal/open_linux.go` using D-Bus `org.freedesktop.FileManager1.ShowItems` or `xdg-open`.
 - Implement `internal/urlscheme/registry_linux.go` using `.desktop` entry registration and `xdg-mime`.
 
-**Verify:** `go test ./internal/mutation ./internal/reveal ./internal/urlscheme -count=1`.
+**Verify:** `go test ./internal/mutation ./internal/reveal ./internal/urlscheme -count=1` passes. Completed 2026-09-20.
 
 ---
 
-## 18.4 Linux secret storage and worker packaging
+## 18.4 Linux secret storage and worker packaging [COMPLETED]
 
 Implement Linux credential protection and worker binary extraction:
 - Implement `internal/secret/protect_linux.go` supporting Secret Service via D-Bus with permission-checked `0600` local fallback.
 - Create `fetch-uassettool.sh` (or update download script) for `UAssetTool-linux-x64.tar.gz`.
 - Ensure executable permissions (`0755`) on extraction and confirm runtime Oodle library resolution.
 
-**Verify:** `go test ./internal/secret ./internal/uassettool -count=1`.
+**Verify:** `go test ./internal/secret ./internal/uassettool -count=1` passes. Completed 2026-09-20.
 
 ---
 
-## 18.5 Wails Linux packaging and AppImage build
+## 18.5 Wails Linux packaging and AppImage build [COMPLETED]
 
 Configure Wails for Linux builds:
 - Validate WebKit2GTK compilation on Ubuntu 22.04 / WSL2.
 - Create AppImage packaging recipe and `build-linux.sh`.
 - Verify application launch, UI rendering, and window sizing.
 
-**Verify:** `wails dev` launches and serves the UI. AppImage builds and runs standalone.
+**Verify:** `wails dev` launches and serves the UI. AppImage builds and runs standalone. Completed 2026-09-20.
 
 ---
 
-## 18.6 Cross-distro verification and CI
+## 18.6 Cross-distro verification and CI [COMPLETED]
 
 Complete testing and CI integration:
 - Run canonical check script on Linux: Go tests, Biome linting, and frontend tests.
@@ -92,4 +93,4 @@ Complete testing and CI integration:
 - Update GitHub Actions workflow to build and attach Linux AppImage to releases.
 - Document distro prerequisites in `README.md`.
 
-**Verify:** All checks pass on Linux. AppImage runs cleanly.
+**Verify:** All checks pass on Linux. AppImage runs cleanly. Completed 2026-09-20.

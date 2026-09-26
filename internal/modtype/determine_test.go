@@ -233,7 +233,7 @@ const pinnedWorkerSourceRevision = uassettool.PinnedSourceRevision
 
 func pinnedWorkerExecutablePath(t *testing.T) string {
 	t.Helper()
-	path, err := filepath.Abs(filepath.Join("..", "..", "build", "uassettool", "UAssetTool.exe"))
+	path, err := filepath.Abs(filepath.Join("..", "..", "build", uassettool.WorkerDevelopmentDirectory, uassettool.WorkerExecutableName))
 	if err != nil {
 		t.Fatalf("resolve pinned worker path: %v", err)
 	}

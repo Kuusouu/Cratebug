@@ -158,10 +158,14 @@ func ExtractIoStore(c caller, utocPath, outputPath, aesKey string) (int, error) 
 	}
 
 	var raw struct {
-		Count int `json:"count"`
+		ExtractedCount *int `json:"extracted_count"`
+		Count          int  `json:"count"`
 	}
 	if err := c.Call("extract_iostore", params, &raw); err != nil {
 		return 0, err
+	}
+	if raw.ExtractedCount != nil {
+		return *raw.ExtractedCount, nil
 	}
 	return raw.Count, nil
 }

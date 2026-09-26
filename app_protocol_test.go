@@ -64,10 +64,27 @@ func TestRegisterNexusProtocolPersistsADisplacedOwner(t *testing.T) {
 	}
 }
 
+func TestPersistProtocolSnapshotPreservesDesktopFile(t *testing.T) {
+	app := testApp(t, false)
+	want := urlscheme.Snapshot{
+		Command:     "flatpak run --branch=stable org.vortex.App %u",
+		DesktopFile: "org.vortex.App.desktop",
+	}
+	if err := app.persistProtocolSnapshot(want); err != nil {
+		t.Fatal(err)
+	}
+
+	got := app.LoadMetadata().Document.Settings.NexusProtocol
+	if got.Command != want.Command || got.DesktopFile != want.DesktopFile {
+		t.Errorf("persisted snapshot = %+v, want command and desktop file", got)
+	}
+}
+
 func TestRegisterNexusProtocolRollsBackWhenSnapshotCannotBeSaved(t *testing.T) {
 	// Arrange
-	selfExe := `C:\Apps\Cratebug\Cratebug.exe`
-	otherExe := `C:\Apps\Vortex\Vortex.exe`
+	dir := t.TempDir()
+	selfExe := filepath.Join(dir, "Cratebug.exe")
+	otherExe := filepath.Join(dir, "Vortex.exe")
 	app := testApp(t, false)
 	app.allowProtocol = true
 	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
@@ -108,8 +125,9 @@ func TestRegisterNexusProtocolRollsBackWhenSnapshotCannotBeSaved(t *testing.T) {
 
 func TestUnregisterNexusProtocolRestoresThePersistedOwner(t *testing.T) {
 	// Arrange
-	selfExe := `C:\Apps\Cratebug\Cratebug.exe`
-	otherExe := `C:\Apps\Vortex\Vortex.exe`
+	dir := t.TempDir()
+	selfExe := filepath.Join(dir, "Cratebug.exe")
+	otherExe := filepath.Join(dir, "Vortex.exe")
 	app := testApp(t, false)
 	app.allowProtocol = true
 	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {

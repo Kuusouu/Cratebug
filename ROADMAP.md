@@ -497,6 +497,36 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Setup and publishing steps are documented well enough to follow from a clean install of each distro.
 - Screenshots from each distro are reviewed against the Windows build.
 
+## Phase 19 - Linux AppImage self-updating
+
+**Status:** Unstarted
+
+**Outcome:** Linux users can update their Cratebug AppImage directly in the application.
+
+**Includes:**
+
+- Multi-platform asset discovery in `internal/update/client.go`. The client resolves `.AppImage` or `.AppImage.zsync` assets on Linux. It preserves `.exe` resolution on Windows.
+- Linux update application in `internal/update/apply_linux.go`.
+  - Check the `$APPIMAGE` environment variable to find the running AppImage file.
+  - Download the updated AppImage file.
+  - Set executable permissions (`0755`) on the downloaded file.
+  - Launch a detached shell helper.
+  - The helper waits for Cratebug to exit, replaces the AppImage file atomically, and relaunches the new version.
+- Non-AppImage environment handling. When Cratebug runs outside an AppImage (development builds or source runs), the updater reports a clear error. It asks the user to update manually.
+- Unit and integration tests for Linux asset matching and script generation.
+
+**Excludes:**
+
+- System package manager updates (`.deb`, `.rpm`, Flatpak, AUR).
+- Windows updater modifications.
+
+**Exit criteria:**
+
+- The update client detects the Linux AppImage asset on Linux.
+- The application updates and relaunches successfully from an AppImage.
+- Running outside an AppImage shows a clear error message.
+- All unit tests pass on Windows and Linux.
+
 ## Deferred post-release work
 
 Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.

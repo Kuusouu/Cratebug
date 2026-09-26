@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -27,6 +28,30 @@ type fileSnapshot struct {
 type priorityExpectation struct {
 	kind  PriorityKind
 	value int
+}
+
+func TestFolderKeysFollowPlatformCaseRules(t *testing.T) {
+	// Arrange
+	wantEqual := runtime.GOOS == "windows"
+	for _, test := range []struct {
+		name  string
+		upper string
+		lower string
+	}{
+		{"bundle", fileGroupKey("A/mod.pak", "mod"), fileGroupKey("a/mod.pak", "mod")},
+		{"mod ID", modEntryID("A", "mod", extensionPrimaryPak, false), modEntryID("a", "mod", extensionPrimaryPak, false)},
+		{"orphan ID", orphanedSidecarEntryID("A", "mod"), orphanedSidecarEntryID("a", "mod")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Act
+			gotEqual := test.upper == test.lower
+
+			// Assert
+			if gotEqual != wantEqual {
+				t.Errorf("keys %q and %q: equal = %t, want %t on %s", test.upper, test.lower, gotEqual, wantEqual, runtime.GOOS)
+			}
+		})
+	}
 }
 
 // Verifies supported formats and fixture-specific diagnostics.

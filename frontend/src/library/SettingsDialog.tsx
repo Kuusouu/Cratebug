@@ -396,6 +396,10 @@ export function SettingsDialog({
 						<p className={styles["setting-section-hint"]}>
 							Paste a personal API key. Cratebug stores it only on this machine.
 						</p>
+						<p className={styles["setting-section-hint"]}>
+							On Linux, Cratebug uses Secret Service when available. Otherwise, it
+							stores the key in a file that only your account can read.
+						</p>
 						<button
 							type="button"
 							className={styles["nexus-link"]}

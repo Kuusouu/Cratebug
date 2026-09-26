@@ -488,10 +488,10 @@ func TestListIoStoreFilesPropagatesCallError(t *testing.T) {
 // Pinned in docs/decisions/0004-pin-uassettool-worker.md; update both together.
 const pinnedWorkerSourceRevision = PinnedSourceRevision
 
-// Resolves the pinned worker fetched by fetch-uassettool.ps1 into build/uassettool.
+// Resolves the pinned worker in its platform-specific development directory.
 func pinnedWorkerExecutablePath(t *testing.T) string {
 	t.Helper()
-	path, err := filepath.Abs(filepath.Join("..", "..", "build", "uassettool", "UAssetTool.exe"))
+	path, err := filepath.Abs(filepath.Join("..", "..", "build", WorkerDevelopmentDirectory, WorkerExecutableName))
 	if err != nil {
 		t.Fatalf("resolve pinned worker path: %v", err)
 	}
@@ -756,4 +756,52 @@ func TestOperationsAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 			t.Fatalf("stub listing still has metadata names: %v", got)
 		}
 	})
+}
+
+func TestExtractIoStoreDecodesExtractedCount(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"extracted_count":5}`)}
+
+	// Act
+	count, err := ExtractIoStore(fake, "/path/mod.utoc", "/path/out", "")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ExtractIoStore() error = %v, want nil", err)
+	}
+	if count != 5 {
+		t.Errorf("ExtractIoStore() count = %d, want 5", count)
+	}
+}
+
+func TestExtractIoStoreFallsBackToCount(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"count":3}`)}
+
+	// Act
+	count, err := ExtractIoStore(fake, "/path/mod.utoc", "/path/out", "")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ExtractIoStore() error = %v, want nil", err)
+	}
+	if count != 3 {
+		t.Errorf("ExtractIoStore() count = %d, want 3", count)
+	}
+}
+
+func TestExtractIoStorePreservesZeroExtractedCount(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"extracted_count":0,"count":5}`)}
+
+	// Act
+	count, err := ExtractIoStore(fake, "/path/mod.utoc", "/path/out", "")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("ExtractIoStore() error = %v, want nil", err)
+	}
+	if count != 0 {
+		t.Errorf("ExtractIoStore() count = %d, want 0", count)
+	}
 }

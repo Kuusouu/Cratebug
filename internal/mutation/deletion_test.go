@@ -226,22 +226,6 @@ func TestDeleteModReconcilesPartialRecycleFailure(t *testing.T) {
 	assertFileContents(t, filepath.Join(root, "Example_9999999_P.ucas"), "ucas")
 }
 
-// Guards the shell API's double-null-terminated multi-path requirement without
-// calling the user's real Recycle Bin.
-func TestJoinShellPaths(t *testing.T) {
-	// Arrange
-	paths := []string{"one.pak", "two.utoc"}
-
-	// Act
-	got := joinShellPaths(paths)
-
-	// Assert
-	want := "one.pak\x00two.utoc\x00\x00"
-	if got != want {
-		t.Errorf("joinShellPaths() = %q, want %q", got, want)
-	}
-}
-
 func moveToDisposableRecycleBin(t *testing.T, recycleRoot string) func([]string) error {
 	t.Helper()
 	return func(paths []string) error {

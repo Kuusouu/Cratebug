@@ -91,3 +91,7 @@ func copyAndFreeBlob(out windows.DataBlob) ([]byte, error) {
 	}
 	return copied, nil
 }
+
+func checkFilePermissions(string) error {
+	return nil
+}

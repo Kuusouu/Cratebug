@@ -1,4 +1,4 @@
-// Package secret is a one-value store that encrypts at rest with DPAPI on Windows.
+// Package secret stores one value with DPAPI on Windows and Secret Service or an owner-only file on Linux.
 package secret
 
 import (
@@ -18,7 +18,7 @@ const (
 	secretDirMode  os.FileMode = 0o700
 )
 
-// Holds one encrypted value at a filesystem path.
+// Holds one value at a filesystem path.
 type Store struct {
 	path    string
 	entropy []byte
@@ -55,7 +55,7 @@ func NewPlainStore(path string, entropy []byte) Store {
 	}
 }
 
-// Encrypts value and writes it atomically. An empty value is rejected so
+// Writes value atomically in the platform's storage format. An empty value is rejected so
 // callers use Clear to remove a stored secret.
 func (s Store) Set(value string) error {
 	if value == "" {
@@ -80,6 +80,9 @@ func (s Store) Set(value string) error {
 
 // Decrypts and returns the stored value. A missing file is ErrNotConfigured.
 func (s Store) Get() (string, error) {
+	if err := checkFilePermissions(s.path); err != nil {
+		return "", err
+	}
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {

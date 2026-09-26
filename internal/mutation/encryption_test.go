@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -17,6 +18,7 @@ type scriptedEncryptionCaller struct {
 	encryptedByUTOC   map[string]bool
 	failCreate        bool
 	failListPak       bool
+	extractCountZero  bool
 	pakListing        string
 	rebuiltPakListing string
 	createPakBody     string
@@ -32,12 +34,18 @@ func (s *scriptedEncryptionCaller) Call(action string, params map[string]any, re
 		}
 		return json.Unmarshal([]byte(encryptionJSON(s.encryptedByUTOC[filepath.Base(path)])), result)
 	case "extract_iostore":
+		if s.extractCountZero {
+			return json.Unmarshal([]byte(`{"count":0}`), result)
+		}
 		output, _ := params["output_path"].(string)
 		name := "extracted.txt"
 		if s.writeUasset {
 			name = "extracted.uasset"
 		}
-		return os.WriteFile(filepath.Join(output, name), []byte("extracted"), 0o600)
+		if err := os.WriteFile(filepath.Join(output, name), []byte("extracted"), 0o600); err != nil {
+			return err
+		}
+		return json.Unmarshal([]byte(`{"count":1}`), result)
 	case "list_pak":
 		if s.failListPak {
 			return &uassettool.ToolError{Action: action, Message: "list failed"}
@@ -466,5 +474,34 @@ func encryptableIoStoreEntry(id string) discovery.Entry {
 			UTOC: id + ".utoc",
 			UCAS: id + ".ucas",
 		},
+	}
+}
+
+func TestSetModEncryptionFailsWhenExtractYieldsNoPackages(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
+	library, err := discovery.Scan(root)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+	entry := library.Entries[0]
+	caller := &scriptedEncryptionCaller{
+		encryptedByUTOC:  map[string]bool{"Hero_9999999_P.utoc": false},
+		extractCountZero: true,
+	}
+
+	// Act
+	result, err := SetModEncryption(root, []string{entry.ID}, true, caller, nil, nil)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetModEncryption() error = %v, want nil with per-mod failure", err)
+	}
+	if len(result.Failed) != 1 {
+		t.Fatalf("Failed = %v, want one failure", result.Failed)
+	}
+	if !strings.Contains(result.Failed[0].Message, "no packages were extracted") {
+		t.Errorf("failure message = %q, want message containing 'no packages were extracted'", result.Failed[0].Message)
 	}
 }

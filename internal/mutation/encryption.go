@@ -364,8 +364,12 @@ func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt, curren
 	if currentlyEncrypted {
 		extractKey = uassettool.MarvelRivalsAESKey
 	}
-	if _, err := uassettool.ExtractIoStore(caller, utocAbs, extractDir, extractKey); err != nil {
+	extractedCount, err := uassettool.ExtractIoStore(caller, utocAbs, extractDir, extractKey)
+	if err != nil {
 		return fmt.Errorf("extract IoStore: %w", err)
+	}
+	if extractedCount == 0 {
+		return fmt.Errorf("extract IoStore: no packages were extracted from %s", filepath.Base(utocAbs))
 	}
 
 	hybrid := false

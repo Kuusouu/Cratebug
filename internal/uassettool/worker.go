@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -19,9 +18,6 @@ const (
 	// PinnedSourceRevision is the Git commit hash of the pinned UAssetToolRivals release.
 	// Kept in sync with docs/decisions/0004-pin-uassettool-worker.md and fetch-uassettool.ps1.
 	PinnedSourceRevision = "7c185ae5da2ac446cf58db75ebd34f9402b8b5dc"
-
-	// WorkerExecutableName is the filename of the UAssetTool binary on Windows.
-	WorkerExecutableName = "UAssetTool.exe"
 
 	// EnvWorkerPath is the environment variable override for locating the worker binary.
 	EnvWorkerPath = "CRATEBUG_UASSETTOOL_PATH"
@@ -67,7 +63,7 @@ var ErrWorkerTimeout = errors.New("uassettool: worker did not respond in time")
 // ResolveExecutablePath locates the pinned UAssetTool executable by checking in order:
 //  1. The CRATEBUG_UASSETTOOL_PATH environment variable override.
 //  2. The installed production layout: <executable-dir>/uassettool/UAssetTool.exe.
-//  3. The development layout: build/uassettool/UAssetTool.exe relative to working directory.
+//  3. The platform's development worker directory under build/.
 //
 // Returns ErrWorkerNotFound if the executable is not present at any checked location.
 func ResolveExecutablePath() (string, error) {
@@ -107,20 +103,20 @@ func resolveExecutablePath(
 
 	if getwdFunc != nil {
 		if cwd, err := getwdFunc(); err == nil && cwd != "" {
-			devPath := filepath.Join(cwd, "build", "uassettool", WorkerExecutableName)
+			devPath := filepath.Join(cwd, "build", WorkerDevelopmentDirectory, WorkerExecutableName)
 			if fileExists(devPath) {
 				return filepath.Clean(devPath), nil
 			}
 		}
 	}
 
-	relDevPath := filepath.Join("build", "uassettool", WorkerExecutableName)
+	relDevPath := filepath.Join("build", WorkerDevelopmentDirectory, WorkerExecutableName)
 	if fileExists(relDevPath) {
 		return filepath.Clean(relDevPath), nil
 	}
 
-	return "", fmt.Errorf("%w: checked %s, production layout (<exe>/uassettool/%s), and development layout (build/uassettool/%s)",
-		ErrWorkerNotFound, EnvWorkerPath, WorkerExecutableName, WorkerExecutableName)
+	return "", fmt.Errorf("%w: checked %s, production layout (<exe>/uassettool/%s), and development layout (build/%s/%s)",
+		ErrWorkerNotFound, EnvWorkerPath, WorkerExecutableName, WorkerDevelopmentDirectory, WorkerExecutableName)
 }
 
 // NewPinnedWorker resolves the worker executable path using ResolveExecutablePath,
@@ -198,7 +194,7 @@ func NewWorker(config WorkerConfig) (*Worker, error) {
 	}
 
 	cmd := execCommand(config.ExecutablePath)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	setHideWindow(cmd)
 	cmd.Stderr = &stderrLogWriter{logger: config.Logger}
 
 	stdin, err := cmd.StdinPipe()
@@ -248,7 +244,7 @@ func verifyWorkerVersion(executablePath, expectedSourceRevision string) error {
 	defer cancel()
 
 	cmd := execCommandContext(ctx, executablePath, "--version")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	setHideWindow(cmd)
 
 	output, err := cmd.Output()
 	if err != nil {

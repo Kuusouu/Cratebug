@@ -85,8 +85,8 @@ func NewApp() (*App, error) {
 		return nil, fmt.Errorf("resolve nexus key location: %w", err)
 	}
 	classifier := modtype.NewSessionClassifier(modtype.DefaultWorkerLauncher(nil))
-	app := newApp(mutation.WindowsGameRunningChecker{}, metadata.NewStore(path), classifier, nil, nil, secret.NewStore(keyPath, nexusKeyEntropy))
-	if exe, exeErr := os.Executable(); exeErr == nil {
+	app := newApp(mutation.NewGameRunningChecker(), metadata.NewStore(path), classifier, nil, nil, secret.NewStore(keyPath, nexusKeyEntropy))
+	if exe, exeErr := protocolExecutablePath(); exeErr == nil {
 		app.protocol = urlscheme.New(urlscheme.SchemeNXM, exe)
 	}
 	app.allowProtocol = AppVersion != "dev" && looksLikeInstalledBuild()

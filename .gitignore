@@ -32,6 +32,8 @@ coverage.out
 # Wails generated output and packaging assets
 /build/bin/
 /build/uassettool/
+/build/uassettool-linux/
+/build/linux/AppDir/
 /build/windows/installer/wails_tools.nsh
 
 # Frontend dependencies and build output

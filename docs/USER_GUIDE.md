@@ -37,6 +37,8 @@ If you'd rather update manually, the **View release** button opens the GitHub re
 
 Cratebug downloads Marvel Rivals mods from Nexus Mods with **your** API key. The key stays on this machine. It is never sent to Cratebug infrastructure and never shown in the app after you paste it.
 
+On Linux, Cratebug uses Secret Service when available. Otherwise, it stores the key in an owner-only file under the user config directory. This fallback does not encrypt the key.
+
 ### Get an API key
 
 1. Open **Settings** (gear icon).
@@ -48,7 +50,7 @@ Premium and free accounts both work. The difference is only how the download sta
 
 ### Open Nexus downloads in Cratebug
 
-The **Open Nexus downloads in Cratebug** switch registers Cratebug as the `nxm://` handler Windows uses when you click **Mod Manager Download** on Nexus.
+The **Open Nexus downloads in Cratebug** switch registers Cratebug as the `nxm://` handler used when you click **Mod Manager Download** on Nexus.
 
 Installed builds turn this on by themselves when nothing else owns `nxm://`. If another app already owns it, Cratebug names that app and asks before taking over. Turning the switch off gives the previous app back.
 
@@ -66,7 +68,7 @@ Dev builds of Cratebug (running from source with `wails dev`) do not register.
 Nexus does not let a free account request the file from the API. You still paste the page URL and pick a file, then Cratebug opens the Nexus page and waits.
 
 1. On that page, click **Mod Manager Download** (not Manual Download).
-2. Windows hands Cratebug the `nxm://` link.
+2. The system hands Cratebug the `nxm://` link.
 3. Confirm the download. From there the preview is the same as Premium.
 
 If Cratebug is closed, a click still launches it with that link. If it is already open, the running window comes to the front.

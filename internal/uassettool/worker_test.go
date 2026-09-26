@@ -287,10 +287,8 @@ func TestResolveExecutablePathRejectsMissingEnvironmentVariablePath(t *testing.T
 
 func TestResolveExecutablePathFindsProductionInstalledLayout(t *testing.T) {
 	// Arrange
-	const (
-		mockExe = `C:\Program Files\Cratebug\Cratebug.exe`
-		want    = `C:\Program Files\Cratebug\uassettool\UAssetTool.exe`
-	)
+	mockExe := filepath.Join(t.TempDir(), "Cratebug")
+	want := filepath.Join(filepath.Dir(mockExe), "uassettool", WorkerExecutableName)
 	fileExists := func(p string) bool {
 		return filepath.Clean(p) == filepath.Clean(want)
 	}
@@ -309,10 +307,8 @@ func TestResolveExecutablePathFindsProductionInstalledLayout(t *testing.T) {
 
 func TestResolveExecutablePathFindsDevelopmentLayout(t *testing.T) {
 	// Arrange
-	const (
-		mockCwd = `C:\repos\Cratebug`
-		want    = `C:\repos\Cratebug\build\uassettool\UAssetTool.exe`
-	)
+	mockCwd := filepath.Join(t.TempDir(), "Cratebug")
+	want := filepath.Join(mockCwd, "build", WorkerDevelopmentDirectory, WorkerExecutableName)
 	fileExists := func(p string) bool {
 		return filepath.Clean(p) == filepath.Clean(want)
 	}

@@ -89,6 +89,9 @@ func (doc *Document) SetNexusProtocol(snapshot NexusProtocolSnapshot) error {
 	if err := validateNexusProtocolField("description", snapshot.Description); err != nil {
 		return err
 	}
+	if err := validateNexusProtocolField("desktop file", snapshot.DesktopFile); err != nil {
+		return err
+	}
 
 	doc.Settings.NexusProtocol = snapshot
 	return nil

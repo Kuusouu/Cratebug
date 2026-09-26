@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/nexus"
@@ -82,6 +83,7 @@ func (a *App) UnregisterNexusProtocol() (NexusProtocolState, error) {
 		Command:     previous.Command,
 		Icon:        previous.Icon,
 		Description: previous.Description,
+		DesktopFile: previous.DesktopFile,
 	}); err != nil {
 		return a.mustProtocolStatus(), err
 	}
@@ -151,6 +153,7 @@ func (a *App) persistProtocolSnapshot(snapshot urlscheme.Snapshot) error {
 		Command:     snapshot.Command,
 		Icon:        snapshot.Icon,
 		Description: snapshot.Description,
+		DesktopFile: snapshot.DesktopFile,
 	}); err != nil {
 		return err
 	}
@@ -170,6 +173,7 @@ func (a *App) persistHandlerEnabled(displaced urlscheme.Snapshot) error {
 			Command:     displaced.Command,
 			Icon:        displaced.Icon,
 			Description: displaced.Description,
+			DesktopFile: displaced.DesktopFile,
 		}); err != nil {
 			return err
 		}
@@ -212,6 +216,7 @@ func runUninstallCleanup() error {
 		Command:     previous.Command,
 		Icon:        previous.Icon,
 		Description: previous.Description,
+		DesktopFile: previous.DesktopFile,
 	}); err != nil {
 		return fmt.Errorf("restore nxm handler: %w", err)
 	}
@@ -227,6 +232,9 @@ func runUninstallCleanup() error {
 }
 
 func looksLikeInstalledBuild() bool {
+	if appImagePath() != "" {
+		return true
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return false
@@ -237,4 +245,26 @@ func looksLikeInstalledBuild() bool {
 	}
 	_, err = os.Stat(filepath.Join(filepath.Dir(exe), uninstallExeName))
 	return err == nil
+}
+
+func protocolExecutablePath() (string, error) {
+	if path := appImagePath(); path != "" {
+		return path, nil
+	}
+	return os.Executable()
+}
+
+func appImagePath() string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	path := os.Getenv("APPIMAGE")
+	if !filepath.IsAbs(path) {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return path
 }

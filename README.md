@@ -26,15 +26,36 @@ Cratebug is an open-source, Windows-first (and Linux soon!) mod manager for Marv
 - **Nexus Mods installs** - paste your own API key, then a Marvel Rivals mod page. Premium accounts can download with a simple URL, free accounts use **Mod Manager Download** button in Nexus!
 - **Conflict detection** - find mods stepping on the same assets, with a one-click priority fix
 - **Self-updating** - check for updates in Settings, download, restart, done
-- **Linux, soon!** - Marvel Rivals plays fine through Proton, so Cratebug is packing its crate for Ubuntu, Fedora and Arch-based distros!
+- **Linux support** - standalone AppImage with Proton game detection, FreeDesktop trash, and Secret Service integration
 
 ## Install
+
+### Windows
 
 1. Download `Cratebug-amd64-installer.exe` from the [latest release](https://github.com/Kuusouu/Cratebug/releases/latest).
 2. Run it. Cratebug installs for your user account only - no administrator rights needed.
 3. Launch it from the Start Menu or the desktop shortcut.
 
 Cratebug is not code-signed yet, so Windows SmartScreen may warn on first run. See [troubleshooting](docs/TROUBLESHOOTING.md).
+
+### Linux
+
+1. Download `Cratebug-x86_64.AppImage` from the [latest release](https://github.com/Kuusouu/Cratebug/releases/latest).
+2. Make the file executable:
+   ```bash
+   chmod +x Cratebug-x86_64.AppImage
+   ```
+3. Run the AppImage:
+   ```bash
+   ./Cratebug-x86_64.AppImage
+   ```
+
+Runtime requirements (these may already be installed):
+- 64-bit Linux distribution with glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+, Fedora 36+, Arch, SteamOS, Bazzite).
+- WebKit2GTK 4.1 (`libwebkit2gtk-4.1-0` on Ubuntu/Pop!_OS/Debian, `webkit2gtk4.1` on Fedora, `webkit2gtk-4.1` on Arch/CachyOS).
+- FUSE 2 (`libfuse2` on Ubuntu/Debian) or run with `--appimage-extract-and-run`.
+
+The AppImage opened in Hyper-V VMs on [Fedora](docs/screenshots/phase-18/task-18.6-fedora-launch.png) and [Pop!_OS](docs/screenshots/phase-18/task-18.6-pop-os-launch.png) without extra packages. [CachyOS](docs/screenshots/phase-18/task-18.6-cachyos-launch.png) needed `sudo pacman -Syu webkit2gtk-4.1`.
 
 ## Finding your library
 
@@ -50,6 +71,8 @@ Use the install button, drag and drop files onto the window, or the download ico
 
 ## Building from source
 
+### Windows
+
 You need 64-bit Windows 10 (1909+) or 11, Git with [Git LFS](https://git-lfs.com/), and the Microsoft WebView2 Runtime. [`mise`](https://mise.jdx.dev/) pins the toolchain but is optional:
 
 ```powershell
@@ -63,6 +86,24 @@ Pop-Location
 .\fetch-uassettool.ps1          # fetch the pinned UAssetTool worker
 mise exec -c "wails dev"        # run the app
 .\check.ps1                     # run every check
+```
+
+### Linux
+
+You need a 64-bit Linux distribution (Ubuntu 22.04+ recommended), Git with Git LFS, and development libraries for GTK 3 and WebKit2GTK 4.1:
+
+```bash
+# Ubuntu / Debian prerequisites
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+git lfs install
+git clone https://github.com/Kuusouu/Cratebug.git
+cd Cratebug
+mise install
+cd frontend && mise exec -c "bun install --frozen-lockfile" && cd ..
+./fetch-uassettool.sh          # fetch the pinned UAssetTool worker and Oodle library
+./build-linux.sh               # build the standalone AppImage
+./check.sh                     # run every check
 ```
 
 The full contributor workflow, including running without `mise` and building the installer, is in [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -45,6 +45,7 @@ type Snapshot struct {
 	Command     string
 	Icon        string
 	Description string
+	DesktopFile string
 	Values      []Value
 }
 
@@ -246,7 +247,7 @@ func (r *Registrar) notifyShell() {
 }
 
 func (s Snapshot) Empty() bool {
-	return s.Command == "" && s.Icon == "" && s.Description == "" && len(s.Values) == 0
+	return s.Command == "" && s.Icon == "" && s.Description == "" && s.DesktopFile == "" && len(s.Values) == 0
 }
 
 func (s Snapshot) values() []Value {

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/Kuusouu/Cratebug/internal/discovery"
-	"golang.org/x/sys/windows"
 )
 
 // Moves one current scanner entry to an existing physical folder.
@@ -412,19 +411,7 @@ func requireDirectory(path, label string) error {
 		return fmt.Errorf("%s is not a real directory: %q", label, path)
 	}
 
-	pathPointer, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return fmt.Errorf("encode %s path: %w", label, err)
-	}
-
-	attributes, err := windows.GetFileAttributes(pathPointer)
-	if err != nil {
-		return fmt.Errorf("read %s attributes: %w", label, err)
-	}
-	if attributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-		return fmt.Errorf("%s is a reparse-point directory: %q", label, path)
-	}
-	return nil
+	return verifyNotReparsePoint(path, label)
 }
 
 // Validates each existing component from root through path immediately before

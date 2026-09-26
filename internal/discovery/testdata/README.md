@@ -25,8 +25,8 @@ BentoMod behavior:
 - Equal stems in different directories are distinct candidates.
 - Enabled and disabled primaries with the same directory and stem are retained
   as an ambiguous candidate set.
-- Folder and stem matching is case-insensitive for Windows-first discovery, but
-  reported paths retain their original casing.
+- Stem matching is case-insensitive. Folder matching is case-insensitive on
+  Windows and case-sensitive on Linux. Reported paths retain their original casing.
 
 ## Inventory
 

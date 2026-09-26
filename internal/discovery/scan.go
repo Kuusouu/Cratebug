@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -230,9 +231,17 @@ func Scan(root string) (Library, error) {
 	return result, nil
 }
 
-// Groups case-insensitively while retaining original path casing for display.
+// Keeps mixed-case sidecars together without merging distinct physical folders.
 func fileGroupKey(path, stem string) string {
-	return strings.ToLower(relativeFolder(path)) + groupKeySeparator + strings.ToLower(stem)
+	return folderKey(relativeFolder(path)) + groupKeySeparator + strings.ToLower(stem)
+}
+
+// Preserves Linux folder case while keeping existing Windows identities stable.
+func folderKey(folder string) string {
+	if runtime.GOOS == "windows" {
+		return strings.ToLower(folder)
+	}
+	return folder
 }
 
 // Normalizes a root-level file to an empty relative directory.
@@ -343,7 +352,7 @@ func orphanEntry(stem, path string, sidecars Sidecars) Entry {
 
 // Produces a stable identity for an entry while Cratebug changes only its primary suffix.
 func modEntryID(folder, stem string, kind extension, ambiguous bool) string {
-	id := entryIDModPrefix + entryIDSeparator + strings.ToLower(folder) + entryIDSeparator + strings.ToLower(stem)
+	id := entryIDModPrefix + entryIDSeparator + folderKey(folder) + entryIDSeparator + strings.ToLower(stem)
 	if ambiguous {
 		// Ambiguous primaries cannot be mutated, so their current suffix disambiguates read-only entries.
 		return id + entryIDSeparator + string(kind)
@@ -354,7 +363,7 @@ func modEntryID(folder, stem string, kind extension, ambiguous bool) string {
 
 // Produces a stable identity for a sidecar-only entry within a scan result.
 func orphanedSidecarEntryID(folder, stem string) string {
-	return entryIDOrphanedSidecarPrefix + entryIDSeparator + strings.ToLower(folder) + entryIDSeparator + strings.ToLower(stem)
+	return entryIDOrphanedSidecarPrefix + entryIDSeparator + folderKey(folder) + entryIDSeparator + strings.ToLower(stem)
 }
 
 // Removes filename-only priority conventions for presentation.

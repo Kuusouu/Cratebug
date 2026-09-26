@@ -224,6 +224,35 @@ func TestSteamProviderDetectPrefersTheFirstLibraryInOrder(t *testing.T) {
 	}
 }
 
+func TestSteamProviderDetectFindsInstallInFallbackRoots(t *testing.T) {
+	// Arrange
+	steamRoot := t.TempDir()
+	libraryRoot := t.TempDir()
+	writeSteamVDF(t, steamRoot, libraryRoot)
+	paksPath := writeMarvelRivalsInstall(t, libraryRoot, true)
+	provider := SteamProvider{
+		registrySteamPath: func() (string, error) { return "", nil },
+		fallbackRoots:     []string{steamRoot},
+	}
+
+	// Act
+	detection, err := provider.Detect()
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detection.State != StateLibraryFound {
+		t.Fatalf("State = %q, want %q", detection.State, StateLibraryFound)
+	}
+	if detection.PaksPath != paksPath {
+		t.Errorf("PaksPath = %q, want %q", detection.PaksPath, paksPath)
+	}
+	if want := filepath.Join(paksPath, LibraryDirName); detection.LibraryPath != want {
+		t.Errorf("LibraryPath = %q, want %q", detection.LibraryPath, want)
+	}
+}
+
 func TestSteamProviderDetectIgnoresAFileShapedLikeThePaksDirectory(t *testing.T) {
 	// Arrange
 	steamRoot := t.TempDir()

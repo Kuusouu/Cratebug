@@ -672,6 +672,7 @@ export namespace metadata {
 	    command?: string;
 	    icon?: string;
 	    description?: string;
+	    desktopFile?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new NexusProtocolSnapshot(source);
@@ -682,6 +683,7 @@ export namespace metadata {
 	        this.command = source["command"];
 	        this.icon = source["icon"];
 	        this.description = source["description"];
+	        this.desktopFile = source["desktopFile"];
 	    }
 	}
 	export class Settings {
