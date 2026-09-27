@@ -26,6 +26,9 @@ Read only what the task requires:
 - `README.md` for canonical development commands.
 - `CODING_GUIDELINES.md` for language, test, frontend, and CSS conventions.
 
+Record phase progress in `ROADMAP.md` and `TASKS.md`.
+Store technical decisions in `docs/decisions/`. Do not create separate phase review documents.
+
 Before editing, identify the active task and confirm that the work belongs in the current roadmap phase. Do not implement later-phase work without approval.
 
 ## Before editing

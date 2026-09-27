@@ -319,7 +319,7 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 13 - Epic Games library detection
 
-**Status:** Complete. Review approved 2026-09-02; see `docs/reviews/phase-13-review.md`.
+**Status:** Complete. Review approved 2026-09-02.
 
 **Outcome:** Cratebug detects a Marvel Rivals mod library from the Epic Games launcher through the Phase 12 provider seam, verified against a real Epic installation.
 
@@ -342,7 +342,7 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 14 - Batch actions and in-place encryption
 
-**Status:** Complete. Review approved 2026-09-05; see `docs/reviews/phase-14-review.md`.
+**Status:** Complete. Review approved 2026-09-05.
 
 **Outcome:** Users can check many mods and run the same action on the set from one Actions menu, including encrypting or decrypting complete IoStore bundles in place.
 
@@ -371,7 +371,7 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 15 - Unsupported companion PAK cleanup and required encryption
 
-**Status:** Complete. Review approved 2026-09-06; see `docs/reviews/phase-15-review.md`.
+**Status:** Complete. Review approved 2026-09-06.
 
 **Outcome:** Cratebug warns when installed or incoming mods still contain `chunknames` / `patched_files` companion PAK entries (anti-cheat crash as of 3 September 2026), and rewrites only those `.pak` files one at a time. After classify, it offers encryption for complete unencrypted IoStore mods that touch files outside `/Game/Marvel/Characters`, and runs those rebuilds through a write-worker pool.
 

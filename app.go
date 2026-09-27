@@ -622,9 +622,7 @@ func (a *App) IsFolderEmpty(modRoot, folder string) (bool, error) {
 // A folder rename or move changes the scanner ID of every mod it contains,
 // but its Result reports only the folder's own old and new paths, not a
 // per-mod ID pair, so those operations call the executor directly instead of
-// this helper. Metadata for mods inside a renamed or moved folder is not
-// reconciled; this matches the existing frontend limitation described in
-// docs/reviews/phase-4-review.md.
+// this helper. These operations do not reconcile metadata for mods in the folder.
 func (a *App) executeAndReconcile(operation mutation.Operation) (mutation.Result, error) {
 	return suppressWatcherResult(a, func() (mutation.Result, error) {
 		result, err := a.mutationExecutor.Execute(operation)
