@@ -12,7 +12,12 @@
 }
 
 .settings-body {
+	--scrollbar-gap: 0.75rem;
+
 	min-height: 0;
+	/* Use the dialog padding for the scrollbar gap to preserve the content width. */
+	margin-inline-end: calc(-1 * var(--scrollbar-gap));
+	padding-inline-end: var(--scrollbar-gap);
 	overflow-x: hidden;
 	overflow-y: auto;
 }
