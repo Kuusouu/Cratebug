@@ -13,6 +13,19 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+### Taking your crates to Linux
+
+- Your crates are now supported on Linux distros. WOOHOOOO!
+- Cratebug now ships on Linux as an AppImage. Point it at your Steam library, and it spots Marvel Rivals running through Proton.
+- Deleted mods land in desktop Trash, so you can bring them back. Cratebug opens mods and folders in your file manager and catches `nxm://` links.
+- Secret Service guards your Nexus key. If that service is missing, Cratebug stores it in a local file only your account can read or write.
+
+### Smoothing the ride
+
+- File Explorer opens the right mod or folder, even when its path has spaces or commas.
+- Settings hold their width while you scroll, and focus outlines have room to show.
+- Disabled buttons now keep a calm, standard cursor.
+
 ## [2026.09.20]
 
 ### Watching the crates live
