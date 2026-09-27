@@ -137,6 +137,8 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.6rem;
+	/* Keep the 3px focus outline and its 2px offset inside the scroll area. */
+	padding-inline: 5px;
 }
 
 .accent-swatch {
