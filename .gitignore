@@ -49,7 +49,6 @@ coverage.out
 
 # Keep only the Linux views used by the README.
 /docs/screenshots/**
-!/docs/screenshots/phase-18/
-!/docs/screenshots/phase-18/task-18.6-cachyos-launch.png
-!/docs/screenshots/phase-18/task-18.6-fedora-launch.png
-!/docs/screenshots/phase-18/task-18.6-pop-os-launch.png
+!/docs/screenshots/cachyos-initial-launch.png
+!/docs/screenshots/fedora-initial-launch.png
+!/docs/screenshots/popos-initial-launch.png
