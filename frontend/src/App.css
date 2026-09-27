@@ -209,7 +209,7 @@ select:focus-visible {
 }
 
 button:disabled {
-	cursor: wait;
+	cursor: default;
 	opacity: 0.58;
 }
 
