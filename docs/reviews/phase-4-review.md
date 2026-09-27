@@ -139,47 +139,12 @@ limitation unrelated to Phase 4 changes.
 No automated test targeted a real Marvel Rivals mod directory. Go tests use
 `t.TempDir()` fixtures throughout.
 
-## Manual checks and screenshot paths
+## Manual checks
 
 All manual verification used `C:\ModsTest`, a user-designated disposable
 library, plus small synthetic fixtures under the session scratchpad for
 cases `C:\ModsTest` did not already contain (an incomplete IoStore bundle
 missing `.ucas`). No real Marvel Rivals mod directory was used.
-
-Rename and priority (task 4.5.3):
-- [Rename dialog, valid name ready to submit](../screenshots/phase-4/task-4.5.3-rename-ready.png)
-- [Rename success toast](../screenshots/phase-4/task-4.5.3-rename-success.png)
-- [Rename rejected: Windows-reserved character](../screenshots/phase-4/task-4.5.3-rename-invalid.png)
-- [Priority rejected: out of bounds](../screenshots/phase-4/task-4.5.3-priority-invalid.png)
-- [Busy state mid-request](../screenshots/phase-4/task-4.5.3-busy.png)
-
-Folder and move controls (task 4.5.4):
-- [Root context menu (New folder only)](../screenshots/phase-4/task-4.5.4-folder-context-menu-root.png)
-- [Folder context menu (New/Rename/Move)](../screenshots/phase-4/task-4.5.4-folder-context-menu.png)
-- [Nested folder created and selected](../screenshots/phase-4/task-4.5.4-nested-folder-created.png)
-- [Folder create collision rejected](../screenshots/phase-4/task-4.5.4-folder-collision.png)
-- [Folder renamed, browsed view remapped](../screenshots/phase-4/task-4.5.4-folder-renamed.png)
-- [Move-folder dialog excludes self and descendants](../screenshots/phase-4/task-4.5.4-move-folder-dialog.png)
-- [Folder move success, subtree relocated](../screenshots/phase-4/task-4.5.4-move-folder-success.png)
-- [Mod context menu](../screenshots/phase-4/task-4.5.4-mod-context-menu.png)
-- [Move-mod dialog](../screenshots/phase-4/task-4.5.4-move-mod-dialog.png)
-- [Mod move success](../screenshots/phase-4/task-4.5.4-move-mod-success.png)
-- [Priority rejected via context-menu path](../screenshots/phase-4/task-4.5.4-priority-invalid-context.png)
-- [Folder rename rejected: reserved character](../screenshots/phase-4/task-4.5.4-folder-rename-invalid.png)
-
-Recoverable deletion (task 4.5.5):
-- [Delete menu item, destructive styling](../screenshots/phase-4/task-4.5.5-mod-context-menu-delete.png)
-- [Delete confirmation, countdown gate active (Delete (2))](../screenshots/phase-4/task-4.5.5-delete-confirm-countdown.png)
-- [Delete success, catalog and folder counts updated](../screenshots/phase-4/task-4.5.5-delete-success.png)
-- [Incomplete-bundle context menu (Delete only, no organize actions)](../screenshots/phase-4/task-4.5.5-incomplete-bundle-menu.png)
-- [Incomplete-bundle delete confirmation, missing-file warning](../screenshots/phase-4/task-4.5.5-delete-incomplete-bundle.png)
-
-Interaction resilience (task 4.5.6):
-- [Scan error state](../screenshots/phase-4/task-4.5.6-scan-error.png)
-- [Narrow layout (700px)](../screenshots/phase-4/task-4.5.6-narrow-layout.png)
-- [Narrow layout, context menu triggered](../screenshots/phase-4/task-4.5.6-narrow-context-menu.png)
-- [Folder mutation in flight, its own dialog locked](../screenshots/phase-4/task-4.5.6-conflict-lock.png)
-- [Cross-category lock: folder mutation disables mod cards](../screenshots/phase-4/task-4.5.6-cross-category-lock.png)
 
 Filesystem-level verification (not just UI claims):
 - After a complete-bundle delete, confirmed via

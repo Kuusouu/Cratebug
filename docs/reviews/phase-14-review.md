@@ -72,13 +72,13 @@ Validation on the working tree (2026-09-05):
 
 Driven in the wails dev browser tab (Playwright / Edge, `http://localhost:34115`) against the scanned library at `C:\Users\mew\Downloads\~mods` (74 mods). That drive was UI-only. No encrypt, decrypt, or other mutation was applied to that library.
 
-1. **Empty check set** — header shows `0 selected`. Select all / Clear / Actions chrome present. Screenshot: `docs/screenshots/phase-14/task-14.4-empty-check-set.png`.
-2. **N selected** — two cards checked, header `2 selected`, checked tint visible. Screenshot: `docs/screenshots/phase-14/task-14.4-n-selected.png`.
-3. **Clear** — checked set emptied. Screenshot: `docs/screenshots/phase-14/task-14.4-clear-selection.png`.
-4. **Lock mark** — encrypted IoStore card shows the corner lock in grid and list, separate from the IoStore / category pills. Screenshots: `docs/screenshots/phase-14/task-14.4-lock-mark.png`, `task-14.4-lock-mark-list.png`.
-5. **Mixed Encrypt disabled** — one encrypted and one unencrypted IoStore checked. Actions menu open, Encrypt greyed. Screenshot: `docs/screenshots/phase-14/task-14.5-mixed-encrypt-disabled.png`.
+1. **Empty check set** — header shows `0 selected`. Select all / Clear / Actions chrome present.
+2. **N selected** — two cards checked, header `2 selected`, checked tint visible.
+3. **Clear** — checked set emptied.
+4. **Lock mark** — encrypted IoStore card shows the corner lock in grid and list, separate from the IoStore / category pills.
+5. **Mixed Encrypt disabled** — one encrypted and one unencrypted IoStore checked. Actions menu open, Encrypt greyed.
 
-Encrypt and decrypt success on a disposable IoStore is proven by the supervised-worker round trip and the mutation replace/rollback tests, not by a running-app screenshot. `C:\ModsFixtures` was not present. The user's library was not used for a rewrite.
+The supervised-worker round trip and mutation tests verified encrypt and decrypt behavior on a disposable IoStore. No running-app test verified these operations. `C:\ModsFixtures` was not present. The user's library was not used for a rewrite.
 
 The Playwright tab is a separate process from the native WebView2 window. Shared Go backend means classification and `Identity.encrypted` are real. Size- and DPI-sensitive lock chrome was not checked in the native window.
 
@@ -86,13 +86,12 @@ The Playwright tab is a separate process from the native WebView2 window. Shared
 
 ## Known limitations and deferred findings
 
-1. **No running-app encrypt/decrypt screenshot.** 14.7 asked for a successful rebuild on fixtures. That capture is missing. The worker fixture and mutation tests cover the rewrite. A later pass can screenshot a disposable library without touching a real `~mods`.
-2. **Catalog screenshots vs final click rules.** Some early `task-14.4` / `task-14.5` shots were taken while card checkboxes still existed. The locked design is Explorer-style click with tint and border only. Current `ModCatalog.tsx` has no checkbox.
-3. **Browser-session parity.** The drive ran in the wails dev browser tab, not the native window.
-4. **Hybrid mesh `.usmap`.** The disposable worker fixture has no real meshes. extract→create did not need a `.usmap`. A real mesh rebuild that the pinned worker cannot finish without one is an open risk. The test records it.
-5. **Companion PAK `chunknames` / `patched_files`.** After 3 September 2026 the game/anti-cheat can crash if those metadata names remain in an installed companion `.pak`. Cratebug already ignores them for hybrid detection. It does not strip them. Encrypt rebuilds the whole triple and may write them again. A pak-only cleanup is later work, not this phase.
-6. **Install-time obfuscation and classic PAK encryption.** Out of scope by design.
-7. **Console noise pre-existing.** A Wails `ipc.js` TypeError at page load and a favicon 404 appear in the dev session. Both predate this phase.
+1. **No running-app encrypt/decrypt verification.** Task 14.7 required a successful rebuild on fixtures. Only the worker fixture and mutation tests verified the rewrite. Manual verification on a disposable library remains open.
+2. **Browser-session parity.** The drive ran in the wails dev browser tab, not the native window.
+3. **Hybrid mesh `.usmap`.** The disposable worker fixture has no real meshes. extract→create did not need a `.usmap`. A real mesh rebuild that the pinned worker cannot finish without one is an open risk. The test records it.
+4. **Companion PAK `chunknames` / `patched_files`.** After 3 September 2026 the game/anti-cheat can crash if those metadata names remain in an installed companion `.pak`. Cratebug already ignores them for hybrid detection. It does not strip them. Encrypt rebuilds the whole triple and may write them again. A pak-only cleanup is later work, not this phase.
+5. **Install-time obfuscation and classic PAK encryption.** Out of scope by design.
+6. **Console noise pre-existing.** A Wails `ipc.js` TypeError at page load and a favicon 404 appear in the dev session. Both predate this phase.
 
 ## Review decision
 

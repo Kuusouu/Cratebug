@@ -65,12 +65,6 @@ mise exec -c "wails build -clean -platform windows/amd64 -nsis -installscope use
 - Confirmed an adjacent unrelated sentinel file remained unchanged.
 - Confirmed no test installation or process remained afterward.
 
-## Screenshots
-
-- [Development application](../screenshots/phase-0/task-0.3-development.png)
-- [Production application](../screenshots/phase-0/task-0.6-production.png)
-- [Installed application](../screenshots/phase-0/task-0.6-installed.png)
-
 ## Scope audit
 
 The repository contains only the minimal Wails application shell, frontend-to-Go connectivity binding, validation, CI, and documentation.

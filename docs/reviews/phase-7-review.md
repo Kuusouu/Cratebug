@@ -131,8 +131,8 @@ Validation output:
 
 1. **Live App Verification (`wails dev`):**
    - Scanned fixture libraries; verified that format badges (`IoStore`/`Classic`) render immediately, followed by progressive skeleton pulsing pills, and smoothly transition to resolved category badges (`Mesh`, `VFX`, `Audio`, `UI`, `Texture`, etc.) and hero portrait thumbnails with hover tooltips.
-   - **Progressive Classifying State:** `docs/screenshots/phase-7/task-7.6-classifying.png` captures the intermediate scan state with pulsing category skeleton badges.
-   - **Fully Classified State:** `docs/screenshots/phase-7/task-7.8-classified.png` captures the fully resolved catalog displaying category badges, format pills, and corresponding hero portraits (Cloak & Dagger, Cyclops, Daredevil, Devil Dinosaur, Jeff the Land Shark, Deadpool) alongside graceful package icon fallbacks.
+   - **Progressive Classifying State:** The intermediate scan state showed pulsing category skeleton badges.
+   - **Fully Classified State:** The resolved catalog showed category badges, format pills, hero portraits, and package icon fallbacks.
 2. **Installer Verification:**
    - Generated `Cratebug-amd64-installer.exe` with Wails/NSIS, inspected archive contents with `7z l`, extracted to temporary directory, and verified that `uassettool\UAssetTool.exe` and `THIRD_PARTY_NOTICES.md` are present at the expected locations.
 

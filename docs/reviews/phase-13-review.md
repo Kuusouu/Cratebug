@@ -48,10 +48,10 @@ Validation on `feat/epic-gamedetect`:
 
 Driven live against the running `wails dev` build via playwright-cli (Chromium, `http://localhost:34115`). Detection is read-only. **Create library was not confirmed** on the earlier empty-Paks pass.
 
-1. **Toolbar detect control** — empty library state, "Detect Epic Games library" with the Epic logo in the toolbar and as the empty-state affordance. Screenshot: `docs/screenshots/phase-13/task-3-toolbar-detect-button.png`.
-2. **Settings provider section** — Steam and Epic Games both selectable; Epic Games pressed with checkmark; no "coming soon" hint. Screenshot: `docs/screenshots/phase-13/task-3-settings-provider-section.png`.
-3. **Detect → create dialog** — heading "No mod library was found for Epic Games", Epic logo, path `C:\Program Files\Epic Games\MarvelRivalsjKtnW\MarvelGame\Marvel\Content\Paks`, create offer. Cancel closed the dialog with no write. Screenshot: `docs/screenshots/phase-13/task-3-detect-create-library-dialog.png`.
-4. **Detect → library found** — after the maintainer added `~mods` with fixtures, Detect reported the same library, showed "This library is already active.", and rescanned 74 mods from `...\Paks\~mods`. Screenshots: `docs/screenshots/phase-13/task-5-already-active-toast.png`, `docs/screenshots/phase-13/task-5-epic-library-scanned.png`.
+1. **Toolbar detect control** — empty library state, "Detect Epic Games library" with the Epic logo in the toolbar and as the empty-state affordance.
+2. **Settings provider section** — Steam and Epic Games both selectable; Epic Games pressed with checkmark; no "coming soon" hint.
+3. **Detect → create dialog** — heading "No mod library was found for Epic Games", Epic logo, path `C:\Program Files\Epic Games\MarvelRivalsjKtnW\MarvelGame\Marvel\Content\Paks`, create offer. Cancel closed the dialog with no write.
+4. **Detect → library found** — after the maintainer added `~mods` with fixtures, Detect reported the same library, showed "This library is already active.", and rescanned 74 mods from `...\Paks\~mods`.
 
 The playwright tab is a separate process from the native WebView2 window. Shared Go backend means detection results are real. Size- and DPI-sensitive layout was not checked in the native window.
 

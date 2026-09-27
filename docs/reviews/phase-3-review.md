@@ -57,11 +57,6 @@ rejected plans, destination races, game-running safety, and stable entry IDs.
 Automated tests use `t.TempDir()` fixtures; no real Marvel Rivals mod directory
 was targeted by automated testing.
 
-## Screenshots
-
-- [Enabled and disabled catalog states](../screenshots/phase-3/task-3-6-disabled-mods.png)
-- [Game-running error state](../screenshots/phase-3/task-3-6-game-running-error.png)
-
 ## Limitations and deferred findings
 
 - Phase 3 intentionally supports only single-mod enable and disable. Batch

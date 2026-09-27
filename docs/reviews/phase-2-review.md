@@ -65,16 +65,6 @@ changes:
 It ran Go formatting, frontend formatting and linting, TypeScript checking,
 the Vite production build, Go vet, and all Go tests.
 
-## Screenshots
-
-- [Initial library state](../screenshots/phase-2/task-2-initial-library.png)
-- [Populated library](../screenshots/phase-2/task-2-populated-library.png)
-- [Compact cards](../screenshots/phase-2/task-2-compact-cards.png)
-- [Large cards](../screenshots/phase-2/task-2-large-cards.png)
-- [List view](../screenshots/phase-2/task-2-list.png)
-- [Minimum window size](../screenshots/phase-2/task-2-window-size.png)
-- [Final 2,400-entry library](../screenshots/phase-2/task-2-final-phase-2-library.png)
-
 ## Limitations and deferred findings
 
 - All Mods renders every matching card. The current 2,400-entry stress library

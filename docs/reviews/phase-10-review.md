@@ -61,9 +61,6 @@ Validation output on the merged master state:
 - **Published release:** "Cratebug 2026.08.27", not marked prerelease, exactly one asset (`Cratebug-amd64-installer.exe`), body matching the `## [2026.08.27]` CHANGELOG section verbatim.
 - **Live install and update test (maintainer-performed):** the maintainer performed a clean install of the published installer, then drove that installed build through check for updates, download, silent apply (upgrade-in-place over the existing install), and automatic relaunch, and confirmed the running version afterwards. Reported as working; see the timing note in limitations.
 - **CI:** the master CI workflow passed after the Phase 10 merge.
-- **Screenshots:**
-  - `docs/screenshots/phase-10/installed-settings-updates-section.png` — the installed build's Settings > Updates section showing "Version 2026.08.27" against the live library.
-  - `docs/screenshots/phase-10/settings-updates-section.png`, `check-for-updates-result.png`, `check-for-updates-toast-fixed.png`, `install-from-url-preview.png`, `hscroll-investigation.png` — development-phase verification of the update check, result/toast states, URL-install preview, and a scaling-fix investigation.
 
 ## Known limitations and deferred findings
 

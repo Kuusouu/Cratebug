@@ -140,7 +140,7 @@ recognized only `float64` (encoding/json's numeric type) and misread a
 migration's own freshly-set `int`, tripping the anti-infinite-loop guard on
 every migration.
 
-## Manual checks and screenshot paths
+## Manual checks
 
 All manual verification used a disposable fixture library created under the
 session scratchpad directory (two synthetic `.pak` files, one nested), never
@@ -450,7 +450,7 @@ they were found).
   rather than immediately trusting a "still broken" report without checking
   whether a restart (not just a refresh) resolves it first.
 
-## Visual verification pass (screenshots)
+## Visual verification pass
 
 **Date:** 2026-08-25
 
@@ -458,43 +458,34 @@ The prior passes above could not capture pixel screenshots (no compositing
 browser). This pass fixed that: the repo's `playwright` MCP server had no
 browser binary installed (`~/AppData/Local/ms-playwright` did not exist), so
 `mise exec -- bunx @playwright/mcp@latest install-browser chrome-for-testing`
-was run once and the server reconnected on session restart. All screenshots
-below are real WebView2/Wails-served renders at `http://localhost:34115`,
-driven against `C:\ModsFixtures` (the running `wails dev` instance was
-temporarily repointed from the user's real Marvel Rivals folder to fixtures
-for this pass, with the user's explicit approval, and repointed back
-afterward). Screenshots are in `docs/screenshots/phase-5/`.
+was run once and the server reconnected on session restart. This pass used
+the Wails-served app at `http://localhost:34115` against `C:\ModsFixtures`.
+The user approved the temporary switch from their real Marvel Rivals folder
+to fixtures. The app used the original folder again after the checks.
 
-- `task-5.6-library-baseline.png` — compact-view catalog on fixtures.
-- `task-5.6-settings-default.png`, `task-5.6-settings-dark-teal.png` —
-  Settings dialog; confirmed System/Light/Dark and all six accent options
-  (five presets plus custom hex) apply immediately and live, including to
-  the dialog's own chrome.
-- `task-5.6-tagmenu-empty.png`, `task-5.6-tagmenu-created.png` — toolbar tag
-  catalog popover empty state and after creating two tags ("Favorites",
-  "WIP"), including the success toast.
-- `task-5.6-mod-context-menu.png`, `task-5.6-tagdialog-checklist.png` —
-  mod context menu showing "Tags..." alongside Rename/Priority/Move/Delete,
-  and the resulting checklist dialog.
-- `task-5.6-card-tag-chip.png` — assigned "Favorites" tag rendering as a
-  removable chip on both the card and the selected-mod panel.
-- `task-5.6-tag-filter-active.png` — toolbar tag filter narrowing the
-  catalog to the one tagged mod, with the active filter count badge.
-- `task-5.6-dragdrop-mod-result.png` — a mod card dragged onto a sidebar
-  folder, confirmed via the resulting toast and updated folder counts.
-- `task-5.6-dragdrop-folder-result.png` — a folder dragged onto another
-  folder (nesting), confirmed via toast and the sidebar tree collapsing to
-  the new structure.
-- `task-5.6-dragdrop-tag-reconcile.png` — the tagged mod dragged to a new
-  folder; the "Favorites" chip survived the move. This specifically
-  exercises `App.executeAndReconcile` through the new drag-and-drop trigger
-  added in this addendum, which the addendum's own manual checks had only
-  exercised through the context-menu Rename/Priority/Move dialogs, not drag.
-- `task-5.4-corrupt-recovery-toast.png` — corrupting the real
-  `metadata.json` and reloading: no crash, the same recovery toast text
-  documented above, and the library scanned normally.
-- `task-5.6-large-view.png`, `task-5.6-list-view.png` — the other two
-  catalog view modes, for layout consistency with the compact view above.
+The pass checked the compact, large, and list views on fixtures for layout
+consistency. Settings checks confirmed that System, Light, Dark, and all six
+accent options applied immediately to the app and the dialog.
+
+The toolbar tag menu showed its empty state and then the new "Favorites"
+and "WIP" tags with a success toast. The mod context menu showed "Tags..."
+alongside Rename, Priority, Move, and Delete. The tag checklist opened correctly.
+
+The "Favorites" tag appeared as a removable chip on the card and the
+selected-mod panel. The toolbar tag filter narrowed the catalog to the one
+tagged mod and showed the active filter count.
+
+A mod drag onto a sidebar folder produced a success toast and updated the
+folder counts. A folder drag into another folder produced a toast and
+updated the sidebar hierarchy.
+
+The tagged mod retained its "Favorites" chip after a drag to a new folder.
+This checked `App.executeAndReconcile` through the drag-and-drop action.
+The earlier pass checked this behavior only through the context menu.
+
+The test corrupted the real `metadata.json`. The app then
+reloaded without a crash, showed the expected recovery toast, and scanned
+the library normally.
 
 **Finding, not a regression:** the corrupt/recovery test above was run after
 two prior drag-and-drop moves in the same session. The restored `.bak` was
@@ -569,8 +560,7 @@ the detection but no task wired it to the frontend.
 finding above (still present in `metadata.json` at its stale pre-move
 scanner ID), reloaded the app, and confirmed the toast "1 tagged mod record
 no longer matches anything in this scan. Its tags are kept in case the mod
-reappears." appears
-(`docs/screenshots/phase-5/task-5.4-orphan-notice.png`). Clicking "Scan
+reappears." appears. Clicking "Scan
 library" again with no state change did not re-show the toast, confirming
 the dedup ref. No fixture files were modified; the underlying orphaned
 record was left in place afterward since it is pre-existing test debris

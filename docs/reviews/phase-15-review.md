@@ -82,7 +82,7 @@ Validation on the working tree at `50ec6b4` (2026-09-06), run for this review:
 
 ## End-to-end evidence
 
-**There is none for this phase, and that is the material gap in it.** No running-app drive was performed and `docs/screenshots/phase-15/` does not exist. `C:\ModsFixtures`, the standing disposable fixture library named in `AGENTS.md`, is not present on this machine, and tasks 15.6 and 15.8 both conditioned their screenshots on a fixture being drivable.
+**No running-app verification was performed for this phase.** The disposable fixture library, `C:\ModsFixtures`, was absent on this machine. Tasks 15.6 and 15.8 required usable fixtures for their manual checks.
 
 What that leaves proven and unproven:
 
@@ -92,12 +92,11 @@ What that leaves proven and unproven:
 ## Known limitations and deferred findings
 
 1. **No running-app verification for this phase.** Three exit criteria — the companion warning appearing once on first load of a dirty library, the install preview naming affected mods, and the required-encryption offer appearing after classify — rest on code reading rather than on a drive. Building `C:\ModsFixtures` with a dirty companion PAK and a Characters-leaving IoStore bundle, then driving `wails dev`, would close all three in one pass. This is the first thing to do if any doubt arises about Phase 15's UI behaviour.
-2. **No Phase 15 screenshots.** `docs/screenshots/phase-15/` does not exist. Carried forward with finding 1.
-3. **Carried from Phase 14: no running-app encrypt or decrypt capture.** Still open, and now joined by the companion-cleanup equivalent.
-4. **Hybrid mesh `.usmap`.** Unchanged from Phase 14. The disposable worker fixture has no real meshes, so extract-then-create never needed a `.usmap`. A real mesh rebuild that the pinned worker cannot finish without one remains an open risk, recorded in the test.
-5. **No persisted "never ask again".** Rejected in 0006 for this phase, so a user who dismisses an offer is asked again next launch. Deliberate: a leftover dirty library would otherwise go silent.
-6. **Companion cleanup does not rebuild `.utoc` or `.ucas`.** By design. If a container itself ever carries the crashing names, this phase does not address it.
-7. **Install-time obfuscation and classic PAK encryption.** Out of scope by design.
+2. **Carried from Phase 14: no running-app encrypt or decrypt verification.** Still open, and now joined by the companion-cleanup equivalent.
+3. **Hybrid mesh `.usmap`.** Unchanged from Phase 14. The disposable worker fixture has no real meshes, so extract-then-create never needed a `.usmap`. A real mesh rebuild that the pinned worker cannot finish without one remains an open risk, recorded in the test.
+4. **No persisted "never ask again".** Rejected in 0006 for this phase, so a user who dismisses an offer is asked again next launch. Deliberate: a leftover dirty library would otherwise go silent.
+5. **Companion cleanup does not rebuild `.utoc` or `.ucas`.** By design. If a container itself ever carries the crashing names, this phase does not address it.
+6. **Install-time obfuscation and classic PAK encryption.** Out of scope by design.
 
 ## Review decision
 

@@ -57,10 +57,6 @@ Validation output:
 
 1. **Live app verification (`C:\ModsFixtures`, `wails dev`):** Drove the running app in a real browser tab at the Wails-bound dev URL (`http://localhost:34115`, confirmed with a working `window.go` bridge — "Connected to backend" in console) against the full `C:\ModsFixtures` library (72 mods). Clicked "Check for conflicts" and got a real, mixed result: 4 duplicate-priority groups, 1 cross-priority group, and 2 unavailable mods, with the "2 enabled mods could not be scanned (encrypted or unreadable) and are excluded from these results" notice rendered correctly. Confirmed the Invisible Woman group's `JIRA_INVIS_SilicaSound!PrismParade_V1_Kuru` participant renders collapsed as "21 overlapping files" by default, and that clicking the toggle expands it to the individual file tags (`MI_1050308_Body.uasset`, etc.) while the sibling participant row and other groups stay independently collapsed.
 2. **Responsiveness:** The scan against the full 72-mod fixture library returned and rendered the dialog with no visible delay; matches the "remains responsive" exit criterion under the synchronous-call design confirmed in 9.3.
-3. **Screenshots:**
-   - `docs/screenshots/phase-9/task-9.5-initial.png`
-   - `docs/screenshots/phase-9/task-9.5-conflicts-collapsed.png` — dialog open, duplicate-priority and cross-priority groups visible, participant file lists collapsed.
-   - `docs/screenshots/phase-9/task-9.5-conflicts-expanded.png` — same dialog with one participant's file list expanded via the disclosure toggle.
 
 ## Known limitations and deferred findings
 

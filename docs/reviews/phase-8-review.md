@@ -65,9 +65,7 @@ Validation output:
 
 1. **Live app verification (real fixtures, `wails dev`):** Drove the running app directly (via `PrepareInstall`/`ApplyInstall` for backend-level checks, and the real UI for drag-and-drop and the preview dialog) against the fixtures in `C:\ModInstallations`: classic-only, IoStore across all four archive formats, a real bare `.pak` with automatic sidecar discovery, a multi-bundle archive installing two mods at once, a nested-folder archive, both invalid fixtures rejected cleanly, and a real `.rar` (`AkkabanAcolyteUI_9999999_P.rar`) installing correctly with classification. Collision detection was exercised for real by reinstalling the same mod into the same folder, then resolved once by rename and once by overwrite. A prepared-but-not-applied session was cancelled and left zero trace on disk.
 2. **Drag-and-drop:** confirmed working against the actual native application window, not just the dev-server browser proxy used for other checks.
-3. **Screenshots:**
-   - `docs/screenshots/phase-8/task-8.5-library-empty.png` captures the empty-library state (`ModsFixtures` cleared) before an install.
-   - `docs/screenshots/phase-8/task-8.3-install-preview-collision.png` captures the installation preview dialog mid-flow with two real mods staged from real archives (one from a `.zip`, one from a `.rar`), a live collision banner with its overwrite checkbox and rename hint, hero classification, and the disabled "Install 2 mods" button reflecting the unresolved collision.
+3. **Library and preview states:** The empty library state appeared before installation. The preview showed two mods from `.zip` and `.rar` archives with hero classification. A live collision banner showed an overwrite checkbox and a rename hint. The unresolved collision kept "Install 2 mods" disabled.
 
 ## Known limitations and deferred findings
 

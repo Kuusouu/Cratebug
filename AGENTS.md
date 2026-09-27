@@ -103,7 +103,9 @@ live-sync, and DOM/CSS behavior can differ by window size and DPI. Say when a
 check ran in the browser only, and ask the person running the native window to
 verify anything size- or DPI-sensitive directly.
 
-- Save screenshots as `docs/screenshots/<phase>/task-<number>-<state>.png`.
+- Save task verification screenshots as `.playwright-cli/screenshots/<phase>/task-<number>-<state>.png`.
+  This directory is ignored by Git. Do not commit these screenshots.
+  Track only the application screenshots used by `README.md`: `main.png` and the three Linux launch views.
 - Fixtures: `C:\ModsFixtures` is the standing library for manually driving the app —
   a small, varied set of classic and IoStore bundles (enabled, disabled via each
   recognized suffix, and one with a missing sidecar) across a few folders. Point the

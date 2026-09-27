@@ -48,11 +48,11 @@ Validation on the phase branch:
 
 Driven live against the running `wails dev` build via playwright-cli (the maintainer had deliberately moved their real `~mods` folder so detection would hit the install-found-without-library state):
 
-1. **Toolbar detect control** — the app loaded with `C:\ModsFixtures` (3 mods), the Steam-branded detect button rendered between the path field and Refresh. Screenshot: `docs/screenshots/phase-12/task-3-toolbar-detect-button.png`.
-2. **Detect → create dialog** — clicking Detect produced exactly the install-found state: heading "No mod library was found for Steam", the real install path (`c:\program files (x86)\steam\...\Content\Paks`) shown in a code block, and the create offer. Screenshot: `docs/screenshots/phase-12/task-3-detect-create-library-dialog.png`.
-3. **Confirmed creation** — clicking "Create library" closed the dialog, set the path field to the new `~mods` path, and rescanned automatically to the empty state ("No supported mods found"). A filesystem check confirmed the Paks directory gained exactly one entry, the empty `~mods` folder, with the game's own files untouched. Screenshot: `docs/screenshots/phase-12/task-3-created-library-scanned.png`.
+1. **Toolbar detect control** — the app loaded with `C:\ModsFixtures` (3 mods), the Steam-branded detect button rendered between the path field and Refresh.
+2. **Detect → create dialog** — clicking Detect produced exactly the install-found state: heading "No mod library was found for Steam", the real install path (`c:\program files (x86)\steam\...\Content\Paks`) shown in a code block, and the create offer.
+3. **Confirmed creation** — clicking "Create library" closed the dialog, set the path field to the new `~mods` path, and rescanned automatically to the empty state ("No supported mods found"). A filesystem check confirmed the Paks directory gained exactly one entry, the empty `~mods` folder, with the game's own files untouched.
 4. **Re-detect after creation** — clicking Detect again hit the same-library branch: no dialog, rescan, and the "This library is already active." toast, verified in the accessibility snapshot.
-5. **Settings provider section** — Steam pressed/selected with checkmark, Epic Games disabled, hint text present. Screenshot: `docs/screenshots/phase-12/task-3-settings-provider-section.png`.
+5. **Settings provider section** — Steam pressed/selected with checkmark, Epic Games disabled, hint text present.
 6. **Restore** — the library was pointed back at `C:\ModsFixtures` through the normal path-field flow and scanned to the expected 3 mods, confirming regular scanning is unaffected.
 
 The maintainer's real Steam installation was used read-only for detection, and for the one confirmed creation exactly as set up beforehand.

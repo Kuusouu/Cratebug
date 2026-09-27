@@ -55,7 +55,8 @@ Runtime requirements (these may already be installed):
 - WebKit2GTK 4.1 (`libwebkit2gtk-4.1-0` on Ubuntu/Pop!_OS/Debian, `webkit2gtk4.1` on Fedora, `webkit2gtk-4.1` on Arch/CachyOS).
 - FUSE 2 (`libfuse2` on Ubuntu/Debian) or run with `--appimage-extract-and-run`.
 
-The AppImage opened in Hyper-V VMs on [Fedora](docs/screenshots/phase-18/task-18.6-fedora-launch.png) and [Pop!_OS](docs/screenshots/phase-18/task-18.6-pop-os-launch.png) without extra packages. [CachyOS](docs/screenshots/phase-18/task-18.6-cachyos-launch.png) needed `sudo pacman -Syu webkit2gtk-4.1`.
+The AppImage opened in Hyper-V VMs on [Fedora](docs/screenshots/phase-18/task-18.6-fedora-launch.png) and [Pop!_OS](docs/screenshots/phase-18/task-18.6-pop-os-launch.png) without extra packages.
+[CachyOS](docs/screenshots/phase-18/task-18.6-cachyos-launch.png) required `sudo pacman -Syu webkit2gtk-4.1`.
 
 ## Finding your library
 
