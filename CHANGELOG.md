@@ -13,6 +13,8 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.10.01]
+
 ### Taking your crates to Linux
 
 - Your crates are now supported on Linux distros. WOOHOOOO!
