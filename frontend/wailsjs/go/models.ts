@@ -271,6 +271,7 @@ export namespace install {
 	    modName: string;
 	    destinationFolder: string;
 	    overwrite: boolean;
+	    encrypt: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ApplyItem(source);
@@ -282,6 +283,7 @@ export namespace install {
 	        this.modName = source["modName"];
 	        this.destinationFolder = source["destinationFolder"];
 	        this.overwrite = source["overwrite"];
+	        this.encrypt = source["encrypt"];
 	    }
 	}
 	export class ApplyResult {
@@ -345,6 +347,7 @@ export namespace install {
 	    destinationFolder: string;
 	    collision: CollisionInfo;
 	    identity: modtype.Identity;
+	    canEncrypt: boolean;
 	    issues?: discovery.Issue[];
 	    unsupportedCompanionPak?: boolean;
 	
@@ -364,6 +367,7 @@ export namespace install {
 	        this.destinationFolder = source["destinationFolder"];
 	        this.collision = this.convertValues(source["collision"], CollisionInfo);
 	        this.identity = this.convertValues(source["identity"], modtype.Identity);
+	        this.canEncrypt = source["canEncrypt"];
 	        this.issues = this.convertValues(source["issues"], discovery.Issue);
 	        this.unsupportedCompanionPak = source["unsupportedCompanionPak"];
 	    }

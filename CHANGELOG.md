@@ -13,6 +13,13 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+## [2026.10.03]
+
+### Crates in disguise
+
+- Each mod now has an **Encrypt on install** switch for complete IoStore bundles. Choose encryption before a local or Nexus install. Tiny switch, fancy disguise!
+- Clear mods start with the switch off. Already encrypted mods keep their costume.
+
 ## [2026.10.01]
 
 ### Taking your crates to Linux

@@ -30,6 +30,7 @@ type PreviewItem struct {
 	DestinationFolder       string                 `json:"destinationFolder"`
 	Collision               CollisionInfo          `json:"collision"`
 	Identity                modtype.Identity       `json:"identity"`
+	CanEncrypt              bool                   `json:"canEncrypt"`
 	Issues                  []discovery.Issue      `json:"issues,omitempty"`
 	UnsupportedCompanionPak bool                   `json:"unsupportedCompanionPak,omitempty"`
 }
@@ -84,6 +85,7 @@ func BuildPreview(modRoot string, session *StagedSession, defaultFolder string, 
 			DestinationFolder:       normDefaultFolder,
 			Collision:               collision,
 			Identity:                identities[mod.ID],
+			CanEncrypt:              canEncryptStagedMod(mod),
 			Issues:                  mod.Issues,
 			UnsupportedCompanionPak: mod.UnsupportedCompanionPak,
 		})

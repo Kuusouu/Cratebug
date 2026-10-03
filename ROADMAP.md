@@ -464,7 +464,7 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 18 - Linux distribution
 
-**Status:** Active
+**Status:** Complete.
 
 **Outcome:** Cratebug runs on Linux as a first-class build. Marvel Rivals is playable on Linux through Proton with its anti-cheat working, so the mods a Linux player manages are the same Windows bundles in the same Steam library layout. The work is making Cratebug itself portable, not changing what a mod is.
 
@@ -499,7 +499,7 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 
 ## Phase 19 - Linux AppImage self-updating
 
-**Status:** Unstarted
+**Status:** Deferred (post-release).
 
 **Outcome:** Linux users can update their Cratebug AppImage directly in the application.
 
@@ -527,8 +527,35 @@ Phase 11 folded into this phase: the update/apply flow needs a real release to t
 - Running outside an AppImage shows a clear error message.
 - All unit tests pass on Windows and Linux.
 
+## Phase 20 - Per-mod install encryption
+
+**Status:** Implementation complete. Review pending. Approved by the user on 2026-10-03.
+
+The test review removed one duplicate rollback assertion block.
+All four install encryption test functions remain.
+
+**Outcome:** Users can choose encryption for each complete IoStore mod in the install preview.
+
+**Includes:**
+
+- A separate toggle for each mod in the shared local and Nexus preview.
+- An off default for clear mods. Encrypted mods stay encrypted.
+- A staged rebuild through the existing encryption backend before destination writes.
+- Clear eligibility, progress, and error states.
+- Temporary-fixture tests and app checks with `PinkVFX.zip`.
+
+**Excludes:** Classic PAK encryption, install-time decryption, and persistent encryption preferences.
+
+**Exit criteria:**
+
+- Each selected mod keeps its own encryption choice.
+- Unsupported bundles cannot request encryption.
+- A rebuild failure leaves the destination library intact.
+- Source archives and loose files stay intact.
+- Checks pass and the app screenshots receive review.
+
 ## Deferred post-release work
 
-Potential later work includes BentoMod/Repak-X state migration, install-time obfuscation, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
+Deferred work includes Phase 19 (Linux AppImage self-updating), BentoMod/Repak-X state migration, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
 
 These require separate specification and roadmap decisions.

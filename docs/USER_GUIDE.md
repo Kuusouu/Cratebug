@@ -33,6 +33,17 @@ Cratebug closes itself, applies the update silently, and reopens automatically â
 
 If you'd rather update manually, the **View release** button opens the GitHub release page, where you can download and run the installer yourself.
 
+## Choose encryption before a mod install
+
+Each mod in the install preview has an **Encrypt on install** switch.
+Turn it on to encrypt that mod before Cratebug copies it into your library.
+The switch starts off for clear mods. An encrypted mod stays encrypted.
+Only complete IoStore bundles support this option.
+
+Encryption rebuilds the bundle. Cratebug shows the current target during the rebuild.
+If a rebuild fails, Cratebug stops the install before it changes the destination library.
+The source archive and loose source files stay intact.
+
 ## Installing a mod from Nexus Mods
 
 Cratebug downloads Marvel Rivals mods from Nexus Mods with **your** API key. The key stays on this machine. It is never sent to Cratebug infrastructure and never shown in the app after you paste it.

@@ -253,6 +253,7 @@ export function InstallPreviewDialog({
 					modName: config.modName.trim(),
 					destinationFolder: config.destinationFolder,
 					overwrite: config.overwrite,
+					encrypt: config.encrypt,
 				});
 			});
 
@@ -533,6 +534,52 @@ export function InstallPreviewDialog({
 											</label>
 										</div>
 
+										<div className={styles["install-encryption-row"]}>
+											<div>
+												<p className={styles["install-encryption-label"]}>
+													Encrypt on install
+												</p>
+												<p
+													id={`mod-encryption-hint-${item.id}`}
+													className={styles["install-encryption-hint"]}
+												>
+													{item.identity?.encrypted
+														? "Already encrypted. The install preserves this state."
+														: !item.canEncrypt
+															? "Requires a complete IoStore bundle."
+															: config.encrypt
+																? "Rebuild this mod with encryption before install."
+																: "Keep this mod's current encryption state."}
+												</p>
+											</div>
+											<button
+												type="button"
+												role="switch"
+												aria-checked={
+													item.identity?.encrypted || config.encrypt
+												}
+												aria-label={`Encrypt ${config.modName} on install`}
+												aria-describedby={`mod-encryption-hint-${item.id}`}
+												className={styles["install-encryption-switch"]}
+												disabled={
+													!isSelected ||
+													phase === "applying" ||
+													!item.canEncrypt ||
+													item.identity?.encrypted
+												}
+												onClick={() =>
+													handleConfigChange(item.id, {
+														encrypt: !config.encrypt,
+													})
+												}
+											>
+												<span
+													className={styles["install-encryption-knob"]}
+													aria-hidden="true"
+												/>
+											</button>
+										</div>
+
 										{error && (
 											<p className="mutation-dialog-error" role="alert">
 												{error}
@@ -550,10 +597,10 @@ export function InstallPreviewDialog({
 												>
 													<p>
 														{config.modName} has unsupported companion
-														PAK entries (chunknames / patched_files).
-														Cratebug will rewrite that .pak during
-														install. IoStore .utoc and .ucas stay as
-														they are.
+														PAK entries (chunknames / patched_files).{" "}
+														{config.encrypt
+															? "The encryption rebuild also removes these entries."
+															: "Cratebug will rewrite only that .pak before install."}
 													</p>
 												</div>
 											</div>
@@ -676,11 +723,18 @@ export function InstallPreviewDialog({
 						</div>
 
 						<div className={styles["install-preview-footer"]}>
+							{phase === "applying" && (
+								<p className={styles["install-encryption-hint"]} role="status">
+									{downloadProgress?.phase === "encrypting"
+										? downloadProgress.message
+										: "Install mods..."}
+								</p>
+							)}
 							{unsupportedCompanionCount > 0 && (
 								<p className={styles["install-footer-warning"]} role="status">
 									{unsupportedCompanionCount === 1
-										? "1 selected mod has unsupported companion PAK entries (chunknames / patched_files). Cratebug will rewrite that .pak during install. IoStore .utoc and .ucas stay as they are."
-										: `${unsupportedCompanionCount} selected mods have unsupported companion PAK entries (chunknames / patched_files). Cratebug will rewrite those .pak files during install. IoStore .utoc and .ucas stay as they are.`}
+										? "1 selected mod has unsupported companion PAK entries (chunknames / patched_files). Cratebug will remove these entries before install."
+										: `${unsupportedCompanionCount} selected mods have unsupported companion PAK entries (chunknames / patched_files). Cratebug will remove these entries before install.`}
 								</p>
 							)}
 							{blockingIssues && (

@@ -209,6 +209,59 @@
 	}
 }
 
+.install-encryption-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.install-encryption-label {
+	margin: 0;
+	font-size: 0.85rem;
+	font-weight: 650;
+}
+
+.install-encryption-hint {
+	margin: 0.25rem 0 0;
+	color: var(--muted);
+	font-size: 0.78rem;
+	line-height: 1.4;
+}
+
+.install-encryption-switch {
+	display: inline-flex;
+	width: 2.5rem;
+	height: 1.4rem;
+	align-items: center;
+	padding: 0.15rem;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: var(--panel);
+}
+
+.install-encryption-switch[aria-checked="true"] {
+	border-color: color-mix(in srgb, var(--accent), transparent 40%);
+	background: var(--accent);
+}
+
+.install-encryption-switch:disabled {
+	opacity: 0.55;
+}
+
+.install-encryption-knob {
+	width: 1.05rem;
+	height: 1.05rem;
+	border-radius: 50%;
+	background: var(--page);
+	box-shadow: 0 0.05rem 0.15rem rgba(0, 0, 0, 0.35);
+	transition: transform 0.15s ease;
+}
+
+.install-encryption-switch[aria-checked="true"] .install-encryption-knob {
+	transform: translateX(1.05rem);
+}
+
 .install-collision-banner,
 .install-warning-banner {
 	display: flex;

@@ -6,6 +6,7 @@ export type ModConfig = {
 	modName: string;
 	destinationFolder: string;
 	overwrite: boolean;
+	encrypt: boolean;
 };
 
 // Builds the default configuration for a freshly discovered preview item: included,
@@ -17,6 +18,7 @@ export function defaultModConfig(item: install.PreviewItem): ModConfig {
 		modName: item.modName,
 		destinationFolder: item.destinationFolder,
 		overwrite: false,
+		encrypt: false,
 	};
 }
 

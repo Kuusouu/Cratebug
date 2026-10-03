@@ -1,96 +1,58 @@
 # Cratebug Active Tasks
 
-**Phase:** 18 - Linux distribution
-**Status:** Active
+**Phase:** 20 - Per-mod install encryption
+**Status:** Implementation complete. Review pending.
 
-This file contains only the active work. Do not start the next phase.
+Phase 18 is complete. Phase 19 stays deferred.
+The user approved Phase 20 on 2026-10-03.
 
-## Objective
+## 20.1 Per-mod install encryption [IMPLEMENTED]
 
-Make Cratebug run on Linux as a first-class build. Marvel Rivals runs on Linux through Proton with working anti-cheat; the managed mods are the same Windows bundles in the same Steam library layout. The goal is to make Cratebug portable without changing mod formats or core architecture.
+Add an encryption toggle to each mod in the shared install preview.
+Start clear mods with the toggle off. Preserve encrypted mods.
+Disable the toggle for classic and incomplete bundles.
+Encrypt selected staged bundles before the install copies files into the library.
+Stop the install if a rebuild fails. Keep the source files intact.
+Show the current encryption target while the worker runs.
 
-## Design decisions
+**Verify:**
 
-* **Ubuntu 22.04 as build baseline.** Building on Ubuntu 22.04 links against glibc 2.35, ensuring the resulting AppImage runs across Ubuntu, Debian, Fedora, Bazzite, Arch, and SteamOS.
-* **AppImage primary distribution.** A single-file AppImage provides maximum portability without sandboxing constraints or immediate app store review queues.
-* **Safe trash semantics.** File deletion on Linux must route through FreeDesktop Trash (`gio trash` or `~/.local/share/Trash`). Deletion must fail with an explicit error rather than silently degrading to permanent file deletion.
-* **Secret storage with fallback.** Use the FreeDesktop Secret Service API (via D-Bus) for Nexus API key storage, with a secure local key file (`0600` permissions under `~/.config/cratebug/`) when no secret daemon is available.
-* **Proton process inspection.** The running-game check reads `/proc` to detect `marvel-win64-shipping.exe` running under Proton or Wine.
-* **Desktop integration via FreeDesktop standards.** `nxm://` protocol handling uses `~/.local/share/applications/cratebug-nxm.desktop` and `xdg-mime`. File reveal uses D-Bus `FileManager1.ShowItems` or `xdg-open`.
+1. Test independent choices, mixed source states, invalid bundles, rebuild failure, and cancellation with temporary fixtures.
+2. Run `check.ps1` and the frontend tests.
+3. Drive the app with `PinkVFX.zip` and several mods in a disposable fixture library.
+4. Capture the preview, progress, success, and failure states.
+5. Verify the installed encryption state with the backend. Stop for review.
 
-## Out of scope
+**Results (2026-10-03):**
 
-* macOS and ARM architectures
-* Flatpak / Flathub submission (planned for post-release)
-* Native distribution package managers (.deb, .rpm, AUR)
-* Managing Proton prefixes differently from standard Steam libraries
+- `check.ps1` passed. Go format, vet, tests, frontend format, lint, typecheck, and production frontend build passed.
+- All 82 frontend tests passed. New Go tests cover independent choices, mixed states, source preservation, unsupported bundles, failure, and cancellation.
+- The app installed `PinkVFX.zip` with encryption. A two-mod install kept one copy clear and encrypted the other copy.
+- A second-target failure left all 12 destination file hashes intact. An encrypted-source install preserved all three bundle files byte for byte.
+- The source ZIP hash stayed intact. The preview and action buttons fit at 1400 x 950 and 1350 x 650 CSS pixels.
 
----
+GPT 6 Astra reviewed the new tests at high effort.
+The review removed one duplicate rollback assertion block.
+All four test functions keep distinct install checks.
+The Go package tests, `check.ps1`, and all 82 frontend tests passed after the removal.
 
-## 18.1 Portable Go foundation and build tag isolation [COMPLETED]
+Windows denied access to `C:\ModsFixtures`.
+The app checks used `.playwright-cli/fixtures/install-encryption/library` instead.
+The browser check replaced the native file picker with fixture paths.
+The real Go backend handled all file operations.
+The browser snapshot tool failed. The screenshots are frames from browser recordings.
 
-Isolate Windows-specific imports behind `//go:build windows` tags and create portable stubs:
-- Add `window_other.go` with `primaryWorkArea() (int, int)` returning `(0, 0)`.
-- Isolate `internal/update/apply.go` behind `//go:build windows` and add `apply_other.go` stub.
-- Split `internal/uassettool/worker.go` executable naming (`UAssetTool` vs `UAssetTool.exe`) and process attributes (`HideWindow`).
-- Split `internal/mutation/mutation.go` (`moveFileWithoutReplace`) and `internal/mutation/folders.go` (`requireDirectory`).
-- Add `//go:build windows` to `internal/mutation/recycle_windows.go` and `internal/mutation/game_running_windows.go`.
-- Make `internal/gamedetect` portable by splitting Windows registry access into `steam_windows.go` and `steam_other.go`.
+**Screenshots:** `.playwright-cli/screenshots/phase-20/`
 
-**Verify:** `GOOS=linux go vet ./...` passes without errors. All unit tests pass in WSL2 Linux (`go test ./...`) and Windows (`.\check.ps1`). Completed 2026-09-20.
+- `task-20.1-multiple-preview.png`
+- `task-20.1-progress.png`
+- `task-20.1-multiple-success.png`
+- `task-20.1-already-encrypted.png`
+- `task-20.1-failure.png`
 
----
-
-## 18.2 Linux game detection and running-game process check [COMPLETED]
-
-Implement Linux Steam detection and running-game check:
-- Split `internal/gamedetect/steam.go` into `steam_windows.go` and `steam_linux.go`.
-- On Linux, check `~/.local/share/Steam`, `~/.steam/steam`, `~/.steam/root`, and Flatpak Steam paths. Parse `steamapps/libraryfolders.vdf` using the existing parser.
-- Implement `internal/mutation/game_running_linux.go` by inspecting `/proc` for `marvel-win64-shipping.exe`.
-
-**Verify:** `go test ./internal/gamedetect ./internal/mutation -run "TestSteam|TestGameRunning" -count=1` passes with mock filesystem and `/proc` fixtures. Completed 2026-09-20.
-
----
-
-## 18.3 Linux file operations and desktop integration [COMPLETED]
-
-Implement safe Linux file mutations and desktop hooks:
-- Implement `internal/mutation/recycle_linux.go` using `gio trash` with fallback to FreeDesktop trash spec.
-- Implement `internal/reveal/open_linux.go` using D-Bus `org.freedesktop.FileManager1.ShowItems` or `xdg-open`.
-- Implement `internal/urlscheme/registry_linux.go` using `.desktop` entry registration and `xdg-mime`.
-
-**Verify:** `go test ./internal/mutation ./internal/reveal ./internal/urlscheme -count=1` passes. Completed 2026-09-20.
-
----
-
-## 18.4 Linux secret storage and worker packaging [COMPLETED]
-
-Implement Linux credential protection and worker binary extraction:
-- Implement `internal/secret/protect_linux.go` supporting Secret Service via D-Bus with permission-checked `0600` local fallback.
-- Create `fetch-uassettool.sh` (or update download script) for `UAssetTool-linux-x64.tar.gz`.
-- Ensure executable permissions (`0755`) on extraction and confirm runtime Oodle library resolution.
-
-**Verify:** `go test ./internal/secret ./internal/uassettool -count=1` passes. Completed 2026-09-20.
-
----
-
-## 18.5 Wails Linux packaging and AppImage build [COMPLETED]
-
-Configure Wails for Linux builds:
-- Validate WebKit2GTK compilation on Ubuntu 22.04 / WSL2.
-- Create AppImage packaging recipe and `build-linux.sh`.
-- Verify application launch, UI rendering, and window sizing.
-
-**Verify:** `wails dev` launches and serves the UI. AppImage builds and runs standalone. Completed 2026-09-20.
-
----
-
-## 18.6 Cross-distro verification and CI [COMPLETED]
-
-Complete testing and CI integration:
-- Run canonical check script on Linux: Go tests, Biome linting, and frontend tests.
-- Validate mod lifecycle: scan, enable, disable, move, rename, delete to trash, encrypt, strip companion, install.
-- Update GitHub Actions workflow to build and attach Linux AppImage to releases.
-- Document distro prerequisites in `README.md`.
-
-**Verify:** All checks pass on Linux. AppImage runs cleanly. Completed 2026-09-20.
+These checks used the browser.
+They did not check the native WebView, Linux, a live Nexus download, or the game.
+The Nexus path shares the preview and apply flow.
+Wails logged a browser IPC error during setup, before the install checks.
+The real install calls and backend checks passed. Leave that runtime issue outside this task.
+Stop for review. Do not start another phase.

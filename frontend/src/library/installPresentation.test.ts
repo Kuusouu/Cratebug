@@ -76,6 +76,7 @@ describe("hasUnresolvedCollisions", () => {
 				modName: "IronMan",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -95,6 +96,7 @@ describe("hasUnresolvedCollisions", () => {
 				modName: "IronMan",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -114,6 +116,7 @@ describe("hasUnresolvedCollisions", () => {
 				modName: "IronMan",
 				destinationFolder: "",
 				overwrite: true,
+				encrypt: false,
 			},
 		};
 
@@ -133,6 +136,7 @@ describe("hasUnresolvedCollisions", () => {
 				modName: "IronMan",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -153,6 +157,7 @@ describe("findBatchCollisions", () => {
 				modName: "Hulk",
 				destinationFolder: "Heroes",
 				overwrite: false,
+				encrypt: false,
 			},
 			"mod-2": {
 				id: "mod-2",
@@ -160,6 +165,7 @@ describe("findBatchCollisions", () => {
 				modName: "Thor",
 				destinationFolder: "Heroes",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -178,6 +184,7 @@ describe("findBatchCollisions", () => {
 				modName: "Lagoona",
 				destinationFolder: "Characters/InvisibleWoman",
 				overwrite: false,
+				encrypt: false,
 			},
 			"mod-2": {
 				id: "mod-2",
@@ -185,6 +192,7 @@ describe("findBatchCollisions", () => {
 				modName: "Lagoona",
 				destinationFolder: "Characters/InvisibleWoman",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -205,6 +213,7 @@ describe("findBatchCollisions", () => {
 				modName: "Lagoona",
 				destinationFolder: "Characters/InvisibleWoman",
 				overwrite: false,
+				encrypt: false,
 			},
 			"mod-2": {
 				id: "mod-2",
@@ -212,6 +221,7 @@ describe("findBatchCollisions", () => {
 				modName: "Lagoona",
 				destinationFolder: "Characters/InvisibleWoman",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -230,6 +240,7 @@ describe("findBatchCollisions", () => {
 				modName: "Lagoona",
 				destinationFolder: "Characters/InvisibleWoman",
 				overwrite: false,
+				encrypt: false,
 			},
 			"mod-2": {
 				id: "mod-2",
@@ -237,6 +248,7 @@ describe("findBatchCollisions", () => {
 				modName: "Lagoona",
 				destinationFolder: "Install/Testing",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -267,6 +279,7 @@ describe("detectLibraryCollision", () => {
 			modName: "InvisibleWoman_Skin",
 			destinationFolder: "Characters/InvisibleWoman",
 			overwrite: false,
+			encrypt: false,
 		};
 		const libraryEntries = [
 			new discovery.Entry({
@@ -294,6 +307,7 @@ describe("detectLibraryCollision", () => {
 			modName: "InvisibleWoman_Skin",
 			destinationFolder: "Install/Testing",
 			overwrite: false,
+			encrypt: false,
 		};
 		const libraryEntries = [
 			new discovery.Entry({
@@ -319,6 +333,7 @@ describe("detectLibraryCollision", () => {
 			modName: "InvisibleWoman_Skin_CustomVariant",
 			destinationFolder: "Characters/InvisibleWoman",
 			overwrite: false,
+			encrypt: false,
 		};
 		const libraryEntries = [
 			new discovery.Entry({
@@ -350,6 +365,7 @@ describe("detectLibraryCollision", () => {
 			modName: "InvisibleWoman_Skin",
 			destinationFolder: "Characters/InvisibleWoman",
 			overwrite: false,
+			encrypt: false,
 		};
 
 		const collision = detectLibraryCollision(item, config, []);
@@ -373,6 +389,7 @@ describe("detectLibraryCollision", () => {
 			modName: "InvisibleWoman_Skin_Renamed",
 			destinationFolder: "Characters/InvisibleWoman",
 			overwrite: false,
+			encrypt: false,
 		};
 
 		const collision = detectLibraryCollision(item, config, []);
@@ -390,6 +407,7 @@ describe("hasBlockingIssues", () => {
 				modName: "Hulk",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -410,6 +428,7 @@ describe("hasBlockingIssues", () => {
 				modName: "Hulk",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -430,6 +449,7 @@ describe("hasBlockingIssues", () => {
 				modName: "Hulk",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 
@@ -454,6 +474,7 @@ describe("selectedUnsupportedCompanionCount", () => {
 				modName: "Hulk",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 			"mod-2": {
 				id: "mod-2",
@@ -461,6 +482,7 @@ describe("selectedUnsupportedCompanionCount", () => {
 				modName: "Storm",
 				destinationFolder: "",
 				overwrite: false,
+				encrypt: false,
 			},
 		};
 

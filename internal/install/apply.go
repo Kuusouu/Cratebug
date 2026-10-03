@@ -36,6 +36,7 @@ type ApplyItem struct {
 	ModName           string `json:"modName"`
 	DestinationFolder string `json:"destinationFolder"`
 	Overwrite         bool   `json:"overwrite"`
+	Encrypt           bool   `json:"encrypt"`
 }
 
 // ApplyResult reports the final reconciled library state and IDs of installed mods.

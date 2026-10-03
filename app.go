@@ -927,10 +927,19 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 			return install.ApplyResult{}, err
 		}
 		defer worker.Close()
+		onProgress := func(p install.Progress) {
+			if a.ctx != nil {
+				wailsRuntime.EventsEmit(a.ctx, "install:progress", p)
+			}
+		}
+		if err := install.EncryptStagedMods(ctx, session, items, worker, onProgress); err != nil {
+			return install.ApplyResult{}, err
+		}
 		if err := stripStagedCompanionPaks(session, items, worker); err != nil {
 			return install.ApplyResult{}, err
 		}
 
+		onProgress(install.Progress{Phase: "applying", Message: "Install mods..."})
 		result, err := install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
 		if err != nil {
 			return result, err
