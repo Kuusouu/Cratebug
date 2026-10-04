@@ -63,9 +63,10 @@ type bundleSwap struct {
 	bak  string
 }
 
-// Rebuilds each complete IoStore bundle in entryIDs with or without
-// obfuscation. Mixed encryption state and ineligible formats fail before
-// any file is rewritten. encrypt true writes obfuscated output.
+// Encrypts each complete IoStore bundle in entryIDs directly, or decrypts by
+// rebuilding. Mixed encryption state and ineligible formats fail before
+// any file is rewritten. encrypt true AES-encrypts existing chunks without a
+// legacy-asset conversion; encrypt false rebuilds without obfuscation.
 func SetModEncryption(
 	modRoot string,
 	entryIDs []string,
@@ -339,6 +340,73 @@ func validateEncryptableEntry(entry discovery.Entry) error {
 }
 
 func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt, currentlyEncrypted bool, caller ArchiveCaller) error {
+	if encrypt {
+		return rewriteBundleEncryptionDirect(root, entry, caller)
+	}
+	return rewriteBundleEncryptionRebuild(root, entry, encrypt, currentlyEncrypted, caller)
+}
+
+// Encrypts the bundle's existing IoStore chunks directly through pak_fixer.
+// No legacy-asset conversion runs, so cooked class references are preserved.
+// The worker rewrites copies in a temp directory; live files change only
+// through the existing park+replace+rollback swap.
+func rewriteBundleEncryptionDirect(root string, entry discovery.Entry, caller ArchiveCaller) error {
+	primaryAbs := filepath.Join(root, filepath.FromSlash(entry.PrimaryPath))
+	utocAbs := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UTOC))
+	ucasAbs := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UCAS))
+	if !pathWithinRoot(root, primaryAbs) || !pathWithinRoot(root, utocAbs) || !pathWithinRoot(root, ucasAbs) {
+		return fmt.Errorf("bundle paths escape the mod root")
+	}
+
+	workDir, err := os.MkdirTemp("", "cratebug-encrypt-*")
+	if err != nil {
+		return fmt.Errorf("create encryption work directory: %w", err)
+	}
+	defer os.RemoveAll(workDir)
+
+	// Stage under a plain .pak name so the worker finds the sibling .utoc
+	// next to it even when the live primary is disabled (.pak_crateoff).
+	stagedPak := filepath.Join(workDir, "bundle.pak")
+	stagedUtoc := filepath.Join(workDir, "bundle.utoc")
+	stagedUcas := filepath.Join(workDir, "bundle.ucas")
+	for live, staged := range map[string]string{
+		primaryAbs: stagedPak,
+		utocAbs:    stagedUtoc,
+		ucasAbs:    stagedUcas,
+	} {
+		if err := requireRegularFile(live, "live bundle file"); err != nil {
+			return err
+		}
+		if err := copyRegularFile(live, staged); err != nil {
+			return fmt.Errorf("stage bundle file for encryption: %w", err)
+		}
+	}
+
+	if _, err := uassettool.EncryptIoStoreDirect(caller, stagedPak, uassettool.MarvelRivalsAESKey); err != nil {
+		return fmt.Errorf("encrypt IoStore: %w", err)
+	}
+	encrypted, err := uassettool.IsIoStoreEncrypted(caller, stagedUtoc)
+	if err != nil {
+		return fmt.Errorf("verify encryption: %w", err)
+	}
+	if !encrypted {
+		return fmt.Errorf("verify encryption: container is not encrypted after rewrite")
+	}
+
+	// pak_fixer also drops the chunknames manifest when present, so no
+	// separate companion strip is needed here.
+	rebuilt := map[string]string{
+		primaryAbs: stagedPak,
+		utocAbs:    stagedUtoc,
+		ucasAbs:    stagedUcas,
+	}
+	return replaceBundleFiles(root, rebuilt)
+}
+
+func rewriteBundleEncryptionRebuild(root string, entry discovery.Entry, encrypt, currentlyEncrypted bool, caller ArchiveCaller) error {
+	// Decrypt-only path. It extracts to legacy assets and recreates the
+	// container, which needs the game's class database to round-trip cooked
+	// meshes. Do not reuse this for encrypt: use the direct path above.
 	primaryAbs := filepath.Join(root, filepath.FromSlash(entry.PrimaryPath))
 	utocAbs := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UTOC))
 	ucasAbs := filepath.Join(root, filepath.FromSlash(entry.Sidecars.UCAS))

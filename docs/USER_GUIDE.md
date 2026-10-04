@@ -102,11 +102,13 @@ A batch that only partly succeeds says so. It does not call the whole run a succ
 
 ## Encrypting or decrypting IoStore mods
 
-Encrypt and Decrypt live only in the Actions menu. They rebuild each complete IoStore bundle (`.pak` + `.utoc` + `.ucas`) so the Marvel Rivals game key wraps the container. Classic PAK mods cannot be encrypted. A mix of encrypted and unencrypted IoStore mods disables the action until the set is uniform.
+Encrypt and Decrypt live only in the Actions menu. Encrypt rewrites each complete IoStore bundle (`.pak` + `.utoc` + `.ucas`) in place so the Marvel Rivals game key wraps the container. Decrypt rebuilds the bundle without obfuscation. Classic PAK mods cannot be encrypted. A mix of encrypted and unencrypted IoStore mods disables the action until the set is uniform.
 
-Encryption is a rebuild, not a bit-flip. Large mods can take several minutes. Close Marvel Rivals first. A failed rebuild leaves that one mod as it was. Mods that already finished in the same batch stay changed. The rebuilt companion `.pak` is stripped of `chunknames` and `patched_files` before it replaces the live files.
+Encryption is a container rewrite, not a bit-flip. Large mods can take several minutes. Close Marvel Rivals first. A failed run leaves that one mod as it was. Mods that already finished in the same batch stay changed. The companion `.pak` is stripped of `chunknames` and `patched_files` before the live files change.
 
 A lock mark on a card means that IoStore bundle is encrypted. The category pill (Mesh, UI, and so on) does not change.
+
+The catalog header has a filter button next to Tags. Its Encryption section offers All, Encrypted, or Unencrypted. The narrowed views show only classified complete IoStore bundles, so classic mods and bundles still being scanned stay hidden until they qualify.
 
 The first time Cratebug finishes classifying a library in a session, it offers to encrypt complete IoStore mods that change files outside `/Game/Marvel/Characters`. Those mods will not load until they are encrypted. You can decline for this session. Refresh does not ask again. If leftover companion PAK names are also present, that warning is shown first.
 

@@ -56,3 +56,32 @@ The Nexus path shares the preview and apply flow.
 Wails logged a browser IPC error during setup, before the install checks.
 The real install calls and backend checks passed. Leave that runtime issue outside this task.
 Stop for review. Do not start another phase.
+
+## 20.2 Direct encryption fix (2026-10-04)
+
+Encrypt (install toggle and Actions) no longer rebuilds through
+`extract_iostore` + `create_mod_iostore`: that conversion drops cooked class
+references without the game's class database (2 corrupted textures on Shark,
+384 lost references on PinkVFX). Encrypt now copies the bundle to a temp
+directory, runs the pinned worker's `pak_fixer` with obfuscation on the copy,
+verifies the encrypted flag, and swaps files through park+replace+rollback.
+Decrypt still rebuilds; the pinned worker exposes no direct decrypt rewrite.
+
+**Verify:**
+
+1. `check.ps1` passed. All 82 frontend tests passed (`bun test`).
+2. Real worker + real Shark fixture: library encrypt kept all 6 internal
+   paths identical, set the encrypted flag, and left no `chunknames` names.
+   Staged install with the toggle installed 1 encrypted mod, kept the
+   listing, and left the source ZIP byte-identical.
+3. No browser check: this machine has no Node, so `playwright-cli` cannot
+   run. The toggle UI is unchanged; only the backend changed.
+
+Catalog encryption filter (same fix, per user approval): the header has a
+filter-icon button next to Tags whose popover holds titled sections, starting
+with Encryption (All / Encrypted / Unencrypted). Later filters append a
+section entry (`FilterMenu.tsx`, `LibraryScreen.tsx`) without touching the
+menu. Narrowed views show only classified complete IoStore bundles;
+unclassified entries and ineligible bundles stay hidden until they qualify.
+5 new frontend tests (87 total pass). The confirm dialog and user guide now
+say encrypt instead of rebuild.

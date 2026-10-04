@@ -86,8 +86,15 @@ import { DetectLibraryDialog } from "./DetectLibraryDialog";
 import { EncryptConfirmDialog } from "./EncryptConfirmDialog";
 import { EncryptionRequiredDialog } from "./EncryptionRequiredDialog";
 import { encryptionMenuState } from "./encryptionAction";
+import {
+	type EncryptionFilter,
+	encryptionFilterLabels,
+	encryptionFilters,
+	matchesEncryptionFilter,
+} from "./encryptionFilter";
 import { canChangeModState, canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
 import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
+import { type FilterSection, FilterMenu } from "./FilterMenu";
 import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
 import { InstallFromNexusDialog } from "./InstallFromNexusDialog";
@@ -346,6 +353,7 @@ function libraryStatusMessage(
 	selectedFolder: string,
 	search: string,
 	viewMode: ViewMode,
+	encryptionFilter: EncryptionFilter,
 ): string {
 	switch (state) {
 		case "initial":
@@ -364,7 +372,8 @@ function libraryStatusMessage(
 						? "library root"
 						: selectedFolder;
 			const matchesSearch = search.trim() !== "" ? " matching" : "";
-			return `${viewModeLabels[viewMode]} view. ${entryCount}${matchesSearch} mods shown in ${scope}.`;
+			const matchesEncryption = encryptionFilter === "all" ? "" : ` ${encryptionFilter}`;
+			return `${viewModeLabels[viewMode]} view. ${entryCount}${matchesSearch}${matchesEncryption} mods shown in ${scope}.`;
 		}
 	}
 }
@@ -404,6 +413,7 @@ export function LibraryScreen() {
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
+	const [encryptionFilter, setEncryptionFilter] = useState<EncryptionFilter>("all");
 	const [accentColor, setAccentColor] = useState("");
 	const [identitiesByEntryID, setIdentitiesByEntryID] = useState<
 		Record<string, modtype.Identity>
@@ -504,9 +514,22 @@ export function LibraryScreen() {
 				if (!tags.some((tag) => tagFilterIDs.has(tag.id))) return false;
 			}
 
+			if (!matchesEncryptionFilter(entry, encryptionFilter, identitiesByEntryID)) {
+				return false;
+			}
+
 			return true;
 		});
-	}, [library, libraryIndex, search, selectedFolder, tagFilterIDs, entryTags]);
+	}, [
+		library,
+		libraryIndex,
+		search,
+		selectedFolder,
+		tagFilterIDs,
+		entryTags,
+		encryptionFilter,
+		identitiesByEntryID,
+	]);
 	const statusMessage = libraryStatusMessage(
 		libraryState,
 		scanError,
@@ -514,6 +537,7 @@ export function LibraryScreen() {
 		selectedFolder,
 		search,
 		viewMode,
+		encryptionFilter,
 	);
 	const selectedEntry = library?.entries.find((entry) => entry.id === selectedEntryID) ?? null;
 	const checkedEntries = useMemo(
@@ -536,6 +560,24 @@ export function LibraryScreen() {
 	const encryptMenu = useMemo(
 		() => encryptionMenuState(checkedEntries, identitiesByEntryID),
 		[checkedEntries, identitiesByEntryID],
+	);
+	// Filter sections are data: a later filter (bundle type, enabled state)
+	// appends another entry here without touching FilterMenu.
+	const filterSections = useMemo<FilterSection[]>(
+		() => [
+			{
+				id: "encryption",
+				title: "Encryption",
+				defaultValue: "all",
+				selectedValue: encryptionFilter,
+				options: encryptionFilters.map((filter) => ({
+					value: filter,
+					label: encryptionFilterLabels[filter],
+				})),
+				onSelect: (value) => setEncryptionFilter(value as EncryptionFilter),
+			},
+		],
+		[encryptionFilter],
 	);
 	const isMutationLocked = mutatingEntryIDs.size > 0 || isFolderMutating;
 	const dismissMutationFeedback = useCallback(() => setMutationFeedback(null), []);
@@ -2758,6 +2800,7 @@ export function LibraryScreen() {
 								onRenameTag={renameTag}
 								onDeleteTag={deleteTag}
 							/>
+							<FilterMenu sections={filterSections} />
 						</div>
 						<fieldset className={styles["view-mode-controls"]}>
 							<legend className="visually-hidden">Catalog view</legend>

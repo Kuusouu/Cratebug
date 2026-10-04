@@ -548,7 +548,7 @@ export function InstallPreviewDialog({
 														: !item.canEncrypt
 															? "Requires a complete IoStore bundle."
 															: config.encrypt
-																? "Rebuild this mod with encryption before install."
+																? "Encrypt this mod before install."
 																: "Keep this mod's current encryption state."}
 												</p>
 											</div>

@@ -805,3 +805,60 @@ func TestExtractIoStorePreservesZeroExtractedCount(t *testing.T) {
 		t.Errorf("ExtractIoStore() count = %d, want 0", count)
 	}
 }
+
+func TestEncryptIoStoreDirectSendsPakFixerObfuscate(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"total":1,"fixed":0,"already_clean":1,"failed":0,"containers_encrypted":1,"containers_already_encrypted":0,"containers_failed":0}`)}
+
+	// Act
+	result, err := EncryptIoStoreDirect(fake, "mod.pak", MarvelRivalsAESKey)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("EncryptIoStoreDirect() error = %v, want nil", err)
+	}
+	if fake.action != "pak_fixer" {
+		t.Errorf("action = %q, want pak_fixer", fake.action)
+	}
+	if fake.params["file_path"] != "mod.pak" {
+		t.Errorf("params[file_path] = %v, want mod.pak", fake.params["file_path"])
+	}
+	if fake.params["obfuscate"] != true {
+		t.Errorf("params[obfuscate] = %v, want true", fake.params["obfuscate"])
+	}
+	if fake.params["aes_key"] != MarvelRivalsAESKey {
+		t.Errorf("params[aes_key] = %v, want MarvelRivalsAESKey", fake.params["aes_key"])
+	}
+	if result.ContainersEncrypted != 1 {
+		t.Errorf("ContainersEncrypted = %d, want 1", result.ContainersEncrypted)
+	}
+}
+
+func TestEncryptIoStoreDirectRejectsEmptyPath(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{}
+
+	// Act
+	_, err := EncryptIoStoreDirect(fake, "", "")
+
+	// Assert
+	if err == nil {
+		t.Fatal("EncryptIoStoreDirect() error = nil, want an error for an empty path")
+	}
+	if fake.action != "" {
+		t.Error("EncryptIoStoreDirect() called the worker with an empty path, want no call")
+	}
+}
+
+func TestEncryptIoStoreDirectFailsWhenContainerNotEncrypted(t *testing.T) {
+	// Arrange
+	fake := &fakeCaller{respond: respondWithJSON(`{"total":1,"fixed":0,"already_clean":1,"failed":0,"containers_encrypted":0,"containers_already_encrypted":0,"containers_failed":0}`)}
+
+	// Act
+	_, err := EncryptIoStoreDirect(fake, "mod.pak", "")
+
+	// Assert
+	if err == nil {
+		t.Fatal("EncryptIoStoreDirect() error = nil, want an error when no container was encrypted")
+	}
+}

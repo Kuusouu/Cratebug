@@ -13,7 +13,7 @@ func canEncryptStagedMod(mod StagedMod) bool {
 		mod.Sidecars.UTOC != "" && mod.Sidecars.UCAS != "" && len(mod.Issues) == 0
 }
 
-// Rebuilds selected staged bundles before the install can change the destination.
+// Encrypts selected staged bundles before the install can change the destination.
 // A false choice preserves the source encryption state. It never decrypts a mod.
 func EncryptStagedMods(ctx context.Context, session *StagedSession, items []ApplyItem, caller mutation.ArchiveCaller, progress func(Progress)) error {
 	modsByID := make(map[string]StagedMod, len(session.Mods))

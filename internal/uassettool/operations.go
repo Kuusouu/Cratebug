@@ -245,6 +245,51 @@ func CreateModIoStore(c caller, outputPath, inputDir string, options IoStoreCrea
 	}, nil
 }
 
+// Rewrites the sibling IoStore container with AES-encrypted chunks through
+// the worker's pak_fixer path. This encrypts existing chunks in place without
+// a legacy-asset conversion, so cooked class references are preserved. pakPath
+// must end in .pak so the worker finds its sibling .utoc/.ucas. aesKey may be
+// empty to use the worker default, which matches MarvelRivalsAESKey.
+type PakFixerResult struct {
+	Total                      int `json:"total"`
+	Fixed                      int `json:"fixed"`
+	AlreadyClean               int `json:"already_clean"`
+	Failed                     int `json:"failed"`
+	ContainersEncrypted        int `json:"containers_encrypted"`
+	ContainersAlreadyEncrypted int `json:"containers_already_encrypted"`
+	ContainersFailed           int `json:"containers_failed"`
+}
+
+// Encrypts the IoStore container beside pakPath without rebuilding assets.
+func EncryptIoStoreDirect(c caller, pakPath, aesKey string) (PakFixerResult, error) {
+	if pakPath == "" {
+		return PakFixerResult{}, fmt.Errorf("uassettool: pak_fixer: pak path is required")
+	}
+
+	params := map[string]any{
+		"file_path": pakPath,
+		"obfuscate": true,
+	}
+	if aesKey != "" {
+		params["aes_key"] = aesKey
+	}
+
+	var raw PakFixerResult
+	if err := c.Call("pak_fixer", params, &raw); err != nil {
+		return PakFixerResult{}, err
+	}
+	if raw.Failed != 0 {
+		return raw, fmt.Errorf("uassettool: pak_fixer: %d pak rewrite failed", raw.Failed)
+	}
+	if raw.ContainersFailed != 0 {
+		return raw, fmt.Errorf("uassettool: pak_fixer: %d container encryption failed", raw.ContainersFailed)
+	}
+	if raw.ContainersEncrypted == 0 && raw.ContainersAlreadyEncrypted == 0 {
+		return raw, fmt.Errorf("uassettool: pak_fixer: container was not encrypted")
+	}
+	return raw, nil
+}
+
 // True when the last path segment is chunknames or patched_files, the leftover
 // IoStore bookkeeping names anti-cheat rejects as of 3 September 2026. Mount
 // prefixes still match; a longer filename that merely contains those strings does not.

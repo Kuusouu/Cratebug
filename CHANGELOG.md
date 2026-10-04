@@ -13,6 +13,11 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+### Safer disguises
+
+- Fixed Encrypt corrupting mesh and texture mods. Encryption now rewrites the container in place instead of rebuilding it, so your mods come out the other side intact.
+- The catalog header has a new filter button: show All, Encrypted, or Unencrypted mods to find things faster.
+
 ## [2026.10.03]
 
 ### Crates in disguise

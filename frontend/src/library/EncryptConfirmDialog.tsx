@@ -13,8 +13,9 @@ type EncryptConfirmDialogProps = {
 };
 
 /**
- * Warns that encrypt/decrypt rebuilds each IoStore bundle instead of flipping
- * a bit, then gates confirm behind the same short delay as delete.
+ * Warns that encrypt rewrites each IoStore container in place (decrypt still
+ * rebuilds by extracting and recreating), then gates confirm behind the same
+ * short delay as delete.
  */
 export function EncryptConfirmDialog({
 	encrypt,
@@ -61,10 +62,14 @@ export function EncryptConfirmDialog({
 					</p>
 				</div>
 				<p className="delete-confirm-summary">
-					Rebuilds {listed} by extracting and recreating each complete IoStore bundle.
+					{encrypt
+						? `Encrypts ${listed} by rewriting each complete IoStore container in place.`
+						: `Rebuilds ${listed} by extracting and recreating each complete IoStore bundle.`}
 				</p>
 				<p className="mutation-dialog-warning" role="status">
-					A failed rebuild leaves that mod as it was.
+					{encrypt
+						? "A failed encryption leaves that mod as it was."
+						: "A failed rebuild leaves that mod as it was."}
 				</p>
 				<div className="mutation-dialog-actions">
 					<button

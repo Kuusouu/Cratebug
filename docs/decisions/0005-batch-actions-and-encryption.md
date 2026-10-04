@@ -88,3 +88,17 @@ outside `/Game/Marvel/Characters` is offered for encryption on first
 load after classify. That confirm still calls `SetModEncryption`.
 Sequential single-caller `SetModEncryption` remains for tests.
 Install-time obfuscation stays out of scope.
+
+## Addendum 2026-10-04: direct encryption without a rebuild
+
+Encrypting through extract plus `create_mod_iostore` converts cooked assets
+to legacy form and back without the game's class database, which drops class
+references (nulls) in real mesh mods. The pinned worker (`v1.5.9`) already
+encrypts existing chunks in place through `pak_fixer` with obfuscation, which
+preserves container identity, compression state, and decoded chunk bytes.
+
+Encrypt (`encrypt true`) now copies the bundle to a temp directory, runs
+`pak_fixer` with obfuscation on the copy, verifies the encrypted flag, and
+swaps the files through the existing park+replace+rollback path. It never
+extracts to legacy assets. Decrypt still rebuilds and keeps the companion
+strip, since the pinned worker exposes no direct decrypt rewrite.

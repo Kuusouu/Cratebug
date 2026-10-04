@@ -17,12 +17,14 @@ import (
 type scriptedEncryptionCaller struct {
 	encryptedByUTOC   map[string]bool
 	failCreate        bool
+	failPakFixer      bool
 	failListPak       bool
 	extractCountZero  bool
 	pakListing        string
 	rebuiltPakListing string
 	createPakBody     string
 	writeUasset       bool
+	pakFixerTargets   []string
 }
 
 func (s *scriptedEncryptionCaller) Call(action string, params map[string]any, result any) error {
@@ -32,7 +34,29 @@ func (s *scriptedEncryptionCaller) Call(action string, params map[string]any, re
 		if s.rebuiltPakListing != "" && filepath.Base(path) == "rebuilt.utoc" {
 			return json.Unmarshal([]byte(encryptionJSON(true)), result)
 		}
+		// The direct encrypt path verifies staged copies named bundle.utoc.
+		// Those copies are encrypted by the preceding pak_fixer call.
+		if filepath.Base(path) == "bundle.utoc" {
+			return json.Unmarshal([]byte(encryptionJSON(!s.failPakFixer)), result)
+		}
 		return json.Unmarshal([]byte(encryptionJSON(s.encryptedByUTOC[filepath.Base(path)])), result)
+	case "pak_fixer":
+		if s.failPakFixer {
+			return &uassettool.ToolError{Action: action, Message: "encrypt failed"}
+		}
+		path, _ := params["file_path"].(string)
+		s.pakFixerTargets = append(s.pakFixerTargets, filepath.Base(path))
+		if params["obfuscate"] != true {
+			return &uassettool.ToolError{Action: action, Message: "obfuscate is required"}
+		}
+		// Mark the staged copies so the test can tell replacement ran.
+		base := path[:len(path)-len(filepath.Ext(path))]
+		for _, ext := range []string{".pak", ".utoc", ".ucas"} {
+			if err := os.WriteFile(base+ext, []byte("direct"+ext), 0o600); err != nil {
+				return err
+			}
+		}
+		return json.Unmarshal([]byte(`{"total":1,"fixed":0,"already_clean":1,"failed":0,"containers_encrypted":1,"containers_already_encrypted":0,"containers_failed":0}`), result)
 	case "extract_iostore":
 		if s.extractCountZero {
 			return json.Unmarshal([]byte(`{"count":0}`), result)
@@ -206,8 +230,8 @@ func TestSetModEncryptionPreservesDisabledPrimary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rebuilt primary: %v", err)
 	}
-	if string(body) != "rebuilt.pak" {
-		t.Errorf("primary content = %q, want rebuilt.pak", body)
+	if string(body) != "direct.pak" {
+		t.Errorf("primary content = %q, want direct.pak", body)
 	}
 }
 
@@ -222,7 +246,7 @@ func TestSetModEncryptionRollsBackFailedRebuild(t *testing.T) {
 	entry := library.Entries[0]
 	caller := &scriptedEncryptionCaller{
 		encryptedByUTOC: map[string]bool{"Hero_9999999_P.utoc": false},
-		failCreate:      true,
+		failPakFixer:    true,
 	}
 	original, err := os.ReadFile(filepath.Join(root, "Hero_9999999_P.pak"))
 	if err != nil {
@@ -249,7 +273,8 @@ func TestSetModEncryptionRollsBackFailedRebuild(t *testing.T) {
 }
 
 func TestSetModEncryptionFailsClosedWhenCompanionPakListFails(t *testing.T) {
-	// Arrange
+	// Arrange: decrypt still rebuilds, so a companion list failure there must
+	// leave the live files intact.
 	root := t.TempDir()
 	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
 	library, err := discovery.Scan(root)
@@ -258,7 +283,7 @@ func TestSetModEncryptionFailsClosedWhenCompanionPakListFails(t *testing.T) {
 	}
 	entry := library.Entries[0]
 	caller := &scriptedEncryptionCaller{
-		encryptedByUTOC: map[string]bool{"Hero_9999999_P.utoc": false},
+		encryptedByUTOC: map[string]bool{"Hero_9999999_P.utoc": true},
 		failListPak:     true,
 	}
 	original, err := os.ReadFile(filepath.Join(root, "Hero_9999999_P.pak"))
@@ -267,7 +292,7 @@ func TestSetModEncryptionFailsClosedWhenCompanionPakListFails(t *testing.T) {
 	}
 
 	// Act
-	result, err := SetModEncryption(root, []string{entry.ID}, true, caller, nil, nil)
+	result, err := SetModEncryption(root, []string{entry.ID}, false, caller, nil, nil)
 
 	// Assert
 	if err != nil {
@@ -318,7 +343,8 @@ func TestSetModEncryptionSkipsWhenAlreadyAtTarget(t *testing.T) {
 }
 
 func TestSetModEncryptionStripsCompanionMetadataFromRebuiltPak(t *testing.T) {
-	// Arrange
+	// Arrange: decrypt still rebuilds, so the rebuilt companion PAK must be
+	// stripped of chunknames metadata before it reaches the library.
 	root := t.TempDir()
 	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
 	library, err := discovery.Scan(root)
@@ -327,13 +353,13 @@ func TestSetModEncryptionStripsCompanionMetadataFromRebuiltPak(t *testing.T) {
 	}
 	entry := library.Entries[0]
 	caller := &scriptedEncryptionCaller{
-		encryptedByUTOC:   map[string]bool{"Hero_9999999_P.utoc": false},
+		encryptedByUTOC:   map[string]bool{"Hero_9999999_P.utoc": true},
 		rebuiltPakListing: metadataListing(),
 		createPakBody:     "stripped-companion",
 	}
 
 	// Act
-	result, err := SetModEncryption(root, []string{entry.ID}, true, caller, nil, nil)
+	result, err := SetModEncryption(root, []string{entry.ID}, false, caller, nil, nil)
 
 	// Assert
 	if err != nil {
@@ -425,8 +451,8 @@ func TestSetModEncryptionPooledRewritesEachTarget(t *testing.T) {
 		if readErr != nil {
 			t.Fatalf("read %s: %v", name, readErr)
 		}
-		if string(body) != "rebuilt.pak" {
-			t.Errorf("%s content = %q, want rebuilt.pak", name, body)
+		if string(body) != "direct.pak" {
+			t.Errorf("%s content = %q, want direct.pak", name, body)
 		}
 	}
 }
@@ -478,7 +504,7 @@ func encryptableIoStoreEntry(id string) discovery.Entry {
 }
 
 func TestSetModEncryptionFailsWhenExtractYieldsNoPackages(t *testing.T) {
-	// Arrange
+	// Arrange: decrypt still rebuilds, so an empty extract must fail closed.
 	root := t.TempDir()
 	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
 	library, err := discovery.Scan(root)
@@ -487,12 +513,12 @@ func TestSetModEncryptionFailsWhenExtractYieldsNoPackages(t *testing.T) {
 	}
 	entry := library.Entries[0]
 	caller := &scriptedEncryptionCaller{
-		encryptedByUTOC:  map[string]bool{"Hero_9999999_P.utoc": false},
+		encryptedByUTOC:  map[string]bool{"Hero_9999999_P.utoc": true},
 		extractCountZero: true,
 	}
 
 	// Act
-	result, err := SetModEncryption(root, []string{entry.ID}, true, caller, nil, nil)
+	result, err := SetModEncryption(root, []string{entry.ID}, false, caller, nil, nil)
 
 	// Assert
 	if err != nil {

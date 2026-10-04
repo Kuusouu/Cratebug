@@ -395,8 +395,8 @@ func (a *App) EncryptionType() mutation.EncryptionBatchResult {
 	return mutation.EncryptionBatchResult{}
 }
 
-// Rebuilds each checked complete IoStore bundle with or without obfuscation.
-// The Marvel Rivals AES key stays in Go. The frontend receives only the
+// Encrypts each checked complete IoStore bundle directly, or decrypts by
+// rebuilding. The Marvel Rivals AES key stays in Go. The frontend receives only the
 // encrypted flag after the next classify. Emits encrypt:progress events.
 func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) (mutation.EncryptionBatchResult, error) {
 	return suppressWatcherResult(a, func() (mutation.EncryptionBatchResult, error) {

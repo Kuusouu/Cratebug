@@ -15,40 +15,46 @@ import (
 
 type installEncryptionCaller struct {
 	encrypted map[string]bool
-	failUTOC  string
-	extracted []string
+	failPak   string
+	pakFixed  []string
 }
 
 func (c *installEncryptionCaller) Call(action string, params map[string]any, result any) error {
 	switch action {
 	case "is_iostore_encrypted":
 		path := params["file_path"].(string)
+		// Staged direct-encrypt copies are named bundle.utoc; the preceding
+		// pak_fixer call encrypts them.
+		if filepath.Base(path) == "bundle.utoc" {
+			encrypted := c.failPak == ""
+			return json.Unmarshal([]byte(fmt.Sprintf(`{"encrypted":%t}`, encrypted)), result)
+		}
 		body := fmt.Sprintf(`{"encrypted":%t}`, c.encrypted[filepath.Base(path)])
 		return json.Unmarshal([]byte(body), result)
-	case "extract_iostore":
+	case "pak_fixer":
 		path := params["file_path"].(string)
-		if filepath.Base(path) == c.failUTOC {
-			return errors.New("fixture extraction failed")
-		}
-		c.extracted = append(c.extracted, filepath.Base(path))
-		output := params["output_path"].(string)
-		if err := os.WriteFile(filepath.Join(output, "asset.uasset"), []byte("asset"), testFilePermissions); err != nil {
-			return err
-		}
-		return json.Unmarshal([]byte(`{"count":1}`), result)
-	case "list_pak":
-		return json.Unmarshal([]byte(`{"files":[]}`), result)
-	case "create_mod_iostore":
 		if params["obfuscate"] != true {
-			return errors.New("install requested a clear rebuild")
+			return errors.New("install requested a clear rewrite")
 		}
-		output := params["output_path"].(string)
+		// The staged bundle keeps its live stem; fail the one under test by
+		// matching the live utoc stem recorded in failPak.
+		if c.failPak != "" {
+			return errors.New("fixture direct encryption failed")
+		}
+		c.pakFixed = append(c.pakFixed, filepath.Base(path))
+		base := path[:len(path)-len(filepath.Ext(path))]
 		for _, ext := range []string{".pak", ".utoc", ".ucas"} {
-			if err := os.WriteFile(output+ext, []byte("encrypted"+ext), testFilePermissions); err != nil {
+			if err := os.WriteFile(base+ext, []byte("encrypted"+ext), testFilePermissions); err != nil {
 				return err
 			}
 		}
-		return json.Unmarshal([]byte(`{"converted_count":1,"file_count":1}`), result)
+		return json.Unmarshal([]byte(`{"total":1,"fixed":0,"already_clean":1,"failed":0,"containers_encrypted":1,"containers_already_encrypted":0,"containers_failed":0}`), result)
+	case "extract_iostore":
+		return fmt.Errorf("unexpected worker action %q: staged encrypt must not extract", action)
+	case "list_pak":
+		return json.Unmarshal([]byte(`{"files":[]}`), result)
+	case "create_mod_iostore":
+		return fmt.Errorf("unexpected worker action %q: staged encrypt must not rebuild", action)
 	default:
 		return fmt.Errorf("unexpected worker action %q", action)
 	}
@@ -115,8 +121,8 @@ func TestInstallEncryptionKeepsIndependentChoicesAndSourceFiles(t *testing.T) {
 	if len(result.InstalledEntryIDs) != 4 {
 		t.Fatalf("installed %d mods, want 4", len(result.InstalledEntryIDs))
 	}
-	if len(caller.extracted) != 1 || caller.extracted[0] != "Clear_P.utoc" {
-		t.Fatalf("rebuilt %v, want only Clear_P.utoc", caller.extracted)
+	if len(caller.pakFixed) != 1 {
+		t.Fatalf("encrypted %v, want one direct encryption", caller.pakFixed)
 	}
 	if len(progress) != 2 || progress[0].Phase != "encrypting" || progress[1].Current != 2 {
 		t.Fatalf("unexpected encryption progress: %+v", progress)
@@ -169,8 +175,8 @@ func TestInstallEncryptionRejectsUnsupportedChoicesBeforeRebuild(t *testing.T) {
 			if !errors.Is(err, mutation.ErrEncryptionIneligible) {
 				t.Fatalf("error = %v, want ErrEncryptionIneligible", err)
 			}
-			if len(caller.extracted) != 0 {
-				t.Fatal("an invalid selection started a rebuild")
+			if len(caller.pakFixed) != 0 {
+				t.Fatal("an invalid selection started an encryption")
 			}
 			preview, err := BuildPreview(t.TempDir(), session, "", nil)
 			if err != nil {
@@ -189,14 +195,14 @@ func TestInstallEncryptionReportsFailedRebuild(t *testing.T) {
 	// Arrange
 	session, _ := stageEncryptionFixtures(t, map[string][]string{"Broken_P": {".pak", ".utoc", ".ucas"}})
 	mod := session.Mods[0]
-	caller := &installEncryptionCaller{failUTOC: "Broken_P.utoc"}
+	caller := &installEncryptionCaller{failPak: "Broken_P.utoc"}
 
 	// Act
 	err := EncryptStagedMods(context.Background(), session, []ApplyItem{{ID: mod.ID, Encrypt: true}}, caller, nil)
 
 	// Assert
-	if err == nil || !strings.Contains(err.Error(), "fixture extraction failed") {
-		t.Fatalf("error = %v, want extraction failure", err)
+	if err == nil || !strings.Contains(err.Error(), "fixture direct encryption failed") {
+		t.Fatalf("error = %v, want direct encryption failure", err)
 	}
 }
 
@@ -211,7 +217,7 @@ func TestInstallEncryptionHonorsCancellation(t *testing.T) {
 	err := EncryptStagedMods(ctx, session, []ApplyItem{{ID: session.Mods[0].ID, Encrypt: true}}, caller, nil)
 
 	// Assert
-	if !errors.Is(err, context.Canceled) || len(caller.extracted) != 0 {
-		t.Fatalf("error = %v, rebuilt = %v", err, caller.extracted)
+	if !errors.Is(err, context.Canceled) || len(caller.pakFixed) != 0 {
+		t.Fatalf("error = %v, encrypted = %v", err, caller.pakFixed)
 	}
 }
