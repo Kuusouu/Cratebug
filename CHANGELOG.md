@@ -11,12 +11,18 @@ Each version's section below is what the release workflow copies into that
 version's GitHub release notes, so write entries for what a user would
 actually notice, not internal refactors.
 
-## [Unreleased]
+## [2026.10.05]
 
-### Fixed
+### Decrypted crates stay intact
 
-- Decrypt preserves each mod's container ID and cooked assets. It no longer rebuilds mods under one shared ID.
-- Encrypt and Decrypt remove both unsupported companion metadata names before they replace live files.
+- Decrypting an encrypted mod now unwraps it in place instead of rebuilding it, so meshes, textures, and other assets come out the other side intact.
+- Each decrypted mod keeps its own identity. Decrypted mods no longer share a single container ID that made them collide with each other.
+- Encrypt and Decrypt scrub leftover `chunknames` and `patched_files` entries before swapping files in, so a freshly encrypted or decrypted mod won't trip anti-cheat.
+
+### Packing a spare crate
+
+- The Tools menu has Backup / Restore. Backup zips the whole library plus your tags and settings to a file you pick, with progress and cancel along the way.
+- Restore previews a backup first: its file date, how many mods it holds, and whether your tags and settings ride along. Confirming replaces the current library, so it warns you when there's something to lose. Close the game first. A failed or cancelled restore leaves your current library alone.
 
 ## [2026.10.04]
 
