@@ -11,7 +11,7 @@ Each version's section below is what the release workflow copies into that
 version's GitHub release notes, so write entries for what a user would
 actually notice, not internal refactors.
 
-## [Unreleased]
+## [2026.10.04]
 
 ### Safer disguises
 
