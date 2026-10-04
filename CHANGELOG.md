@@ -11,6 +11,13 @@ Each version's section below is what the release workflow copies into that
 version's GitHub release notes, so write entries for what a user would
 actually notice, not internal refactors.
 
+## [Unreleased]
+
+### Fixed
+
+- Decrypt preserves each mod's container ID and cooked assets. It no longer rebuilds mods under one shared ID.
+- Encrypt and Decrypt remove both unsupported companion metadata names before they replace live files.
+
 ## [2026.10.04]
 
 ### Safer disguises

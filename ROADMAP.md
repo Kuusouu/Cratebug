@@ -540,7 +540,7 @@ All four install encryption test functions remain.
 
 - A separate toggle for each mod in the shared local and Nexus preview.
 - An off default for clear mods. Encrypted mods stay encrypted.
-- A staged rebuild through the existing encryption backend before destination writes.
+- Direct encryption of staged IoStore chunks before destination writes.
 - Clear eligibility, progress, and error states.
 - Temporary-fixture tests and app checks with `PinkVFX.zip`.
 
@@ -550,9 +550,16 @@ All four install encryption test functions remain.
 
 - Each selected mod keeps its own encryption choice.
 - Unsupported bundles cannot request encryption.
-- A rebuild failure leaves the destination library intact.
+- An encryption failure leaves the destination library intact.
 - Source archives and loose files stay intact.
 - Checks pass and the app screenshots receive review.
+
+The follow-up repair removes the legacy rebuild from library decryption.
+Decryption preserves cooked chunks and container IDs.
+The user also authorized a backup and repair of 57 existing container ID collisions.
+The repaired library still crashed in the game.
+The asset scan found two null import dependencies in Project Galacta.
+The user stopped further game tests to reinstall fresh mods.
 
 ## Deferred post-release work
 

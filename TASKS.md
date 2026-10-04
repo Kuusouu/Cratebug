@@ -85,3 +85,70 @@ menu. Narrowed views show only classified complete IoStore bundles;
 unclassified entries and ineligible bundles stay hidden until they qualify.
 5 new frontend tests (87 total pass). The confirm dialog and user guide now
 say encrypt instead of rebuild.
+
+## 20.3 Direct decryption and existing mod repair (2026-10-04)
+
+The user authorized the decrypt fix and repair of the supplied mod library.
+This follow-up belongs to the Phase 20 encryption correction.
+
+The legacy decrypt path used the fixed output name `rebuilt`.
+The worker derived the same container ID for every rebuilt mod.
+The library scan found that ID in 57 of 59 bundles.
+Their different container header payloads also shared one chunk ID.
+
+Go now decrypts the existing AES blocks in private staged copies.
+It preserves compressed bytes, physical offsets, cooked assets, chunk IDs, and the container ID.
+It handles clear obfuscated indexes and properly encrypted directory indexes.
+It rejects unsupported versions, signed containers, and multiple partitions before any live replacement.
+Both actions clean companion metadata before replacement.
+The worker pin stays unchanged. See decision 0009.
+
+**Validation:**
+
+1. The focused Go package tests passed. New checks cover compressed bytes, both index forms, unsafe layouts, and the pinned worker.
+2. The updated decrypt path processed copies of all 59 supplied bundles. All 1,756 decoded chunks matched the pre-change hashes.
+3. Shark passed Encrypt then Decrypt. All seven decoded chunks, its original container ID, and its internal paths stayed intact.
+4. The canonical `check.ps1` passed. All 87 frontend tests passed.
+5. Wails launched with an isolated config and a disposable Shark copy. Its bound dev URL returned HTTP 200.
+
+The T3 browser status and open calls both returned `Authentication required`.
+No browser interaction or screenshot check completed.
+No native layout check completed.
+The app text now describes direct decryption. The layout did not change.
+The dev process and its child processes closed after validation.
+
+**Library repair:**
+
+Back up all 177 original files outside the mod library before replacement.
+The backup file hashes matched the originals.
+Repair the 57 affected copies with IDs derived from their actual bundle filenames.
+Update each TOC ID, container header chunk ID, and embedded container header ID.
+Preserve all other decoded data and retain each encryption state.
+Verify the copies before replacement. Verify the library after replacement.
+
+The final library has 59 unique IDs and 1,756 verified decoded chunks.
+All 59 companion PAK hashes stayed intact.
+The two unaffected bundles stayed intact.
+The library still has 56 encrypted bundles, three clear bundles, and 177 files.
+The repair changed 114 sidecar files. It did not rename the mods.
+The backup and detailed manifests remain outside version control.
+
+The collision repair does not establish parity with unavailable original downloads.
+Ten overlapping package paths remain. Some can be intentional overrides.
+Do not remove those mods without further diagnosis.
+The user tested the repaired library. The game still crashed on its async asset load thread.
+All 177 game files matched the verified repaired copies before the isolation test.
+The crash code used a null object reference as a package import index.
+A targeted scan found null import dependencies in two Project Galacta assets.
+These assets were `WBP_Galacta` and `GAL_ModLoader`.
+The scan does not establish whether the original download contained those dependencies.
+No Project Galacta-only game test completed, so the crash cause remains unconfirmed.
+
+The user approved temporary mod isolation tests.
+The game process stayed open with all mods disabled. No menu check completed.
+The user then stopped the tests to reinstall fresh mods.
+All 177 game files returned to their original locations and enabled states.
+All 177 file hashes matched the isolation manifest after restoration.
+No mod remained in the temporary park directory.
+The final `go vet ./...`, `go test ./...`, and `git diff --check` passed.
+Stop for review. Do not start another phase.

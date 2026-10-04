@@ -102,7 +102,7 @@ A batch that only partly succeeds says so. It does not call the whole run a succ
 
 ## Encrypting or decrypting IoStore mods
 
-Encrypt and Decrypt live only in the Actions menu. Encrypt rewrites each complete IoStore bundle (`.pak` + `.utoc` + `.ucas`) in place so the Marvel Rivals game key wraps the container. Decrypt rebuilds the bundle without obfuscation. Classic PAK mods cannot be encrypted. A mix of encrypted and unencrypted IoStore mods disables the action until the set is uniform.
+Encrypt and Decrypt live only in the Actions menu. Encrypt rewrites each complete IoStore bundle (`.pak` + `.utoc` + `.ucas`) in place so the Marvel Rivals game key wraps the container. Decrypt removes encryption from the existing blocks and preserves the container ID and cooked assets. Classic PAK mods cannot be encrypted. A mix of encrypted and unencrypted IoStore mods disables the action until the set is uniform.
 
 Encryption is a container rewrite, not a bit-flip. Large mods can take several minutes. Close Marvel Rivals first. A failed run leaves that one mod as it was. Mods that already finished in the same batch stay changed. The companion `.pak` is stripped of `chunknames` and `patched_files` before the live files change.
 
