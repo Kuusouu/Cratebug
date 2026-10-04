@@ -74,24 +74,23 @@ Use the install button, drag and drop files onto the window, or the download ico
 
 ### Windows
 
-You need 64-bit Windows 10 (1909+) or 11, Git with [Git LFS](https://git-lfs.com/), and the Microsoft WebView2 Runtime. [`mise`](https://mise.jdx.dev/) pins the toolchain but is optional:
+You need 64-bit Windows 10 (1909+) or 11, Git with [Git LFS](https://git-lfs.com/), Go `1.26.5`, Bun `1.3.14`, and the Microsoft WebView2 Runtime:
 
 ```powershell
 git lfs install
 git clone https://github.com/Kuusouu/Cratebug.git
 Set-Location Cratebug
-mise install
 Push-Location frontend
-mise exec -c "bun install --frozen-lockfile"
+bun install --frozen-lockfile
 Pop-Location
 .\fetch-uassettool.ps1          # fetch the pinned UAssetTool worker
-mise exec -c "wails dev"        # run the app
+wails dev                       # run the app
 .\check.ps1                     # run every check
 ```
 
 ### Linux
 
-You need a 64-bit Linux distribution (Ubuntu 22.04+ recommended), Git with Git LFS, and development libraries for GTK 3 and WebKit2GTK 4.1:
+You need a 64-bit Linux distribution (Ubuntu 22.04+ recommended), Git with Git LFS, Go `1.26.5`, Bun `1.3.14`, and development libraries for GTK 3 and WebKit2GTK 4.1:
 
 ```bash
 # Ubuntu / Debian prerequisites
@@ -100,14 +99,13 @@ sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 git lfs install
 git clone https://github.com/Kuusouu/Cratebug.git
 cd Cratebug
-mise install
-cd frontend && mise exec -c "bun install --frozen-lockfile" && cd ..
+cd frontend && bun install --frozen-lockfile && cd ..
 ./fetch-uassettool.sh          # fetch the pinned UAssetTool worker and Oodle library
 ./build-linux.sh               # build the standalone AppImage
 ./check.sh                     # run every check
 ```
 
-The full contributor workflow, including running without `mise` and building the installer, is in [CONTRIBUTING.md](CONTRIBUTING.md).
+The full contributor workflow, including building the installer, is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 

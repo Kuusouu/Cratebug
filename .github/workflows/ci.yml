@@ -27,24 +27,26 @@ jobs:
               with:
                   lfs: true
 
-            - name: Install pinned toolchain
-              uses: jdx/mise-action@v4.2.3
+            - name: Set up Go
+              uses: actions/setup-go@v5
               with:
-                  # Without this the action installs whatever mise.jdx.dev/VERSION
-                  # advertises, which can name a release before it exists on
-                  # GitHub and 404 the download. Pin it like every other tool.
-                  version: 2026.9.2
+                  go-version-file: go.mod
+
+            - name: Set up Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
 
             - name: Verify toolchain
               shell: pwsh
               run: |
-                  mise exec -c "go version"
-                  mise exec -c "bun --version"
+                  go version
+                  bun --version
 
             - name: Install frontend dependencies
               shell: pwsh
               working-directory: frontend
-              run: mise exec -c "bun install --frozen-lockfile"
+              run: bun install --frozen-lockfile
 
             - name: Run canonical checks
               shell: pwsh
@@ -72,7 +74,7 @@ jobs:
             - name: Build Windows application and installer
               shell: pwsh
               run: |
-                  mise exec -c "go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -platform windows/amd64 -nsis -installscope user -nocolour"
+                  go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -platform windows/amd64 -nsis -installscope user -nocolour
                   if (-not (Test-Path "build/bin/Cratebug.exe")) {
                       throw "Wails did not produce build/bin/Cratebug.exe"
                   }
@@ -96,19 +98,24 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
-            - name: Install pinned toolchain
-              uses: jdx/mise-action@v4.2.3
+            - name: Set up Go
+              uses: actions/setup-go@v5
               with:
-                  version: 2026.9.2
+                  go-version-file: go.mod
+
+            - name: Set up Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
 
             - name: Verify toolchain
               run: |
-                  mise exec -c "go version"
-                  mise exec -c "bun --version"
+                  go version
+                  bun --version
 
             - name: Install frontend dependencies
               working-directory: frontend
-              run: mise exec -c "bun install --frozen-lockfile"
+              run: bun install --frozen-lockfile
 
             - name: Run canonical checks
               run: bash ./check.sh

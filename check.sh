@@ -5,13 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}"
 FRONTEND_ROOT="${REPO_ROOT}/frontend"
 
-# Load mise environment if available
-if command -v mise >/dev/null 2>&1; then
-    eval "$(mise env -s bash)"
-elif [ -f "${HOME}/.local/bin/mise" ]; then
-    eval "$("${HOME}/.local/bin/mise" env -s bash)"
-fi
-
 if [ -d "${HOME}/.local/bin" ]; then
     export PATH="${HOME}/.local/bin:${PATH}"
 fi

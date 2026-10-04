@@ -6,13 +6,6 @@ REPO_ROOT="${SCRIPT_DIR}"
 
 echo "==> Verifying environment and toolchain"
 
-# Load mise environment if available
-if command -v mise >/dev/null 2>&1; then
-    eval "$(mise env -s bash)"
-elif [ -f "${HOME}/.local/bin/mise" ]; then
-    eval "$("${HOME}/.local/bin/mise" env -s bash)"
-fi
-
 # Ensure user local bin is in PATH
 if [ -d "${HOME}/.local/bin" ]; then
     export PATH="${HOME}/.local/bin:${PATH}"

@@ -35,10 +35,7 @@ function Resolve-Magick {
     $onPath = Get-Command magick -ErrorAction SilentlyContinue
     if ($onPath) { return $onPath.Source }
 
-    $resolved = & mise which magick 2>$null | Select-Object -First 1
-    if ($resolved -and (Test-Path $resolved)) { return $resolved }
-
-    throw "ImageMagick not found. Run 'mise install' from the repository root, or put magick on PATH."
+    throw "ImageMagick not found. Install it with 'winget install -e --id ImageMagick.ImageMagick --version 7.1.2.31', restart the terminal, and ensure 'magick' is on PATH."
 }
 
 # Downloads one source image and writes it as a downscaled WebP. The '>' on the

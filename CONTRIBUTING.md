@@ -8,19 +8,21 @@ Development targets 64-bit Windows 10 version 1909 or newer and Windows 11. Inst
 
 - Git and [Git LFS](https://git-lfs.com/)
 - Microsoft WebView2 Runtime (Windows 11 already includes it)
+- Go `1.26.5` ([go.dev/dl](https://go.dev/dl/) or `winget install -e --id GoLang.Go --version 1.26.5`)
+- Bun `1.3.14` ([bun.sh](https://bun.sh/) or `winget install -e --id Oven-sh.Bun --version 1.3.14`)
+- Node `24.20.0` or newer, only if you drive the app with the Playwright CLI below
 - NSIS 3, only if you want to build the installer
-- [`mise`](https://mise.jdx.dev/) - recommended, not required (see below)
+- ImageMagick 7, only if you refresh hero portraits with `fetch-hero-portraits.ps1` (`winget install -e --id ImageMagick.ImageMagick --version 7.1.2.31`)
 
 ```powershell
-winget install jdx.mise
 winget install NSIS.NSIS --silent
 ```
 
 Restart the terminal after installing system tools so their updated paths are available.
 
-### mise is optional
+### Pinned versions
 
-`mise` pins Go, Bun, and the Wails CLI to the versions the project expects, so `mise exec -c "<command>"` is the form used throughout the docs. If you prefer not to use it, install the same pinned versions yourself and run the commands directly - nothing in the build depends on `mise` being present. The exact pinned versions and the upgrade policy are in the [toolchain decision](docs/decisions/0001-toolchain-baseline.md).
+Go is pinned by `go.mod`, Bun by `frontend/package.json` (`packageManager`), and the Wails CLI by the `v2.13.0` commands below. The exact pinned versions and the upgrade policy are in the [toolchain decision](docs/decisions/0001-toolchain-baseline.md).
 
 ## Getting started
 
@@ -30,12 +32,10 @@ git clone https://github.com/Kuusouu/Cratebug.git
 Set-Location Cratebug
 git lfs pull
 
-mise install
-mise exec -c "go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0"
-$env:Path = "$(mise exec -c "go env GOPATH")\bin;$env:Path"
+go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
 
 Push-Location frontend
-mise exec -c "bun install --frozen-lockfile"
+bun install --frozen-lockfile
 Pop-Location
 
 .\fetch-uassettool.ps1
@@ -44,9 +44,9 @@ Pop-Location
 Verify the toolchain:
 
 ```powershell
-mise exec -c "go version"
-mise exec -c "bun --version"
-mise exec -c "wails version"
+go version
+bun --version
+wails version
 ```
 
 ### Fetch the pinned UAssetTool worker
@@ -66,7 +66,7 @@ The script downloads the pinned release, verifies its SHA-256 checksum, extracts
 Start the Wails development application from the repository root:
 
 ```powershell
-mise exec -c "wails dev"
+wails dev
 ```
 
 Wails starts Vite through Bun, generates typed application bindings, and launches the desktop window.
@@ -102,13 +102,13 @@ go test ./...
 Build the production Windows AMD64 application:
 
 ```powershell
-mise exec -c "wails build -clean -platform windows/amd64 -nopackage -nocolour"
+wails build -clean -platform windows/amd64 -nopackage -nocolour
 ```
 
 The executable is written to `build/bin/Cratebug.exe`. With NSIS installed, build the per-user installer instead:
 
 ```powershell
-mise exec -c "wails build -clean -platform windows/amd64 -nsis -installscope user -nocolour"
+wails build -clean -platform windows/amd64 -nsis -installscope user -nocolour
 ```
 
 The installer is written to `build/bin/Cratebug-amd64-installer.exe`.

@@ -7,13 +7,13 @@ Set-StrictMode -Version Latest
 $repositoryRoot = $PSScriptRoot
 $frontendRoot = Join-Path $repositoryRoot "frontend"
 
-function Invoke-MiseCommand {
+function Invoke-Step {
     param(
         [Parameter(Mandatory)]
         [string]$Label,
 
         [Parameter(Mandatory)]
-        [string]$Command,
+        [scriptblock]$Script,
 
         [Parameter(Mandatory)]
         [string]$WorkingDirectory
@@ -22,7 +22,7 @@ function Invoke-MiseCommand {
     Write-Host "==> $Label"
     Push-Location $WorkingDirectory
     try {
-        & mise exec -c $Command
+        & $Script
         if ($LASTEXITCODE -ne 0) {
             throw "$Label failed with exit code $LASTEXITCODE."
         }
@@ -33,12 +33,17 @@ function Invoke-MiseCommand {
 }
 
 Write-Host "==> Go formatting"
-$goExecutable = (& mise which go).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $goExecutable) {
-    throw "Unable to locate the pinned Go toolchain through mise."
+$goCommand = Get-Command go -ErrorAction SilentlyContinue
+if (-not $goCommand) {
+    throw "Unable to locate Go on PATH. Install Go 1.26.5 (see CONTRIBUTING.md) and restart the terminal."
 }
 
-$gofmtExecutable = Join-Path (Split-Path -Parent $goExecutable) "gofmt.exe"
+$gofmtCommand = Get-Command gofmt -ErrorAction SilentlyContinue
+if (-not $gofmtCommand) {
+    throw "Unable to locate gofmt on PATH. Ensure the Go toolchain's bin directory is on PATH."
+}
+
+$gofmtExecutable = $gofmtCommand.Source
 $goFiles = @(
     Get-ChildItem -Path $repositoryRoot -Recurse -Filter "*.go" -File |
         Where-Object {
@@ -57,8 +62,8 @@ if ($unformattedFiles.Count -gt 0) {
     throw "Go formatting check failed:`n$($unformattedFiles -join [Environment]::NewLine)"
 }
 
-Invoke-MiseCommand -Label "Frontend checks" -Command "bun run check" -WorkingDirectory $frontendRoot
-Invoke-MiseCommand -Label "Go vet" -Command "go vet ./..." -WorkingDirectory $repositoryRoot
-Invoke-MiseCommand -Label "Go tests" -Command "go test ./..." -WorkingDirectory $repositoryRoot
+Invoke-Step -Label "Frontend checks" -Script { bun run check } -WorkingDirectory $frontendRoot
+Invoke-Step -Label "Go vet" -Script { go vet ./... } -WorkingDirectory $repositoryRoot
+Invoke-Step -Label "Go tests" -Script { go test ./... } -WorkingDirectory $repositoryRoot
 
 Write-Host "All checks passed."
