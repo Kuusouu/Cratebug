@@ -1,10 +1,10 @@
 # Cratebug Active Tasks
 
 **Phase:** 20 - Per-mod install encryption
-**Status:** Implementation complete. Review pending.
+**Status:** Complete. Review approved 2026-10-04.
 
 Phase 18 is complete. Phase 19 stays deferred.
-The user approved Phase 20 on 2026-10-03.
+Phase 20 is complete. No active phase.
 
 ## 20.1 Per-mod install encryption [IMPLEMENTED]
 
@@ -57,7 +57,7 @@ Wails logged a browser IPC error during setup, before the install checks.
 The real install calls and backend checks passed. Leave that runtime issue outside this task.
 Stop for review. Do not start another phase.
 
-## 20.2 Direct encryption fix (2026-10-04)
+## 20.2 Direct encryption fix [IMPLEMENTED] (2026-10-04)
 
 Encrypt (install toggle and Actions) no longer rebuilds through
 `extract_iostore` + `create_mod_iostore`: that conversion drops cooked class
@@ -86,7 +86,7 @@ unclassified entries and ineligible bundles stay hidden until they qualify.
 5 new frontend tests (87 total pass). The confirm dialog and user guide now
 say encrypt instead of rebuild.
 
-## 20.3 Direct decryption and existing mod repair (2026-10-04)
+## 20.3 Direct decryption and existing mod repair [IMPLEMENTED] (2026-10-04)
 
 The user authorized the decrypt fix and repair of the supplied mod library.
 This follow-up belongs to the Phase 20 encryption correction.
@@ -153,7 +153,7 @@ No mod remained in the temporary park directory.
 The final `go vet ./...`, `go test ./...`, and `git diff --check` passed.
 Stop for review. Do not start another phase.
 
-## 20.4 Move direct decryption into UAssetToolRivals (2026-10-04)
+## 20.4 Move direct decryption into UAssetToolRivals [IMPLEMENTED] (2026-10-04)
 
 The user approved the worker change and use of the fixture library.
 UAssetToolRivals v1.5.10 now exposes `decrypt_iostore` through its CLI and JSON interface.
@@ -184,4 +184,4 @@ Wails logged a browser IPC startup error and the page returned a favicon 404.
 The bound decrypt call still succeeded. No native DPI or game test completed.
 
 The automatic encryption prompt still describes a rebuild. Defer that text issue.
-Stop for review. Do not start another phase.
+Review approved 2026-10-04. No active phase.
