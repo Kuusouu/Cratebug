@@ -6,6 +6,7 @@ import {
 	PanelsTopLeft,
 	Settings as SettingsIcon,
 	ShieldAlert,
+	Wrench,
 } from "lucide-react";
 import {
 	type CSSProperties,
@@ -130,6 +131,7 @@ import { SelectedModPanel } from "./SelectedModPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { providerLogos } from "./StoreLogos";
 import { TagMenu } from "./TagMenu";
+import { ToolsDialog } from "./ToolsDialog";
 import { UpdateDialog, type UpdateDownloadProgress } from "./UpdateDialog";
 
 type LibraryIndex = {
@@ -411,6 +413,7 @@ export function LibraryScreen() {
 	const [theme, setTheme] = useState<Theme>("system");
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [toolsOpen, setToolsOpen] = useState(false);
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
 	const [encryptionFilter, setEncryptionFilter] = useState<EncryptionFilter>("all");
@@ -2226,7 +2229,8 @@ export function LibraryScreen() {
 				!activeFolderDialog &&
 				!detectionDialog &&
 				!installSource &&
-				!settingsOpen
+				!settingsOpen &&
+				!toolsOpen
 			) {
 				await maybeOfferCompanionCleanup(libraryRoot);
 				if (activeLibraryRootRef.current === libraryRoot) {
@@ -2248,6 +2252,7 @@ export function LibraryScreen() {
 		maybeOfferRequiredEncryption,
 		reloadLibrary,
 		settingsOpen,
+		toolsOpen,
 	]);
 
 	useEffect(() => {
@@ -2618,6 +2623,15 @@ export function LibraryScreen() {
 						}
 					>
 						<ShieldAlert aria-hidden="true" />
+					</button>
+					<button
+						type="button"
+						className="icon-button"
+						onClick={() => setToolsOpen(true)}
+						aria-label="Tools"
+						title="Tools"
+					>
+						<Wrench aria-hidden="true" />
 					</button>
 					<button
 						type="button"
@@ -3067,6 +3081,7 @@ export function LibraryScreen() {
 					onCheckForUpdate={() => void checkForUpdate()}
 				/>
 			)}
+			{toolsOpen && <ToolsDialog onClose={() => setToolsOpen(false)} />}
 			{detectionDialog && (
 				<DetectLibraryDialog
 					provider={libraryProvider}
@@ -3195,6 +3210,7 @@ export function LibraryScreen() {
 				!activeDialog &&
 				!activeFolderDialog &&
 				!settingsOpen &&
+				!toolsOpen &&
 				!conflictDetailsOpen &&
 				!updateDialogMode &&
 				!installFromNexusOpen &&

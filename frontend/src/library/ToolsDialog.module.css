@@ -1,0 +1,90 @@
+.tools-dialog {
+	display: flex;
+	flex-direction: column;
+	max-height: min(90vh, 46rem);
+	overflow: hidden;
+}
+
+.tools-dialog :global(.conflict-dialog-header) {
+	padding-bottom: 0.5rem;
+	border-bottom: 0;
+	margin-bottom: 0;
+}
+
+.tools-body {
+	--scrollbar-gap: 0.75rem;
+
+	display: grid;
+	gap: 1rem;
+	align-content: start;
+	min-height: 0;
+	/* Use the dialog padding for the scrollbar gap to preserve the content width. */
+	margin-inline-end: calc(-1 * var(--scrollbar-gap));
+	padding-inline-end: var(--scrollbar-gap);
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+
+.tools-placeholder-note {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.8rem;
+	line-height: 1.5;
+}
+
+.tools-list {
+	display: grid;
+	gap: 0.75rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.tool-card {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.75rem;
+	align-items: center;
+	padding: 0.75rem 0.85rem;
+	border: 1px solid var(--line);
+	border-radius: 0.7rem;
+	background: var(--panel-raised);
+}
+
+.tool-card-text {
+	display: grid;
+	gap: 0.25rem;
+	min-width: 0;
+}
+
+.tool-card-title {
+	margin: 0;
+	font-size: 0.85rem;
+	font-weight: 650;
+}
+
+.tool-card-description {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.8rem;
+	line-height: 1.45;
+}
+
+.tool-card-status {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.78rem;
+	line-height: 1.4;
+}
+
+.tool-card > button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.tool-card > button svg {
+	width: 1rem;
+	height: 1rem;
+	flex-shrink: 0;
+}
