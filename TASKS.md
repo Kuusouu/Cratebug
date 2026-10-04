@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 21 - Backup and restore
-**Status:** Designed, awaiting approval. No active implementation.
+**Status:** Tasks 21.1 and 21.2 are implemented. Task 21.3 is in progress.
 
 Phase 20 is complete (see `ROADMAP.md` for the summary). Phase 19 stays deferred.
 
@@ -46,9 +46,9 @@ Restore a user-chosen zip through staged extraction with install-grade traversal
 - `check.ps1` passed. All 88 frontend tests passed (unchanged).
 - No app drive: no UI trigger exists until 21.3.
 
-## 21.3 Wire Backup / Restore into the Tools menu [DESIGNED]
+## 21.3 Wire Backup / Restore into the Tools menu [IN PROGRESS]
 
-Replace the separate backup placeholder cards with one "Backup / Restore" card holding side-by-side Backup and Restore buttons bound to 21.1 and 21.2. Keep the character-data and BentoMod placeholder cards untouched.
+Replace the placeholder cards with one "Backup / Restore" card holding side-by-side Backup and Restore buttons bound to 21.1 and 21.2. The character-data and BentoMod placeholders are removed; the dialog holds only the live card.
 
 **Verify:**
 
@@ -56,3 +56,25 @@ Replace the separate backup placeholder cards with one "Backup / Restore" card h
 2. Run `check.ps1` and the frontend tests.
 3. Drive the app against a disposable fixture library. Run a backup and a restore from the wired menu; screenshot the menu, progress, and success states.
 4. Stop for review.
+
+**Watcher fix results (2026-10-04):**
+
+- Tools releases all library directory handles before the menu opens. Scans and restore retries keep the watcher suspended until dismissal.
+- Close and Escape wait until the active operation finishes. Dismissal restores the directory watches and refreshes the catalog.
+- Three Go regression tests cover nested folder moves, cancellation and retry, root changes during suspension, and event detection after resume.
+- `check.ps1` and all 96 frontend tests passed. The T3 browser verified handle release, event suppression, Close, Escape, and catalog refresh.
+- Screenshots: `.playwright-cli/screenshots/phase21/task-21.3-tools-watcher-suspended.png` and `task-21.3-tools-watcher-resumed.png`. Native file-dialog verification remains incomplete because the Computer Use connection is unavailable.
+
+**Review fixes (2026-10-04):**
+
+- Apply owns each restore token until it finishes. Concurrent apply and discard cannot remove active staging.
+- Retry requires a complete rollback. Failed rollback preserves recovery files, attempts independent return moves, and blocks retry.
+- The watcher drains filesystem channels independently from the event handler. The 200-cycle suspension test completes during continuous file writes.
+- Restore reports confirmed cancellation through its result. The UI shows rollback errors and preserves success after late Cancel.
+- Successful restore reloads metadata and preferences. It also removes tag filters absent from the restored metadata.
+- Six new Go tests cover session ownership, cancellation, late cancellation, Windows rollback locks, channel drainage, and suspension stress.
+- `check.ps1` and all 96 frontend tests passed. The race detector could not run because CGO is disabled and no C compiler is available.
+- Browser checks used controlled restore results on `C:\ModsFixtures`. They verified visible rollback errors, blocked unsafe retry, late-cancel success, restored tags and preferences, and obsolete filter removal.
+- Screenshots: `.playwright-cli/screenshots/phase21/task-21.3-review-rollback-error.png` and `task-21.3-review-late-cancel-success.png`. Native file dialogs remain unverified.
+
+The generated backup models have no trailing whitespace in the reviewed diff. `git diff --check` passed.

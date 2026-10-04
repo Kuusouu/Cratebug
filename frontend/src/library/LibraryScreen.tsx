@@ -51,6 +51,7 @@ import {
 	SetAccentColor,
 	SetDefaultViewMode,
 	SetLibraryProvider,
+	SetLibraryWatcherSuspended,
 	SetModEnabled,
 	SetModEncryption,
 	SetModPriority,
@@ -982,6 +983,21 @@ export function LibraryScreen() {
 		}
 	}, [libraryRoot, showMutationFeedback, classify]);
 
+	async function openTools() {
+		try {
+			await SetLibraryWatcherSuspended(true);
+			setToolsOpen(true);
+		} catch (error) {
+			showMutationFeedback("error", `Could not open Tools: ${errorMessage(error)}`);
+		}
+	}
+
+	async function closeTools() {
+		await SetLibraryWatcherSuspended(false);
+		setToolsOpen(false);
+		void reloadLibrary();
+	}
+
 	// Tags live in Cratebug's own persisted metadata, not the scanned library, so
 	// refreshing after a change re-reads that store instead of rescanning the mod
 	// root. Every mod-level mutation that can change a mod's scanner ID (rename,
@@ -992,6 +1008,39 @@ export function LibraryScreen() {
 		const state = await LoadMetadata();
 		setMetadataDocument(state.document);
 	}, []);
+
+	const applyMetadata = useCallback((document: metadata.Document) => {
+		setMetadataDocument(document);
+		// An older backup can omit a preference. Restore its default in that case.
+		setTheme(
+			themes.includes(document.settings.theme as Theme)
+				? (document.settings.theme as Theme)
+				: "system",
+		);
+		setViewMode(
+			viewModes.includes(document.settings.defaultViewMode as ViewMode)
+				? (document.settings.defaultViewMode as ViewMode)
+				: "compact",
+		);
+		const restoredAccentColor = document.settings.accentColor ?? "";
+		setAccentColor(isValidHexColor(restoredAccentColor) ? restoredAccentColor : "");
+		setLibraryProvider(
+			libraryProviders.includes(document.settings.libraryProvider as LibraryProvider)
+				? (document.settings.libraryProvider as LibraryProvider)
+				: "steam",
+		);
+		setSkipConfirmDelay(Boolean(document.settings.skipDestructiveDelay));
+	}, []);
+
+	async function handleRestored(metadataRestored: boolean) {
+		if (metadataRestored) {
+			const state = await LoadMetadata();
+			applyMetadata(state.document);
+			const restoredTagIDs = new Set((state.document.tags ?? []).map((tag) => tag.id));
+			setTagFilterIDs((current) => retainCheckedIDs(current, restoredTagIDs));
+		}
+		await reloadLibrary();
+	}
 
 	// Applies immediately, matching every other single-click preference in the
 	// app: the icon shows the new theme right away, and only reverts if the
@@ -2473,29 +2522,7 @@ export function LibraryScreen() {
 		void (async () => {
 			try {
 				const state = await LoadMetadata();
-				setMetadataDocument(state.document);
-
-				const persistedTheme = state.document.settings.theme;
-				if (persistedTheme && themes.includes(persistedTheme as Theme)) {
-					setTheme(persistedTheme as Theme);
-				}
-				const persistedViewMode = state.document.settings.defaultViewMode;
-				if (persistedViewMode && viewModes.includes(persistedViewMode as ViewMode)) {
-					setViewMode(persistedViewMode as ViewMode);
-				}
-				const persistedAccentColor = state.document.settings.accentColor;
-				if (persistedAccentColor && isValidHexColor(persistedAccentColor)) {
-					setAccentColor(persistedAccentColor);
-				}
-				const persistedProvider = state.document.settings.libraryProvider;
-				if (
-					persistedProvider &&
-					libraryProviders.includes(persistedProvider as LibraryProvider)
-				) {
-					setLibraryProvider(persistedProvider as LibraryProvider);
-				}
-
-				setSkipConfirmDelay(Boolean(state.document.settings.skipDestructiveDelay));
+				applyMetadata(state.document);
 
 				const persistedRoot = state.document.settings.modRoot?.trim();
 				if (persistedRoot) {
@@ -2516,7 +2543,7 @@ export function LibraryScreen() {
 				);
 			}
 		})();
-	}, [showMutationFeedback]);
+	}, [showMutationFeedback, applyMetadata]);
 
 	// Surfaces orphaned tag records once the scan and the metadata that might
 	// reference it are both loaded. Runs on every library or metadata change
@@ -2627,7 +2654,7 @@ export function LibraryScreen() {
 					<button
 						type="button"
 						className="icon-button"
-						onClick={() => setToolsOpen(true)}
+						onClick={() => void openTools()}
 						aria-label="Tools"
 						title="Tools"
 					>
@@ -3081,7 +3108,14 @@ export function LibraryScreen() {
 					onCheckForUpdate={() => void checkForUpdate()}
 				/>
 			)}
-			{toolsOpen && <ToolsDialog onClose={() => setToolsOpen(false)} />}
+			{toolsOpen && (
+				<ToolsDialog
+					onClose={closeTools}
+					libraryRoot={libraryRoot ?? null}
+					libraryEntryCount={library?.entries.length ?? 0}
+					onRestored={handleRestored}
+				/>
+			)}
 			{detectionDialog && (
 				<DetectLibraryDialog
 					provider={libraryProvider}

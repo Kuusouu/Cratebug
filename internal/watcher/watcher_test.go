@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync/atomic"
@@ -9,6 +10,89 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 )
+
+func TestWatcherDrainsErrorsWhileEventHandlerWaits(t *testing.T) {
+	// Arrange
+	w, err := New(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	w.mu.Lock()
+	locked := true
+	defer func() {
+		if locked {
+			w.mu.Unlock()
+		}
+	}()
+	done := make(chan struct{})
+
+	// Act
+	go func() {
+		w.fsWatcher.Events <- fsnotify.Event{Name: "fixture.pak", Op: fsnotify.Write}
+		w.fsWatcher.Errors <- errors.New("fixture watch error")
+		close(done)
+	}()
+
+	// Assert
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("an event blocked the filesystem error consumer")
+	}
+	w.mu.Unlock()
+	locked = false
+}
+
+func TestWatcherRepeatedSuspensionWithFileActivity(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	w, err := New(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if err := w.SetRoot(root); err != nil {
+		t.Fatal(err)
+	}
+	stop, stopped := make(chan struct{}), make(chan struct{})
+	writeErrors := make(chan error, 1)
+	go func() {
+		defer close(stopped)
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			if err := os.WriteFile(filepath.Join(root, "Active_P.pak"), []byte("fixture"), 0o600); err != nil {
+				writeErrors <- err
+				return
+			}
+		}
+	}()
+	defer func() { close(stop); <-stopped }()
+
+	// Act
+	for range 200 {
+		if err := w.SetSuspended(true); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.SetSuspended(false); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Assert
+	select {
+	case err := <-writeErrors:
+		t.Fatal(err)
+	default:
+	}
+	if len(w.fsWatcher.WatchList()) != 1 {
+		t.Error("resume did not restore the root watch")
+	}
+}
 
 func TestWatcherSetRootAndClose(t *testing.T) {
 	// Arrange
@@ -43,6 +127,126 @@ func TestWatcherSetRootAndClose(t *testing.T) {
 	}
 	if emptyRoot != "" {
 		t.Fatalf("Root() = %q, want empty", emptyRoot)
+	}
+}
+
+func TestWatcherSuspensionReleasesHandlesAndResumes(t *testing.T) {
+	// Arrange
+	root := t.TempDir()
+	child := filepath.Join(root, "cnd")
+	nested := filepath.Join(child, "pajama")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	changed := make(chan struct{}, 1)
+	w, err := New(Options{OnChange: func() {
+		select {
+		case changed <- struct{}{}:
+		default:
+		}
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if err := w.SetRoot(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if err := w.SetSuspended(true); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SetRoot(root); err != nil {
+		t.Fatal(err)
+	}
+	w.Pause()
+	w.ResumeAfter(0)
+	w.handleEvent(fsnotify.Event{Name: nested, Op: fsnotify.Create})
+
+	// Assert
+	if watches := w.fsWatcher.WatchList(); len(watches) != 0 {
+		t.Fatalf("suspended watcher retains directory handles: %v", watches)
+	}
+	if w.Root() != root {
+		t.Fatal("suspension lost the selected root")
+	}
+	parked := filepath.Join(t.TempDir(), "cnd")
+	if err := os.Rename(child, parked); err != nil {
+		t.Fatalf("park nested folder during suspension: %v", err)
+	}
+	if err := os.Rename(parked, child); err != nil {
+		t.Fatalf("return nested folder during suspension: %v", err)
+	}
+	select {
+	case <-changed:
+		t.Fatal("suspended watcher emitted a change")
+	default:
+	}
+
+	// Act
+	if err := w.SetSuspended(false); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(defaultResumeQuietDelay)
+	if err := os.WriteFile(filepath.Join(nested, "External_P.pak"), []byte("fixture"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	select {
+	case <-changed:
+	case <-time.After(time.Second):
+		t.Fatal("resumed watcher did not detect a nested file change")
+	}
+}
+
+func TestWatcherRootChangeStaysSuspended(t *testing.T) {
+	// Arrange
+	w, err := New(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if err := w.SetRoot(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SetSuspended(true); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	nested := filepath.Join(root, "NewFolder")
+	if err := os.Mkdir(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	if err := w.SetRoot(root); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if w.Root() != root {
+		t.Fatal("suspended root change did not retain the new root")
+	}
+	if watches := w.fsWatcher.WatchList(); len(watches) != 0 {
+		t.Fatalf("root change resumed a suspended watcher: %v", watches)
+	}
+
+	// Act
+	if err := w.SetSuspended(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	watches := w.fsWatcher.WatchList()
+	if len(watches) != 2 {
+		t.Fatalf("resumed directory watches = %v, want the new root and its child", watches)
+	}
+	for _, path := range watches {
+		if path != root && path != nested {
+			t.Fatalf("resumed watcher retained an old directory: %q", path)
+		}
 	}
 }
 

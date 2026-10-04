@@ -154,6 +154,14 @@ func suppressWatcherResult[T any](a *App, fn func() (T, error)) (T, error) {
 	return fn()
 }
 
+// Releases library directory handles while the Tools menu is open.
+func (a *App) SetLibraryWatcherSuspended(suspended bool) error {
+	if a.watcher == nil {
+		return nil
+	}
+	return a.watcher.SetSuspended(suspended)
+}
+
 // Confirms that the frontend can reach the Go application.
 func (a *App) RuntimeStatus() string {
 	return "Go backend connected"

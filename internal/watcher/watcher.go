@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -43,6 +44,7 @@ type Watcher struct {
 	trackedDirs  map[string]struct{}
 	closed       bool
 	paused       bool
+	suspended    bool
 	ignoredUntil time.Time
 	generation   uint64
 }
@@ -81,7 +83,9 @@ func (w *Watcher) SetRoot(root string) error {
 
 	cleanRoot := strings.TrimSpace(root)
 	if cleanRoot == "" {
-		w.clearWatchesLocked()
+		if err := w.clearWatchesLocked(); err != nil {
+			return err
+		}
 		w.root = ""
 		return nil
 	}
@@ -95,7 +99,9 @@ func (w *Watcher) SetRoot(root string) error {
 		return nil
 	}
 
-	w.clearWatchesLocked()
+	if err := w.clearWatchesLocked(); err != nil {
+		return err
+	}
 
 	info, err := os.Stat(absRoot)
 	if err != nil {
@@ -110,7 +116,39 @@ func (w *Watcher) SetRoot(root string) error {
 	}
 
 	w.root = absRoot
+	if w.suspended {
+		return nil
+	}
 	return w.watchSubtreeLocked(absRoot)
+}
+
+// Releases directory handles during suspension. The root stays selected so
+// resume can watch the current tree after a restore or a root change.
+func (w *Watcher) SetSuspended(suspended bool) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.closed {
+		return fmt.Errorf("watcher is closed")
+	}
+	if w.suspended == suspended {
+		return nil
+	}
+
+	if suspended {
+		if err := w.clearWatchesLocked(); err != nil {
+			return err
+		}
+		w.suspended = true
+		return nil
+	}
+
+	w.suspended = false
+	w.ignoredUntil = time.Now().Add(defaultResumeQuietDelay)
+	if w.root == "" {
+		return nil
+	}
+	return w.watchSubtreeLocked(w.root)
 }
 
 // Root returns the current watched directory.
@@ -175,16 +213,21 @@ func (w *Watcher) Close() error {
 	return w.fsWatcher.Close()
 }
 
-func (w *Watcher) clearWatchesLocked() {
+func (w *Watcher) clearWatchesLocked() error {
 	w.generation++
+	var failures []error
 	for dir := range w.trackedDirs {
-		_ = w.fsWatcher.Remove(dir)
+		if err := w.fsWatcher.Remove(dir); err != nil && !errors.Is(err, fsnotify.ErrNonExistentWatch) {
+			failures = append(failures, fmt.Errorf("remove directory watch %q: %w", dir, err))
+			continue
+		}
+		delete(w.trackedDirs, dir)
 	}
-	w.trackedDirs = make(map[string]struct{})
 	if w.timer != nil {
 		w.timer.Stop()
 		w.timer = nil
 	}
+	return errors.Join(failures...)
 }
 
 func (w *Watcher) watchSubtreeLocked(root string) error {
@@ -206,17 +249,36 @@ func (w *Watcher) watchSubtreeLocked(root string) error {
 }
 
 func (w *Watcher) readLoop() {
+	// Windows watch changes can wait for an event or error to reach its consumer.
+	// Drain both channels independently while the event handler holds the mutex.
+	events := make(chan fsnotify.Event)
+	go func() {
+		for event := range events {
+			w.handleEvent(event)
+		}
+	}()
+	defer close(events)
+	var pending []fsnotify.Event
 	for {
+		var output chan<- fsnotify.Event
+		var next fsnotify.Event
+		if len(pending) > 0 {
+			output = events
+			next = pending[0]
+		}
 		select {
 		case event, ok := <-w.fsWatcher.Events:
 			if !ok {
 				return
 			}
-			w.handleEvent(event)
+			pending = append(pending, event)
 		case _, ok := <-w.fsWatcher.Errors:
 			if !ok {
 				return
 			}
+		case output <- next:
+			pending[0] = fsnotify.Event{}
+			pending = pending[1:]
 		}
 	}
 }
@@ -225,7 +287,7 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	if w.closed || w.root == "" {
+	if w.closed || w.suspended || w.root == "" {
 		return
 	}
 
@@ -302,7 +364,7 @@ func (w *Watcher) scheduleDebounceLocked() {
 	}
 	w.timer = time.AfterFunc(w.debounce, func() {
 		w.mu.Lock()
-		if w.closed || w.paused || time.Now().Before(w.ignoredUntil) || w.generation != gen {
+		if w.closed || w.paused || w.suspended || time.Now().Before(w.ignoredUntil) || w.generation != gen {
 			w.mu.Unlock()
 			return
 		}

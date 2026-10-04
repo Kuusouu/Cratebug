@@ -14,6 +14,22 @@ export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
+export function BackupLibrary(arg1) {
+  return window['go']['main']['App']['BackupLibrary'](arg1);
+}
+
+export function BackupType() {
+  return window['go']['main']['App']['BackupType']();
+}
+
+export function CanRetryRestore(arg1) {
+  return window['go']['main']['App']['CanRetryRestore'](arg1);
+}
+
+export function CancelBackup() {
+  return window['go']['main']['App']['CancelBackup']();
+}
+
 export function CancelCompanionCleanup() {
   return window['go']['main']['App']['CancelCompanionCleanup']();
 }
@@ -28,6 +44,10 @@ export function CancelInstall(arg1) {
 
 export function CancelNexusDownload() {
   return window['go']['main']['App']['CancelNexusDownload']();
+}
+
+export function CancelRestore() {
+  return window['go']['main']['App']['CancelRestore']();
 }
 
 export function CheckForUpdate() {
@@ -92,6 +112,10 @@ export function DetectLibrary(arg1) {
 
 export function DiscardNexusLink(arg1, arg2) {
   return window['go']['main']['App']['DiscardNexusLink'](arg1, arg2);
+}
+
+export function DiscardRestorePreview(arg1) {
+  return window['go']['main']['App']['DiscardRestorePreview'](arg1);
 }
 
 export function DownloadUpdate(arg1) {
@@ -182,6 +206,22 @@ export function ResolveNexusModPage(arg1) {
   return window['go']['main']['App']['ResolveNexusModPage'](arg1);
 }
 
+export function RestoreApply(arg1, arg2) {
+  return window['go']['main']['App']['RestoreApply'](arg1, arg2);
+}
+
+export function RestorePreview() {
+  return window['go']['main']['App']['RestorePreview']();
+}
+
+export function RestorePreviewType() {
+  return window['go']['main']['App']['RestorePreviewType']();
+}
+
+export function RestoreResultType() {
+  return window['go']['main']['App']['RestoreResultType']();
+}
+
 export function RuntimeStatus() {
   return window['go']['main']['App']['RuntimeStatus']();
 }
@@ -204,6 +244,10 @@ export function SetDefaultViewMode(arg1) {
 
 export function SetLibraryProvider(arg1) {
   return window['go']['main']['App']['SetLibraryProvider'](arg1);
+}
+
+export function SetLibraryWatcherSuspended(arg1) {
+  return window['go']['main']['App']['SetLibraryWatcherSuspended'](arg1);
 }
 
 export function SetModEnabled(arg1, arg2, arg3) {

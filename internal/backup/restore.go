@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,13 @@ const (
 	// Only backups produced by the backup flow are restorable. Anything
 	// else is rejected with a plain error before staging begins.
 	restorableExtension = ".zip"
+
+	// Rename attempts and pause between them when parking and placing
+	// entries. Windows fails renames on locked files (antivirus, indexer, or
+	// a still-running classification read) instead of waiting, so a longer
+	// retry rides out slow readers before reporting honestly.
+	renameAttempts   = 12
+	renameRetryDelay = 500 * time.Millisecond
 )
 
 // Describes staged restore contents without changing anything. Counts come
@@ -33,11 +41,14 @@ const (
 // labeled as such in the confirm preview. A dismissed open dialog reports
 // Cancelled instead of an error so the frontend can stay silent.
 type Preview struct {
-	Token           string    `json:"token"`
-	Counts          Counts    `json:"counts"`
-	MetadataPresent bool      `json:"metadataPresent"`
-	ZipModified     time.Time `json:"zipModified"`
-	Cancelled       bool      `json:"cancelled"`
+	Token           string `json:"token"`
+	Counts          Counts `json:"counts"`
+	MetadataPresent bool   `json:"metadataPresent"`
+	// The archive file's own modification time as RFC 3339 text. A string
+	// keeps the Wails binding generator quiet, which has no time.Time
+	// mapping; the frontend parses it for display.
+	ZipModified string `json:"zipModified"`
+	Cancelled   bool   `json:"cancelled"`
 }
 
 // Describes a completed restore. Counts come from a post-restore scan of
@@ -47,6 +58,7 @@ type RestoreResult struct {
 	Counts           Counts `json:"counts"`
 	MetadataRestored bool   `json:"metadataRestored"`
 	MetadataNote     string `json:"metadataNote,omitempty"`
+	Cancelled        bool   `json:"cancelled"`
 }
 
 // Holds one staged restore between its preview and its apply. The staging
@@ -130,11 +142,11 @@ func (m *SessionManager) Preview(ctx context.Context, zipPath string) (Preview, 
 		Token:           token,
 		Counts:          CountsLibrary(library.Entries),
 		MetadataPresent: metadataFound,
-		ZipModified:     info.ModTime(),
+		ZipModified:     info.ModTime().Format(time.RFC3339),
 	}, nil
 }
 
-// Drops a staged session and its staging directory without touching the library.
+// Drops an idle session. Apply owns active sessions until it finishes.
 func (m *SessionManager) DiscardSession(token string) {
 	m.mu.Lock()
 	session, ok := m.sessions[token]
@@ -147,11 +159,17 @@ func (m *SessionManager) DiscardSession(token string) {
 	}
 }
 
-// Replaces the mod-root tree with the staged session's contents and restores
-// its metadata through the store's safe-write path. The current tree is
-// parked aside first; any failure moves it back, so a failed restore never
-// presents a partial library. The session is consumed whether apply succeeds
-// or fails. Cancellation aborts with the previous library put back.
+// Reports whether a complete staged backup remains available for retry.
+func (m *SessionManager) CanRetry(token string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.sessions[token]
+	return ok
+}
+
+// Replaces the library and restores metadata through the store's safe-write path.
+// A complete rollback retains the session for retry. A failed rollback preserves
+// recovery files and blocks retry. Cancelled means the previous library is intact.
 func (m *SessionManager) Apply(ctx context.Context, modRoot, metadataPath, token string, onProgress func(Progress)) (RestoreResult, error) {
 	m.mu.Lock()
 	session, ok := m.sessions[token]
@@ -160,11 +178,22 @@ func (m *SessionManager) Apply(ctx context.Context, modRoot, metadataPath, token
 	}
 	m.mu.Unlock()
 	if !ok {
-		return RestoreResult{}, fmt.Errorf("restore session not found or already applied")
+		return RestoreResult{}, fmt.Errorf("restore session is active, unavailable, or already applied")
 	}
-	defer os.RemoveAll(session.stagingDir)
+	// The map contains only idle sessions. Discard cannot remove active staging.
+	retryable := true
+	defer func() {
+		if retryable {
+			m.mu.Lock()
+			m.sessions[token] = session
+			m.mu.Unlock()
+		}
+	}()
 
 	if err := ctx.Err(); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return RestoreResult{Cancelled: true}, nil
+		}
 		return RestoreResult{}, fmt.Errorf("restore cancelled before applying: %w", err)
 	}
 
@@ -181,21 +210,29 @@ func (m *SessionManager) Apply(ctx context.Context, modRoot, metadataPath, token
 	// rather than guess which side is authoritative.
 	parkDir := root + ".restore-park"
 	if _, err := os.Lstat(parkDir); err == nil {
-		return RestoreResult{}, fmt.Errorf("a previous restore park still exists at %q; remove it before restoring", parkDir)
+		return RestoreResult{}, fmt.Errorf("a previous restore park still exists at %q; recover its files before restoring", parkDir)
 	} else if !os.IsNotExist(err) {
 		return RestoreResult{}, fmt.Errorf("inspect restore park location: %w", err)
 	}
 	if err := os.Mkdir(parkDir, 0o700); err != nil {
 		return RestoreResult{}, fmt.Errorf("create restore park: %w", err)
 	}
+	rollback := func(cause error, parked, placed []string) (RestoreResult, error) {
+		if err := rollbackPark(root, parkDir, treeDir, parked, placed); err != nil {
+			retryable = false
+			return RestoreResult{}, fmt.Errorf("restore failed: %v; rollback also failed: %v; recovery files remain in %q and %q", cause, err, parkDir, session.stagingDir)
+		}
+		if err := os.Remove(parkDir); err != nil {
+			return RestoreResult{}, fmt.Errorf("remove empty restore park: %w", err)
+		}
+		if errors.Is(cause, context.Canceled) {
+			return RestoreResult{Cancelled: true}, nil
+		}
+		return RestoreResult{}, cause
+	}
 	parked, placed, parkErr := parkAndPlace(ctx, root, parkDir, treeDir, onProgress)
 	if parkErr != nil {
-		rollbackErr := rollbackPark(root, parkDir, treeDir, parked, placed)
-		_ = os.RemoveAll(parkDir)
-		if rollbackErr != nil {
-			return RestoreResult{}, fmt.Errorf("restore failed: %v; rollback also failed: %v", parkErr, rollbackErr)
-		}
-		return RestoreResult{}, parkErr
+		return rollback(parkErr, parked, placed)
 	}
 
 	result := RestoreResult{}
@@ -204,12 +241,7 @@ func (m *SessionManager) Apply(ctx context.Context, modRoot, metadataPath, token
 		result.MetadataRestored = restored
 		result.MetadataNote = note
 		if err != nil {
-			rollbackErr := rollbackPark(root, parkDir, treeDir, parked, placed)
-			_ = os.RemoveAll(parkDir)
-			if rollbackErr != nil {
-				return RestoreResult{}, fmt.Errorf("restore metadata failed: %v; rollback also failed: %v", err, rollbackErr)
-			}
-			return RestoreResult{}, err
+			return rollback(err, parked, placed)
 		}
 	} else {
 		result.MetadataNote = "backup holds no metadata; current metadata kept"
@@ -217,16 +249,13 @@ func (m *SessionManager) Apply(ctx context.Context, modRoot, metadataPath, token
 
 	library, err := discovery.Scan(root)
 	if err != nil {
-		rollbackErr := rollbackPark(root, parkDir, treeDir, parked, placed)
-		_ = os.RemoveAll(parkDir)
-		if rollbackErr != nil {
-			return RestoreResult{}, fmt.Errorf("verify restored library: %v; rollback also failed: %v", err, rollbackErr)
-		}
-		return RestoreResult{}, fmt.Errorf("verify restored library: %w", err)
+		return rollback(fmt.Errorf("verify restored library: %w", err), parked, placed)
 	}
 	_ = os.RemoveAll(parkDir)
 
 	result.Counts = CountsLibrary(library.Entries)
+	retryable = false
+	_ = os.RemoveAll(session.stagingDir)
 	return result, nil
 }
 
@@ -294,8 +323,10 @@ func parkAndPlace(ctx context.Context, root, parkDir, treeDir string, onProgress
 		if err := ctx.Err(); err != nil {
 			return parked, nil, fmt.Errorf("restore cancelled while parking: %w", err)
 		}
-		if err := os.Rename(filepath.Join(root, name), filepath.Join(parkDir, name)); err != nil {
-			return parked, nil, fmt.Errorf("park mod library entry %q: %w", name, err)
+		if err := retryOperation(renameAttempts, renameRetryDelay, func() error {
+			return os.Rename(filepath.Join(root, name), filepath.Join(parkDir, name))
+		}); err != nil {
+			return parked, nil, fmt.Errorf("park mod library entry %q (is it open in another program?): %w", name, err)
 		}
 		parked = append(parked, name)
 		report(name)
@@ -305,8 +336,10 @@ func parkAndPlace(ctx context.Context, root, parkDir, treeDir string, onProgress
 		if err := ctx.Err(); err != nil {
 			return parked, placed, fmt.Errorf("restore cancelled while placing: %w", err)
 		}
-		if err := os.Rename(filepath.Join(treeDir, name), filepath.Join(root, name)); err != nil {
-			return parked, placed, fmt.Errorf("place restored entry %q: %w", name, err)
+		if err := retryOperation(renameAttempts, renameRetryDelay, func() error {
+			return os.Rename(filepath.Join(treeDir, name), filepath.Join(root, name))
+		}); err != nil {
+			return parked, placed, fmt.Errorf("place restored entry %q (is it open in another program?): %w", name, err)
 		}
 		placed = append(placed, name)
 		report(name)
@@ -314,23 +347,38 @@ func parkAndPlace(ctx context.Context, root, parkDir, treeDir string, onProgress
 	return parked, placed, nil
 }
 
-// Returns placed entries to staging and parked entries to the library after
-// a failed apply. Reports the first rollback failure, if any; callers
-// surface it alongside the original error so a half-rolled-back library is
-// never presented as merely failed.
+// Retries one filesystem operation across briefly locked files. Every
+// attempt runs the operation; only persistent failures surface, so transient
+// antivirus, indexer, or classification locks do not fail a restore the user
+// just confirmed.
+func retryOperation(attempts int, delay time.Duration, op func() error) error {
+	var err error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(delay)
+		}
+		if err = op(); err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
+// Attempts every return move. One locked entry must not prevent other recovery.
 func rollbackPark(root, parkDir, treeDir string, parked, placed []string) error {
+	var failures []error
 	for i := len(placed) - 1; i >= 0; i-- {
 		name := placed[i]
 		if err := os.Rename(filepath.Join(root, name), filepath.Join(treeDir, name)); err != nil {
-			return fmt.Errorf("return placed entry %q: %w", name, err)
+			failures = append(failures, fmt.Errorf("return placed entry %q: %w", name, err))
 		}
 	}
 	for _, name := range parked {
 		if err := os.Rename(filepath.Join(parkDir, name), filepath.Join(root, name)); err != nil {
-			return fmt.Errorf("restore parked entry %q: %w", name, err)
+			failures = append(failures, fmt.Errorf("restore parked entry %q: %w", name, err))
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }
 
 // Lists immediate child names in deterministic order.

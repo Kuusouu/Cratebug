@@ -4,13 +4,18 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 )
+
+// Stands in for a transient Windows file lock in retry tests.
+var errTransientLock = errors.New("file is being used by another process")
 
 const restoreFixtureMetadata = `{"schemaVersion":1,"settings":{},"mods":{"mod-1":{"scannerID":"mod::hero"}},"tags":[]}`
 
@@ -155,7 +160,7 @@ func TestPreviewReportsLiveCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preview.Token == "" || !preview.MetadataPresent || preview.ZipModified.IsZero() {
+	if preview.Token == "" || !preview.MetadataPresent || preview.ZipModified == "" {
 		t.Errorf("preview = %+v, want a token, metadata present, and a zip date", preview)
 	}
 	if preview.Counts.Mods != 5 {
@@ -353,6 +358,86 @@ func TestApplyRollsBackOnMetadataWriteFailure(t *testing.T) {
 	}
 }
 
+func TestRetryOperationRidesOutTransientFailures(t *testing.T) {
+	// Arrange.
+	calls := 0
+
+	// Act.
+	err := retryOperation(5, time.Millisecond, func() error {
+		calls++
+		if calls < 3 {
+			return errTransientLock
+		}
+		return nil
+	})
+
+	// Assert.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Errorf("calls = %d, want 3 attempts before success", calls)
+	}
+}
+
+func TestRetryOperationSurfacesPersistentFailures(t *testing.T) {
+	// Arrange.
+	calls := 0
+
+	// Act.
+	err := retryOperation(3, time.Millisecond, func() error {
+		calls++
+		return errTransientLock
+	})
+
+	// Assert.
+	if err == nil {
+		t.Errorf("expected the persistent failure to surface")
+	}
+	if calls != 3 {
+		t.Errorf("calls = %d, want all 3 attempts used", calls)
+	}
+}
+
+func TestApplyFailureKeepsSessionForRetry(t *testing.T) {
+	// Arrange.
+	source := mixedLibrary(t)
+	zipPath := makeBackup(t, source, []byte(restoreFixtureMetadata))
+	library := t.TempDir()
+	writeFile(t, filepath.Join(library, "Keep_1_P.pak"), []byte("keep"))
+	metadataDir := t.TempDir()
+	blockedPath := filepath.Join(metadataDir, "metadata.json")
+	if err := os.Mkdir(blockedPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewSessionManager()
+	preview, err := manager.Preview(context.Background(), zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Act: first attempt fails on the metadata write and rolls back.
+	_, err = manager.Apply(context.Background(), library, blockedPath, preview.Token, nil)
+	if err == nil {
+		t.Fatalf("expected the metadata write failure")
+	}
+
+	// Act: retry with a usable metadata path reuses the staged session.
+	metadataPath := filepath.Join(t.TempDir(), "metadata.json")
+	result, err := manager.Apply(context.Background(), library, metadataPath, preview.Token, nil)
+
+	// Assert.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Counts.Mods != 5 {
+		t.Errorf("counts = %+v, want 5 retried mods", result.Counts)
+	}
+	if got, want := readTree(t, library), readTree(t, source); !reflect.DeepEqual(got, want) {
+		t.Errorf("restored tree = %v, want %v", got, want)
+	}
+}
+
 func TestApplyReportsProgress(t *testing.T) {
 	// Arrange.
 	zipPath := makeBackup(t, mixedLibrary(t), nil)
@@ -379,5 +464,126 @@ func TestApplyReportsProgress(t *testing.T) {
 	last := progress[len(progress)-1]
 	if last.Current != last.Total {
 		t.Errorf("final progress = %+v, want a completed total", last)
+	}
+}
+
+func TestApplyOwnsSessionUntilItFinishes(t *testing.T) {
+	// Arrange
+	source := t.TempDir()
+	writeFile(t, filepath.Join(source, "A_P.pak"), []byte("A"))
+	writeFile(t, filepath.Join(source, "B_P.pak"), []byte("B"))
+	manager := NewSessionManager()
+	preview, err := manager.Preview(context.Background(), makeBackup(t, source, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.DiscardSession(preview.Token)
+	root, otherRoot := t.TempDir(), t.TempDir()
+	writeFile(t, filepath.Join(root, "Keep_P.pak"), []byte("original"))
+	entered, release := make(chan struct{}), make(chan struct{})
+	done := make(chan error, 1)
+
+	// Act
+	go func() {
+		_, err := manager.Apply(context.Background(), root, "", preview.Token, func(p Progress) {
+			if p.Current == 2 {
+				close(entered)
+				<-release
+			}
+		})
+		done <- err
+	}()
+	<-entered
+	_, secondErr := manager.Apply(context.Background(), otherRoot, "", preview.Token, nil)
+	manager.DiscardSession(preview.Token)
+	retryable := manager.CanRetry(preview.Token)
+	close(release)
+	firstErr := <-done
+
+	// Assert
+	if secondErr == nil || retryable {
+		t.Errorf("active session accepted another apply or retry")
+	}
+	if firstErr != nil {
+		t.Fatalf("active discard interrupted restore: %v", firstErr)
+	}
+	if got, want := readTree(t, root), readTree(t, source); !reflect.DeepEqual(got, want) {
+		t.Errorf("restored tree = %v, want %v", got, want)
+	}
+	if len(readTree(t, otherRoot)) != 0 {
+		t.Error("rejected apply changed the second library")
+	}
+}
+
+func TestApplyCancellationRollsBackAndRetainsCompleteStage(t *testing.T) {
+	// Arrange
+	source := t.TempDir()
+	writeFile(t, filepath.Join(source, "A_P.pak"), []byte("A"))
+	writeFile(t, filepath.Join(source, "B_P.pak"), []byte("B"))
+	manager := NewSessionManager()
+	preview, err := manager.Preview(context.Background(), makeBackup(t, source, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.DiscardSession(preview.Token)
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "Keep_P.pak"), []byte("original"))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Act
+	result, err := manager.Apply(ctx, root, "", preview.Token, func(p Progress) {
+		if p.Current == 2 {
+			cancel()
+		}
+	})
+
+	// Assert
+	if err != nil || !result.Cancelled || !manager.CanRetry(preview.Token) {
+		t.Fatalf("cancelled restore = %+v, error = %v", result, err)
+	}
+	if got, want := readTree(t, root), map[string]string{"Keep_P.pak": "original"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("cancelled library = %v, want %v", got, want)
+	}
+
+	// Act
+	result, err = manager.Apply(context.Background(), root, "", preview.Token, nil)
+
+	// Assert
+	if err != nil || result.Cancelled || result.Counts.Mods != 2 {
+		t.Fatalf("retry result = %+v, error = %v", result, err)
+	}
+	if got, want := readTree(t, root), readTree(t, source); !reflect.DeepEqual(got, want) {
+		t.Errorf("retried library = %v, want %v", got, want)
+	}
+}
+
+func TestApplyLateCancellationReportsCompletedRestore(t *testing.T) {
+	// Arrange
+	source := t.TempDir()
+	writeFile(t, filepath.Join(source, "A_P.pak"), []byte("A"))
+	manager := NewSessionManager()
+	preview, err := manager.Preview(context.Background(), makeBackup(t, source, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.DiscardSession(preview.Token)
+	root := t.TempDir()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Act
+	result, err := manager.Apply(ctx, root, "", preview.Token, func(p Progress) {
+		if p.Current == p.Total {
+			cancel()
+		}
+	})
+
+	// Assert
+	if err != nil || result.Cancelled || result.Counts.Mods != 1 {
+		t.Fatalf("completed restore = %+v, error = %v", result, err)
+	}
+	if manager.CanRetry(preview.Token) {
+		t.Error("completed restore retained its session")
 	}
 }

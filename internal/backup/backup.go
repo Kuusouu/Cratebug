@@ -239,7 +239,11 @@ func writeZip(ctx context.Context, out io.Writer, root string, files []backupFil
 		if err := addDirEntries(rel); err != nil {
 			return err
 		}
-		entry, err := writer.Create(rel)
+		// Stored without compression: mod bundles are already compressed
+		// game data, so deflate would burn CPU for no size savings while
+		// making multi-gigabyte libraries slow to back up.
+		header := &zip.FileHeader{Name: rel, Method: zip.Store}
+		entry, err := writer.CreateHeader(header)
 		if err != nil {
 			return fmt.Errorf("write backup entry %q: %w", rel, err)
 		}

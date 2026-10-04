@@ -568,7 +568,9 @@ Task 20.4 records the release pin, tests, and app checks.
 
 ## Phase 21 - Backup and restore
 
-**Status:** Designed, not started. Awaiting approval before implementation.
+**Status:** Tasks 21.1 and 21.2 are implemented. Task 21.3 is in progress, with native file-dialog verification pending.
+
+Review fixes are implemented. Tests cover exclusive restore ownership, safe retry, preserved recovery files, and watcher concurrency. Browser checks cover cancellation outcomes and restored metadata.
 
 **Outcome:** Users can back up the whole mod library to a portable zip file and restore it later from the Tools menu, with honest counts on both ends.
 

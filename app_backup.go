@@ -170,9 +170,15 @@ func (a *App) RestoreApply(modRoot, token string) (backup.RestoreResult, error) 
 		}
 		ctx, stop := context.WithCancel(base)
 		restoreMu.Lock()
+		if restoreCancel != nil {
+			restoreMu.Unlock()
+			stop()
+			return backup.RestoreResult{}, fmt.Errorf("a restore is already active")
+		}
 		restoreCancel = stop
 		restoreMu.Unlock()
 		defer func() {
+			stop()
 			restoreMu.Lock()
 			restoreCancel = nil
 			restoreMu.Unlock()
@@ -191,12 +197,16 @@ func (a *App) DiscardRestorePreview(token string) {
 	a.restoreSessions.DiscardSession(token)
 }
 
+// Keeps retry controls tied to a complete, idle staged backup.
+func (a *App) CanRetryRestore(token string) bool {
+	return a.restoreSessions.CanRetry(token)
+}
+
 // Stops an in-progress RestoreApply; the previous library is put back.
 func (a *App) CancelRestore() {
 	restoreMu.Lock()
 	defer restoreMu.Unlock()
 	if restoreCancel != nil {
 		restoreCancel()
-		restoreCancel = nil
 	}
 }

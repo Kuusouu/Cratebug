@@ -47,6 +47,32 @@ func mixedLibrary(t *testing.T) string {
 	return root
 }
 
+func TestCreateStoresEntriesUncompressed(t *testing.T) {
+	// Arrange.
+	root := mixedLibrary(t)
+	dest := filepath.Join(t.TempDir(), "backup.zip")
+	if _, err := Create(context.Background(), root, "", dest, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act.
+	reader, err := zip.OpenReader(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+
+	// Assert.
+	for _, file := range reader.File {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		if file.Method != zip.Store {
+			t.Errorf("zip entry %q uses method %d, want stored (no compression)", file.Name, file.Method)
+		}
+	}
+}
+
 func readZipEntries(t *testing.T, zipPath string) map[string]string {
 	t.Helper()
 	reader, err := zip.OpenReader(zipPath)
