@@ -566,8 +566,34 @@ Cratebug now calls that worker action for staged IoStore bundles.
 The duplicate Go format reader is removed.
 Task 20.4 records the release pin, tests, and app checks.
 
+## Phase 21 - Backup and restore
+
+**Status:** Designed, not started. Awaiting approval before implementation.
+
+**Outcome:** Users can back up the whole mod library to a portable zip file and restore it later from the Tools menu, with honest counts on both ends.
+
+**Includes:**
+
+- One "Backup / Restore" entry in the Tools dialog: two buttons side by side (Backup, Restore) sharing a single card, replacing the separate placeholder cards. Other placeholder cards stay untouched.
+- Backup (`internal/backup`): scans the current library read-only, then zips the full mod-root tree (every bundle including disabled forms and folders) together with Cratebug's `metadata.json` from the config directory at the zip root. No extra manifest file: `metadata.json` already carries the schema version, tags, and mod records. The destination is user-chosen through a save-file dialog; the source library is never mutated.
+- Restore: user-chosen zip through an open-file dialog, extracted to staging with the same traversal and escape protection as installs. The confirm preview shows the zip file's date (labeled as such, not verified) alongside counts from a live scan of the staged contents; nothing in the zip is trusted. The tree is moved into the library wholesale with park+replace+rollback, and `metadata.json` is restored through the store's safe-write path so a corrupt copy cannot destroy the current one. A zip without `metadata.json` restores the tree and leaves current metadata untouched.
+- Count reporting on both ends: `Backed up X mods (Y IoStore, Z Classic, W Invalid)` and `Restored X mods (Y IoStore, Z Classic, W Invalid)`, where Invalid means incomplete or orphaned bundles per the scanner. Restore is byte-faithful: invalid entries are restored as-is and reported, not silently dropped.
+- Restore preview names what will be replaced, requires confirmation, enforces the game-running lock, and reports progress and cancellation. When the library already holds mods, the preview warns that the current library will be replaced and requires explicit confirmation before proceeding. A failed or cancelled restore rolls back to the pre-restore library and never presents a partial library as restored.
+- Disposable-fixture Go tests for manifest handling, missing-manifest zips, traversal rejection, failure rollback, and cancellation; frontend tests for the wired card.
+
+**Excludes:** Merging a backup into the current library, selective single-mod backup or restore, scheduled or automatic backups, backup encryption, cloud destinations, and restoring into a different mod root.
+
+**Exit criteria:**
+
+- A backup zip always contains `metadata.json` plus a byte-identical copy of the library tree; backing up never changes the library.
+- Restoring a backup reproduces its file tree byte for byte; the reported counts match a post-restore scan.
+- A zip without `metadata.json` restores the tree through the same validation and leaves current metadata untouched.
+- A malicious zip (traversal entries, absolute paths, symlinks) is rejected before anything lands in the library.
+- Failed or cancelled restores leave the previous library intact and say so.
+- Canonical checks pass; running-app backup, preview, and restore states are screenshotted and reviewed.
+
 ## Deferred post-release work
 
-Deferred work includes Phase 19 (Linux AppImage self-updating), BentoMod/Repak-X state migration, full backup and restore, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
+Deferred work includes Phase 19 (Linux AppImage self-updating), BentoMod/Repak-X state migration, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
 
 These require separate specification and roadmap decisions.
