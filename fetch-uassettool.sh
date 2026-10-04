@@ -6,10 +6,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RELEASE_REPO="mewclouds/UAssetToolRivals"
-RELEASE_TAG="v1.5.9"
+RELEASE_TAG="v1.5.10"
 ASSET_NAME="UAssetTool-linux-x64.tar.gz"
-EXPECTED_SHA256="5e70809452baf667c1b0b9604896bc4de439144684b7204bab0a1386b5910d52"
-EXPECTED_SOURCE_REVISION="7c185ae5da2ac446cf58db75ebd34f9402b8b5dc"
+EXPECTED_SHA256="c9ef74ff711c9010e8ae0c9393aec8b757de737ef3e018b435336a8886c61ee9"
+EXPECTED_SOURCE_REVISION="c137d9abc4a7509d25f89ca9c6c0be3b7a87da23"
 
 OODLE_ASSET_NAME="liboo2corelinux64.so.9"
 OODLE_DOWNLOAD_URL="https://github.com/new-world-tools/go-oodle/releases/download/v0.2.3-files/${OODLE_ASSET_NAME}"

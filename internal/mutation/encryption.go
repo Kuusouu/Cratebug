@@ -376,7 +376,7 @@ func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt bool, c
 		if _, err := uassettool.EncryptIoStoreDirect(caller, stagedPak, uassettool.MarvelRivalsAESKey); err != nil {
 			return fmt.Errorf("encrypt IoStore: %w", err)
 		}
-	} else if err := uassettool.DecryptIoStoreDirect(stagedUtoc); err != nil {
+	} else if err := uassettool.DecryptIoStoreDirect(caller, stagedUtoc, uassettool.MarvelRivalsAESKey); err != nil {
 		return fmt.Errorf("decrypt IoStore: %w", err)
 	}
 	encrypted, err := uassettool.IsIoStoreEncrypted(caller, stagedUtoc)

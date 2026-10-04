@@ -152,3 +152,36 @@ All 177 file hashes matched the isolation manifest after restoration.
 No mod remained in the temporary park directory.
 The final `go vet ./...`, `go test ./...`, and `git diff --check` passed.
 Stop for review. Do not start another phase.
+
+## 20.4 Move direct decryption into UAssetToolRivals (2026-10-04)
+
+The user approved the worker change and use of the fixture library.
+UAssetToolRivals v1.5.10 now exposes `decrypt_iostore` through its CLI and JSON interface.
+Cratebug pins commit `c137d9abc4a7509d25f89ca9c6c0be3b7a87da23`.
+See decisions 0004 and 0010.
+
+The worker decrypts existing blocks without asset conversion or recompression.
+It preserves compressed bytes, container IDs, chunk IDs, metadata, and paths.
+It supports unsigned, single-partition TOC versions 1 through 5.
+It validates block ranges before replacement and restores the UCAS backup after replacement failure.
+Cratebug calls the worker on private staged copies.
+Cratebug keeps bundle staging, companion cleanup, state checks, and live replacement rollback.
+The Go IoStore format reader is removed.
+
+**Validation:**
+
+1. `check.ps1` passed. Go format, vet, all Go tests, frontend format, lint, and production build passed.
+2. `go test ./internal/uassettool -run TestDecryptIoStoreDirectWithWorker -count=1 -v` passed with the fetched v1.5.10 worker.
+3. UAT decrypted copies of all 58 supplied bundles and passed Encrypt then Decrypt. All 1,716 decoded chunk hashes matched.
+4. Cratebug sent 55 worker decrypt requests. All 174 output file hashes matched direct UAT output. The source files stayed intact.
+5. Shark, its manual reference, and the original PinkVFX download passed. All 399 decoded chunk hashes matched their inputs.
+
+Playwright drove the Wails app in Edge with a writable workspace copy of PAJAMAPARTYHUD.
+The UI decrypt action succeeded. The `.pak`, `.utoc`, and `.ucas` hashes matched direct UAT output.
+The worker reported an unencrypted state. The source fixture in `C:\ModsFixtures` stayed unchanged.
+The screenshot is `.playwright-cli/screenshots/phase20/task-20.4-decrypted.png` at 1280 by 800 pixels.
+Wails logged a browser IPC startup error and the page returned a favicon 404.
+The bound decrypt call still succeeded. No native DPI or game test completed.
+
+The automatic encryption prompt still describes a rebuild. Defer that text issue.
+Stop for review. Do not start another phase.

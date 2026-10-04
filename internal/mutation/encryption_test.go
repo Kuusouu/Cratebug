@@ -1,9 +1,6 @@
 package mutation
 
 import (
-	"crypto/aes"
-	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -20,27 +17,24 @@ import (
 type scriptedEncryptionCaller struct {
 	encryptedByUTOC map[string]bool
 	failPakFixer    bool
+	failDecrypt     bool
 	failListPak     bool
 	pakListing      string
 	createPakBody   string
 	pakFixerTargets []string
+	decryptTargets  []string
 }
 
 func (s *scriptedEncryptionCaller) Call(action string, params map[string]any, result any) error {
 	switch action {
 	case "is_iostore_encrypted":
 		path, _ := params["file_path"].(string)
-		// Staged decryption changes the real TOC flag; the encrypt mock uses a marker.
 		if filepath.Base(path) == "bundle.utoc" {
 			body, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
-			encrypted := string(body) == "direct.utoc"
-			if len(body) > 80 {
-				encrypted = body[80]&2 != 0
-			}
-			return json.Unmarshal([]byte(encryptionJSON(encrypted)), result)
+			return json.Unmarshal([]byte(encryptionJSON(string(body) == "direct.utoc")), result)
 		}
 		return json.Unmarshal([]byte(encryptionJSON(s.encryptedByUTOC[filepath.Base(path)])), result)
 	case "pak_fixer":
@@ -60,6 +54,22 @@ func (s *scriptedEncryptionCaller) Call(action string, params map[string]any, re
 			}
 		}
 		return json.Unmarshal([]byte(`{"total":1,"fixed":0,"already_clean":1,"failed":0,"containers_encrypted":1,"containers_already_encrypted":0,"containers_failed":0}`), result)
+	case "decrypt_iostore":
+		path, _ := params["file_path"].(string)
+		s.decryptTargets = append(s.decryptTargets, path)
+		if params["aes_key"] != uassettool.MarvelRivalsAESKey {
+			return &uassettool.ToolError{Action: action, Message: "game key is required"}
+		}
+		base := strings.TrimSuffix(path, ".utoc")
+		for _, ext := range []string{".utoc", ".ucas"} {
+			if err := os.WriteFile(base+ext, []byte("clear"+ext), 0o600); err != nil {
+				return err
+			}
+		}
+		if s.failDecrypt {
+			return &uassettool.ToolError{Action: action, Message: "invalid IoStore TOC header"}
+		}
+		return json.Unmarshal([]byte(`{"encrypted":false,"changed":true}`), result)
 	case "list_pak":
 		if s.failListPak {
 			return &uassettool.ToolError{Action: action, Message: "list failed"}
@@ -310,11 +320,10 @@ func TestSetModEncryptionSkipsWhenAlreadyAtTarget(t *testing.T) {
 	}
 }
 
-func TestSetModEncryptionDecryptsWithoutChangingIdentity(t *testing.T) {
+func TestSetModEncryptionDelegatesStagedDecryptionToWorker(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
-	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
-	plainTOC, plainUCAS := writeEncryptedIoStore(t, root, "Hero_9999999_P")
+	writeIoStoreBundle(t, root, "", "Hero_9999999_P", true)
 	library, err := discovery.Scan(root)
 	if err != nil {
 		t.Fatalf("Scan() error = %v", err)
@@ -336,20 +345,26 @@ func TestSetModEncryptionDecryptsWithoutChangingIdentity(t *testing.T) {
 	if len(result.Failed) != 0 {
 		t.Fatalf("Failed = %v, want none", result.Failed)
 	}
-	body, err := os.ReadFile(filepath.Join(root, "Hero_9999999_P.pak"))
+	if len(caller.decryptTargets) != 1 || filepath.Base(caller.decryptTargets[0]) != "bundle.utoc" || pathWithinRoot(root, caller.decryptTargets[0]) {
+		t.Fatal("the decrypt worker did not receive a private staged copy")
+	}
+	if _, err := os.Stat(filepath.Join(root, "Hero_9999999_P.pak")); !os.IsNotExist(err) {
+		t.Fatal("decrypt enabled a disabled primary")
+	}
+	body, err := os.ReadFile(filepath.Join(root, "Hero_9999999_P.pak_crateoff"))
 	if err != nil {
 		t.Fatalf("read primary: %v", err)
 	}
 	if string(body) != "stripped-companion" {
 		t.Errorf("primary content = %q, want the stripped companion PAK", body)
 	}
-	for extension, want := range map[string][]byte{".utoc": plainTOC, ".ucas": plainUCAS} {
+	for _, extension := range []string{".utoc", ".ucas"} {
 		got, err := os.ReadFile(filepath.Join(root, "Hero_9999999_P"+extension))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(got) != string(want) {
-			t.Errorf("decrypted %s differs from the original clear bytes", extension)
+		if string(got) != "clear"+extension {
+			t.Errorf("the worker output did not replace %s", extension)
 		}
 	}
 }
@@ -479,7 +494,7 @@ func encryptableIoStoreEntry(id string) discovery.Entry {
 	}
 }
 
-func TestSetModEncryptionRejectsInvalidTOCBeforeReplacement(t *testing.T) {
+func TestSetModEncryptionRejectsWorkerFailureBeforeReplacement(t *testing.T) {
 	// Arrange
 	root := t.TempDir()
 	writeIoStoreBundle(t, root, "", "Hero_9999999_P", false)
@@ -490,6 +505,7 @@ func TestSetModEncryptionRejectsInvalidTOCBeforeReplacement(t *testing.T) {
 	entry := library.Entries[0]
 	caller := &scriptedEncryptionCaller{
 		encryptedByUTOC: map[string]bool{"Hero_9999999_P.utoc": true},
+		failDecrypt:     true,
 	}
 
 	// Act
@@ -515,45 +531,4 @@ func TestSetModEncryptionRejectsInvalidTOCBeforeReplacement(t *testing.T) {
 			t.Errorf("failed decrypt changed %s", name)
 		}
 	}
-}
-
-func writeEncryptedIoStore(t *testing.T, root, stem string) ([]byte, []byte) {
-	t.Helper()
-	// One uncompressed block keeps the replacement check independent of the worker mock.
-	const headerSize = 144
-	const chunkIDSize = 12
-	const offsetLengthSize = 10
-	const compressionEntrySize = 12
-	toc := make([]byte, headerSize+chunkIDSize+offsetLengthSize+compressionEntrySize)
-	copy(toc, "-==--==--==--==-")
-	toc[16] = 5
-	binary.LittleEndian.PutUint32(toc[20:24], headerSize)
-	binary.LittleEndian.PutUint32(toc[24:28], 1)
-	binary.LittleEndian.PutUint32(toc[28:32], 1)
-	binary.LittleEndian.PutUint32(toc[32:36], compressionEntrySize)
-	binary.LittleEndian.PutUint32(toc[44:48], 16)
-	binary.LittleEndian.PutUint32(toc[52:56], 1)
-	binary.LittleEndian.PutUint64(toc[56:64], 42)
-	copy(toc[headerSize:headerSize+chunkIDSize], []byte("asset-id-123"))
-	entry := toc[headerSize+chunkIDSize+offsetLengthSize:]
-	entry[5], entry[8] = 16, 16
-	plainUCAS := []byte("cooked asset 123")
-	key, err := hex.DecodeString(uassettool.MarvelRivalsAESKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	blockCipher, err := aes.NewCipher(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	encryptedUCAS := make([]byte, len(plainUCAS))
-	blockCipher.Encrypt(encryptedUCAS, plainUCAS)
-	plainTOC := append([]byte(nil), toc...)
-	toc[80] = 2
-	for extension, body := range map[string][]byte{".utoc": toc, ".ucas": encryptedUCAS} {
-		if err := os.WriteFile(filepath.Join(root, stem+extension), body, 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return plainTOC, plainUCAS
 }

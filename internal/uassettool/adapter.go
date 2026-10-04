@@ -107,7 +107,7 @@ func (a *Adapter) Call(action string, params map[string]any, result any) error {
 // the caller is responsible for actually invoking "--version" before trusting
 // any further call to the same worker. The check is a substring match because
 // the worker embeds its build commit as an informational version suffix, for
-// example "UAssetTool v1.5.9+7c185ae5da2ac446cf58db75ebd34f9402b8b5dc".
+// example "UAssetTool v1.5.10+c137d9abc4a7509d25f89ca9c6c0be3b7a87da23".
 func CheckVersion(reportedVersion, expectedSourceRevision string) error {
 	if !strings.Contains(reportedVersion, expectedSourceRevision) {
 		return fmt.Errorf("%w: got %q, want a version containing %q", ErrVersionMismatch, reportedVersion, expectedSourceRevision)

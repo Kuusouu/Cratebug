@@ -1,6 +1,6 @@
 # 0009: Direct IoStore decryption
 
-- Status: Accepted
+- Status: Superseded by decision 0010 on 2026-10-04
 - Date: 2026-10-04
 
 ## Decision

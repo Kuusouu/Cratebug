@@ -17,7 +17,7 @@ import (
 const (
 	// PinnedSourceRevision is the Git commit hash of the pinned UAssetToolRivals release.
 	// Kept in sync with docs/decisions/0004-pin-uassettool-worker.md and fetch-uassettool.ps1.
-	PinnedSourceRevision = "7c185ae5da2ac446cf58db75ebd34f9402b8b5dc"
+	PinnedSourceRevision = "c137d9abc4a7509d25f89ca9c6c0be3b7a87da23"
 
 	// EnvWorkerPath is the environment variable override for locating the worker binary.
 	EnvWorkerPath = "CRATEBUG_UASSETTOOL_PATH"

@@ -290,6 +290,30 @@ func EncryptIoStoreDirect(c caller, pakPath, aesKey string) (PakFixerResult, err
 	return raw, nil
 }
 
+// DecryptIoStoreDirect decrypts a staged bundle without asset conversion or recompression.
+func DecryptIoStoreDirect(c caller, utocPath, aesKey string) error {
+	if utocPath == "" {
+		return fmt.Errorf("uassettool: decrypt_iostore: utoc path is required")
+	}
+	params := map[string]any{"file_path": utocPath}
+	if aesKey != "" {
+		params["aes_key"] = aesKey
+	}
+	var raw struct {
+		Encrypted *bool `json:"encrypted"`
+	}
+	if err := c.Call("decrypt_iostore", params, &raw); err != nil {
+		return err
+	}
+	if raw.Encrypted == nil {
+		return fmt.Errorf("%w: decrypt_iostore: encryption state is missing", ErrMalformedResponse)
+	}
+	if *raw.Encrypted {
+		return fmt.Errorf("uassettool: decrypt_iostore: container remains encrypted")
+	}
+	return nil
+}
+
 // True when the last path segment is chunknames or patched_files, the leftover
 // IoStore bookkeeping names anti-cheat rejects as of 3 September 2026. Mount
 // prefixes still match; a longer filename that merely contains those strings does not.
