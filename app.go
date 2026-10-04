@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Kuusouu/Cratebug/internal/backup"
 	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/gamedetect"
@@ -52,6 +53,7 @@ type App struct {
 	tableLoaded           bool
 	encryptMu             sync.Mutex
 	encryptCancel         chan struct{}
+	restoreSessions       *backup.SessionManager
 	companionMu           sync.Mutex
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
@@ -118,6 +120,7 @@ func newApp(
 		classifier:            classifier,
 		installSessionManager: installSessionManager,
 		detector:              gamedetect.NewDefaultRegistry(),
+		restoreSessions:       backup.NewSessionManager(),
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 		companionCache:        mutation.NewCompanionCache(),
