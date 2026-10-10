@@ -123,8 +123,8 @@ SectionEnd
 Section "uninstall"
     !insertmacro wails.setShellContext
 
-    # Restore a previous nxm:// handler and delete nexus.key while the
-    # executable is still on disk. metadata.json is left in place.
+    # Clean up Nexus credentials and handler registrations from older builds
+    # while the executable is still on disk. metadata.json is left in place.
     IfFileExists "$INSTDIR\${PRODUCT_EXECUTABLE}" 0 skip_uninstall_cleanup
     ExecWait '"$INSTDIR\${PRODUCT_EXECUTABLE}" --uninstall-cleanup'
     skip_uninstall_cleanup:

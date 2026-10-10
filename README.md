@@ -23,10 +23,9 @@ Cratebug is an open-source, Windows-first (and Linux soon!) mod manager for Marv
 - **Organization** - rename, set priority, sort into folders, and tag mods; tags and settings survive renames and moves
 - **Recoverable deletion** - mods and folders go to the Recycle Bin, never straight to the void
 - **Archive installs with a preview** - drop in a `.zip`, `.7z`, `.rar`, or bare `.pak` and review exactly what will be installed first
-- **Nexus Mods installs** - paste your own API key, then a Marvel Rivals mod page. Premium accounts can download with a simple URL, free accounts use **Mod Manager Download** button in Nexus!
 - **Conflict detection** - find mods stepping on the same assets, with a one-click priority fix
 - **Self-updating** - check for updates in Settings, download, restart, done
-- **Linux support** - standalone AppImage with Proton game detection, FreeDesktop trash, and Secret Service integration
+- **Linux support** - standalone AppImage with Proton game detection and FreeDesktop trash
 
 ## Install
 
@@ -68,7 +67,7 @@ Open **Settings** and click **Check for updates**. If a newer release exists, Cr
 
 ## Installing mods
 
-Use the install button, drag and drop files onto the window, or the download icon to install from Nexus Mods. Every path ends at the same preview: see the destination folder, the mod name, and any collisions before anything is written. Details in the [user guide](docs/USER_GUIDE.md).
+Use the install button or drag and drop files onto the window. Review the destination folder, mod name, and any collisions before anything is written. For Nexus Mods, download the archive manually on the website first. Cratebug no longer connects to the Nexus API or handles Mod Manager Download links. Details in the [user guide](docs/USER_GUIDE.md).
 
 ## Building from source
 
@@ -113,7 +112,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for getting st
 
 ## Documentation
 
-- [User guide](docs/USER_GUIDE.md) - installing, finding your library, updating, and URL installs in detail
+- [User guide](docs/USER_GUIDE.md) - installing, finding your library, updating, and batch actions in detail
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - SmartScreen, WebView2, uninstalling, and other common problems
 - [Changelog](CHANGELOG.md)
 - [Roadmap](ROADMAP.md) - what is done and what is next

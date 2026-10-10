@@ -11,6 +11,13 @@ Each version's section below is what the release workflow copies into that
 version's GitHub release notes, so write entries for what a user would
 actually notice, not internal refactors.
 
+## [Unreleased]
+
+### Removed
+
+- Nexus Mods login, personal API keys, in-app downloads, and Mod Manager Download support. Download mod archives manually on Nexus, then use Cratebug's install button or drag and drop.
+- Upgrading removes the old saved key and restores the previous `nxm://` handler when Cratebug still owns it. Existing mods, tags, and settings are preserved.
+
 ## [2026.10.05]
 
 ### Decrypted crates stay intact

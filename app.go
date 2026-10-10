@@ -18,8 +18,6 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
-	"github.com/Kuusouu/Cratebug/internal/nexus"
-	"github.com/Kuusouu/Cratebug/internal/secret"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/update"
 	"github.com/Kuusouu/Cratebug/internal/urlscheme"
@@ -59,21 +57,7 @@ type App struct {
 	companionCache        *mutation.CompanionCache
 	watcher               *watcher.Watcher
 
-	secretStore secret.Store
-
-	pendingURLMu sync.Mutex
-	pendingLink  *nexus.DownloadRequest
-	linkSecrets  map[string]nexus.DownloadSecrets
-	ctxReady     bool
-
-	nexusMu             sync.Mutex
-	nexusClient         *nexus.Client
-	nexusDownloadCancel context.CancelFunc
-	nexusBaseURL        string
-	pendingNexusSource  *pendingNexusInstall
-
-	protocol      *urlscheme.Registrar
-	allowProtocol bool
+	ctxMu sync.Mutex
 }
 
 // Creates the application binding.
@@ -82,30 +66,29 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve metadata storage location: %w", err)
 	}
-	keyPath, err := secret.DefaultNexusKeyPath()
+	exe, err := protocolExecutablePath()
 	if err != nil {
-		return nil, fmt.Errorf("resolve nexus key location: %w", err)
+		return nil, fmt.Errorf("resolve executable for legacy Nexus cleanup: %w", err)
+	}
+	store := metadata.NewStore(path)
+	if err := cleanupLegacyNexus(store, urlscheme.New(urlscheme.SchemeNXM, exe), filepath.Join(filepath.Dir(path), "nexus.key")); err != nil {
+		return nil, err
 	}
 	classifier := modtype.NewSessionClassifier(modtype.DefaultWorkerLauncher(nil))
-	app := newApp(mutation.NewGameRunningChecker(), metadata.NewStore(path), classifier, nil, nil, secret.NewStore(keyPath, nexusKeyEntropy))
-	if exe, exeErr := protocolExecutablePath(); exeErr == nil {
-		app.protocol = urlscheme.New(urlscheme.SchemeNXM, exe)
-	}
-	app.allowProtocol = AppVersion != "dev" && looksLikeInstalledBuild()
+	app := newApp(mutation.NewGameRunningChecker(), store, classifier, nil, nil)
 	app.initWatcher()
 	return app, nil
 }
 
 // Lets tests inject a deterministic game-running detector, a disposable
-// metadata store, a custom classifier, an optional character table, an
-// install session manager, and a secret store.
+// metadata store, a custom classifier, an optional character table,
+// and an install session manager.
 func newApp(
 	gameRunningChecker mutation.GameRunningChecker,
 	metadataStore metadata.Store,
 	classifier *modtype.SessionClassifier,
 	characterTable *modtype.CharacterTable,
 	installSessionManager *install.SessionManager,
-	secretStore secret.Store,
 ) *App {
 	if classifier == nil {
 		classifier = modtype.NewSessionClassifier(nil)
@@ -121,8 +104,6 @@ func newApp(
 		installSessionManager: installSessionManager,
 		detector:              gamedetect.NewDefaultRegistry(),
 		restoreSessions:       backup.NewSessionManager(),
-		secretStore:           secretStore,
-		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 		companionCache:        mutation.NewCompanionCache(),
 	}
 	if characterTable != nil {
@@ -811,15 +792,9 @@ func (a *App) UnassignModTag(entryID, tagID string) error {
 
 // startup is called by Wails when the application is launched, saving the runtime context.
 func (a *App) startup(ctx context.Context) {
-	a.pendingURLMu.Lock()
+	a.ctxMu.Lock()
 	a.ctx = ctx
-	a.ctxReady = true
-	pending := a.pendingLink
-	a.pendingURLMu.Unlock()
-	if pending != nil {
-		a.emitNexusLink(*pending)
-	}
-	a.ensureNexusProtocol()
+	a.ctxMu.Unlock()
 	doc := a.loadMetadataDocument()
 	if doc.Settings.ModRoot != "" && a.watcher != nil {
 		_ = a.watcher.SetRoot(doc.Settings.ModRoot)
@@ -858,15 +833,6 @@ func (a *App) PrepareInstall(modRoot string, filePaths []string, defaultFolder s
 	if len(filePaths) == 0 {
 		return install.PreviewResult{}, fmt.Errorf("no files selected")
 	}
-	a.clearPendingNexusSource()
-	return a.stageAndPreview(modRoot, filePaths, defaultFolder)
-}
-
-// Stages filePaths into a fresh session and builds the install preview.
-// Shared by PrepareInstall (local files) and PrepareNexusInstall (a
-// downloaded Nexus file), which differ only in how filePaths' single
-// entry was obtained.
-func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder string) (install.PreviewResult, error) {
 	session, err := a.installSessionManager.CreateSession(filePaths)
 	if err != nil {
 		return install.PreviewResult{}, fmt.Errorf("create staging session: %w", err)
@@ -968,16 +934,10 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 
 func (a *App) recordInstalledModMetadata(result install.ApplyResult) error {
 	doc := a.loadMetadataDocument()
-	source := a.takePendingNexusSource()
 	for _, entryID := range result.InstalledEntryIDs {
-		modID, err := doc.EnsureMod(entryID)
+		_, err := doc.EnsureMod(entryID)
 		if err != nil {
 			return fmt.Errorf("ensure installed mod metadata: %w", err)
-		}
-		if source != nil {
-			if err := doc.SetModNexusSource(modID, source.ModID, source.FileID, source.Version); err != nil {
-				return fmt.Errorf("record nexus source: %w", err)
-			}
 		}
 	}
 	if err := a.metadataStore.Save(doc); err != nil {
@@ -988,7 +948,6 @@ func (a *App) recordInstalledModMetadata(result install.ApplyResult) error {
 
 // CancelInstall cleans up staging data when the user cancels the installation preview.
 func (a *App) CancelInstall(sessionID string) error {
-	a.clearPendingNexusSource()
 	return a.installSessionManager.RemoveSession(sessionID)
 }
 
@@ -998,7 +957,6 @@ func (a *App) shutdown(_ context.Context) {
 	if a.watcher != nil {
 		_ = a.watcher.Close()
 	}
-	a.CancelNexusDownload()
 	if a.classifier != nil {
 		_ = a.classifier.Close()
 	}

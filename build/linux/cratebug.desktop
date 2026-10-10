@@ -2,9 +2,8 @@
 Type=Application
 Name=Cratebug
 Comment=Mod manager for Marvel Rivals
-Exec=Cratebug %u
+Exec=Cratebug
 Icon=cratebug
 Terminal=false
 Categories=Game;Utility;
-MimeType=x-scheme-handler/nxm;
 StartupWMClass=Cratebug

@@ -1,6 +1,6 @@
 # Cratebug user guide
 
-This covers installing Cratebug, keeping it updated, installing mods from Nexus Mods, and acting on several mods at once (including encrypting complete IoStore bundles). For other everyday library management, the app itself is the reference. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
+This covers installing Cratebug, keeping it updated, installing downloaded mod archives, and acting on several mods at once (including encrypting complete IoStore bundles). For other everyday library management, the app itself is the reference. If something goes wrong, see [Troubleshooting](TROUBLESHOOTING.md).
 
 ## Installing
 
@@ -44,49 +44,15 @@ Encryption rebuilds the bundle. Cratebug shows the current target during the reb
 If a rebuild fails, Cratebug stops the install before it changes the destination library.
 The source archive and loose source files stay intact.
 
-## Installing a mod from Nexus Mods
+## Installing a mod downloaded from Nexus Mods
 
-Cratebug downloads Marvel Rivals mods from Nexus Mods with **your** API key. The key stays on this machine. It is never sent to Cratebug infrastructure and never shown in the app after you paste it.
+Cratebug no longer connects to Nexus Mods or accepts API keys. Use the website to download an archive, then install it locally:
 
-On Linux, Cratebug uses Secret Service when available. Otherwise, it stores the key in an owner-only file under the user config directory. This fallback does not encrypt the key.
+1. On the Nexus mod page, choose **Manual Download** and save the archive.
+2. In Cratebug, click **Install mod** in the header or drag the archive onto the window.
+3. Review the install preview and confirm the destination and any collision choices.
 
-### Get an API key
-
-1. Open **Settings** (gear icon).
-2. Under **Nexus Mods**, click **Get an API key on Nexus Mods**. Sign in on the Nexus site if you need to.
-3. Copy the personal API key Nexus shows you.
-4. Paste it into the **API key** field in Settings and click **Connect**.
-
-Premium and free accounts both work. The difference is only how the download starts.
-
-### Open Nexus downloads in Cratebug
-
-The **Open Nexus downloads in Cratebug** switch registers Cratebug as the `nxm://` handler used when you click **Mod Manager Download** on Nexus.
-
-Installed builds turn this on by themselves when nothing else owns `nxm://`. If another app already owns it, Cratebug names that app and asks before taking over. Turning the switch off gives the previous app back.
-
-Dev builds of Cratebug (running from source with `wails dev`) do not register.
-
-### Premium accounts
-
-1. Click the download icon in the header.
-2. Paste a Marvel Rivals mod page URL (`https://www.nexusmods.com/marvelrivals/mods/...`).
-3. If the page has more than one file, pick MAIN or OPTIONAL. Cratebug pre-selects the primary file; it does not install automatically.
-4. Continue. Cratebug downloads through the Nexus API and opens the same install preview as a local archive.
-
-### Free accounts
-
-Nexus does not let a free account request the file from the API. You still paste the page URL and pick a file, then Cratebug opens the Nexus page and waits.
-
-1. On that page, click **Mod Manager Download** (not Manual Download).
-2. The system hands Cratebug the `nxm://` link.
-3. Confirm the download. From there the preview is the same as Premium.
-
-If Cratebug is closed, a click still launches it with that link. If it is already open, the running window comes to the front.
-
-### Adult content
-
-Cratebug follows the adult-content setting on your Nexus account. If a mod is marked adult and that setting is off, Cratebug refuses it before showing a name, screenshot, or files — including when you paste a page URL or click Mod Manager Download. There is no in-app switch. Change it on Nexus under [Content Blocking](https://next.nexusmods.com/settings/content-blocking), then try the install again.
+Current builds also remove personal keys saved by older versions. If Cratebug still owns `nxm://` links, it restores the previous handler or removes its registration.
 
 ## Checking several mods at once
 

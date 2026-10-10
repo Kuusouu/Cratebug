@@ -10,7 +10,6 @@ import {conflict} from '../models';
 import {metadata} from '../models';
 import {gamedetect} from '../models';
 import {update} from '../models';
-import {nexus} from '../models';
 
 export function ApplyInstall(arg1:string,arg2:string,arg3:Array<install.ApplyItem>):Promise<install.ApplyResult>;
 
@@ -32,8 +31,6 @@ export function CancelEncryption():Promise<void>;
 
 export function CancelInstall(arg1:string):Promise<void>;
 
-export function CancelNexusDownload():Promise<void>;
-
 export function CancelRestore():Promise<void>;
 
 export function CheckForUpdate():Promise<main.UpdateCheckResult>;
@@ -43,8 +40,6 @@ export function CheckWhatsNew():Promise<main.UpdateCheckResult>;
 export function ClassificationType():Promise<modtype.Identity>;
 
 export function ClassifyLibrary(arg1:string,arg2:Array<discovery.Entry>):Promise<Record<string, modtype.Identity>>;
-
-export function ClearNexusAPIKey():Promise<main.NexusKeyState>;
 
 export function CompanionCleanupType():Promise<mutation.CompanionCleanupResult>;
 
@@ -66,8 +61,6 @@ export function DetectConflicts(arg1:string,arg2:Array<discovery.Entry>):Promise
 
 export function DetectLibrary(arg1:string):Promise<gamedetect.Detection>;
 
-export function DiscardNexusLink(arg1:number,arg2:number):Promise<void>;
-
 export function DiscardRestorePreview(arg1:string):Promise<void>;
 
 export function DownloadUpdate(arg1:update.Release):Promise<string>;
@@ -88,31 +81,17 @@ export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<mutation
 
 export function MoveMod(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
-export function NexusAccount():Promise<main.NexusAccountState>;
-
-export function NexusDownloadRequestType():Promise<nexus.DownloadRequest>;
-
-export function NexusKeyState():Promise<main.NexusKeyState>;
-
-export function NexusProtocolStatus():Promise<main.NexusProtocolState>;
-
 export function OpenFolderInExplorer(arg1:string,arg2:string):Promise<void>;
 
 export function OpenModInExplorer(arg1:string,arg2:string):Promise<void>;
 
 export function PrepareInstall(arg1:string,arg2:Array<string>,arg3:string):Promise<install.PreviewResult>;
 
-export function PrepareNexusInstall(arg1:string,arg2:number,arg3:number,arg4:string):Promise<install.PreviewResult>;
-
-export function RegisterNexusProtocol(arg1:boolean):Promise<main.NexusProtocolState>;
-
 export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
 export function RenameMod(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
 export function RenameTag(arg1:string,arg2:string):Promise<void>;
-
-export function ResolveNexusModPage(arg1:string):Promise<main.NexusLink>;
 
 export function RestoreApply(arg1:string,arg2:string):Promise<backup.RestoreResult>;
 
@@ -144,18 +123,12 @@ export function SetModPriority(arg1:string,arg2:string,arg3:number):Promise<muta
 
 export function SetModRoot(arg1:string):Promise<void>;
 
-export function SetNexusAPIKey(arg1:string):Promise<main.NexusKeyState>;
-
 export function SetSkipDestructiveDelay(arg1:boolean):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
 
 export function StripCompanionPaks(arg1:string,arg2:Array<string>):Promise<mutation.CompanionCleanupResult>;
 
-export function TakePendingNexusLink():Promise<main.NexusLink>;
-
 export function UnassignModTag(arg1:string,arg2:string):Promise<void>;
-
-export function UnregisterNexusProtocol():Promise<main.NexusProtocolState>;
 
 export function UpdateType():Promise<update.Release>;

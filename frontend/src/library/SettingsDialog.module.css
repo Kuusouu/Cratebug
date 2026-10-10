@@ -245,90 +245,8 @@
 	flex-shrink: 0;
 }
 
-.nexus-link {
-	justify-self: start;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--accent);
-	font-size: 0.82rem;
-	font-weight: 650;
-	text-decoration: underline;
-	text-underline-offset: 0.15rem;
-}
-
-.nexus-link:hover:not(:disabled) {
-	filter: none;
-	color: var(--text);
-}
-
-.nexus-account,
-.nexus-key-row,
-.setting-switch-row,
-.nexus-takeover {
-	display: grid;
-	gap: 0.55rem;
-}
-
-.nexus-account p,
-.nexus-takeover p {
-	margin: 0;
-	font-size: 0.85rem;
-	line-height: 1.45;
-}
-
-.nexus-rate-limit {
-	color: var(--muted);
-	font-size: 0.8rem;
-}
-
-.nexus-warning {
-	margin: 0;
-	color: var(--warn);
-	font-size: 0.8rem;
-	font-weight: 650;
-	line-height: 1.4;
-}
-
-.nexus-key-row {
-	grid-template-columns: minmax(0, 1fr) auto;
-	align-items: center;
-}
-
-.nexus-key-row > button,
-.nexus-account > button {
-	min-height: 2.4rem;
-	padding: 0.45rem 0.85rem;
-}
-
-.nexus-key-row .nexus-warning {
-	grid-column: 1 / -1;
-}
-
-.nexus-key-field {
-	display: flex;
-	min-width: 0;
-	padding: 0.35rem 0.7rem;
-	border: 1px solid var(--line);
-	border-radius: 0.7rem;
-	background: var(--panel-raised);
-}
-
-.nexus-key-field input {
-	width: 100%;
-	padding: 0.3rem 0;
-	border: 0;
-	background: transparent;
-	color: var(--text);
-	font-family: ui-monospace, "SF Mono", Consolas, monospace;
-	font-size: 0.82rem;
-}
-
-.nexus-key-field input:focus-visible {
-	outline: none;
-}
-
 .setting-switch-row {
+	display: grid;
 	grid-template-columns: minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 0.75rem;
@@ -378,10 +296,4 @@
 
 .setting-switch[aria-checked="true"] .setting-switch-knob {
 	transform: translateX(1.05rem);
-}
-
-.nexus-takeover-actions {
-	display: flex;
-	justify-content: end;
-	gap: 0.5rem;
 }

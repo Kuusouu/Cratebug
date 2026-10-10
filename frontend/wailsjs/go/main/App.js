@@ -42,10 +42,6 @@ export function CancelInstall(arg1) {
   return window['go']['main']['App']['CancelInstall'](arg1);
 }
 
-export function CancelNexusDownload() {
-  return window['go']['main']['App']['CancelNexusDownload']();
-}
-
 export function CancelRestore() {
   return window['go']['main']['App']['CancelRestore']();
 }
@@ -64,10 +60,6 @@ export function ClassificationType() {
 
 export function ClassifyLibrary(arg1, arg2) {
   return window['go']['main']['App']['ClassifyLibrary'](arg1, arg2);
-}
-
-export function ClearNexusAPIKey() {
-  return window['go']['main']['App']['ClearNexusAPIKey']();
 }
 
 export function CompanionCleanupType() {
@@ -110,10 +102,6 @@ export function DetectLibrary(arg1) {
   return window['go']['main']['App']['DetectLibrary'](arg1);
 }
 
-export function DiscardNexusLink(arg1, arg2) {
-  return window['go']['main']['App']['DiscardNexusLink'](arg1, arg2);
-}
-
 export function DiscardRestorePreview(arg1) {
   return window['go']['main']['App']['DiscardRestorePreview'](arg1);
 }
@@ -154,22 +142,6 @@ export function MoveMod(arg1, arg2, arg3) {
   return window['go']['main']['App']['MoveMod'](arg1, arg2, arg3);
 }
 
-export function NexusAccount() {
-  return window['go']['main']['App']['NexusAccount']();
-}
-
-export function NexusDownloadRequestType() {
-  return window['go']['main']['App']['NexusDownloadRequestType']();
-}
-
-export function NexusKeyState() {
-  return window['go']['main']['App']['NexusKeyState']();
-}
-
-export function NexusProtocolStatus() {
-  return window['go']['main']['App']['NexusProtocolStatus']();
-}
-
 export function OpenFolderInExplorer(arg1, arg2) {
   return window['go']['main']['App']['OpenFolderInExplorer'](arg1, arg2);
 }
@@ -182,14 +154,6 @@ export function PrepareInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['PrepareInstall'](arg1, arg2, arg3);
 }
 
-export function PrepareNexusInstall(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['PrepareNexusInstall'](arg1, arg2, arg3, arg4);
-}
-
-export function RegisterNexusProtocol(arg1) {
-  return window['go']['main']['App']['RegisterNexusProtocol'](arg1);
-}
-
 export function RenameFolder(arg1, arg2, arg3) {
   return window['go']['main']['App']['RenameFolder'](arg1, arg2, arg3);
 }
@@ -200,10 +164,6 @@ export function RenameMod(arg1, arg2, arg3) {
 
 export function RenameTag(arg1, arg2) {
   return window['go']['main']['App']['RenameTag'](arg1, arg2);
-}
-
-export function ResolveNexusModPage(arg1) {
-  return window['go']['main']['App']['ResolveNexusModPage'](arg1);
 }
 
 export function RestoreApply(arg1, arg2) {
@@ -266,10 +226,6 @@ export function SetModRoot(arg1) {
   return window['go']['main']['App']['SetModRoot'](arg1);
 }
 
-export function SetNexusAPIKey(arg1) {
-  return window['go']['main']['App']['SetNexusAPIKey'](arg1);
-}
-
 export function SetSkipDestructiveDelay(arg1) {
   return window['go']['main']['App']['SetSkipDestructiveDelay'](arg1);
 }
@@ -282,16 +238,8 @@ export function StripCompanionPaks(arg1, arg2) {
   return window['go']['main']['App']['StripCompanionPaks'](arg1, arg2);
 }
 
-export function TakePendingNexusLink() {
-  return window['go']['main']['App']['TakePendingNexusLink']();
-}
-
 export function UnassignModTag(arg1, arg2) {
   return window['go']['main']['App']['UnassignModTag'](arg1, arg2);
-}
-
-export function UnregisterNexusProtocol() {
-  return window['go']['main']['App']['UnregisterNexusProtocol']();
 }
 
 export function UpdateType() {

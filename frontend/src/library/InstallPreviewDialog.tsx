@@ -10,13 +10,7 @@ import {
 } from "lucide-react";
 import styles from "./InstallPreviewDialog.module.css";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import {
-	ApplyInstall,
-	CancelInstall,
-	CancelNexusDownload,
-	PrepareInstall,
-	PrepareNexusInstall,
-} from "../../wailsjs/go/main/App";
+import { ApplyInstall, CancelInstall, PrepareInstall } from "../../wailsjs/go/main/App";
 import { type discovery, install } from "../../wailsjs/go/models";
 import {
 	categorySlug,
@@ -33,23 +27,19 @@ import {
 	hasBlockingIssues,
 	hasUnresolvedCollisions,
 	selectedUnsupportedCompanionCount,
+	type InstallProgressView,
 	type ModConfig,
 	validateInstallModName,
 } from "./installPresentation";
-import { type InstallProgressView, formatInstallProgress } from "./nexusPresentation";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
-
-export type InstallSource =
-	| { kind: "files"; paths: string[] }
-	| { kind: "nexus"; modId: number; fileId: number };
 
 export type InstallPreviewDialogProps = {
 	modRoot: string;
-	source: InstallSource;
+	paths: string[];
 	defaultFolder: string;
 	folders: string[];
 	libraryEntries?: readonly discovery.Entry[];
-	downloadProgress?: InstallProgressView | null;
+	progress?: InstallProgressView | null;
 	onDone: (result: install.ApplyResult) => void;
 	onCancel: () => void;
 };
@@ -58,11 +48,11 @@ type DialogPhase = "preparing" | "ready" | "applying" | "error";
 
 export function InstallPreviewDialog({
 	modRoot,
-	source,
+	paths,
 	defaultFolder,
 	folders,
 	libraryEntries = [],
-	downloadProgress = null,
+	progress = null,
 	onDone,
 	onCancel,
 }: InstallPreviewDialogProps) {
@@ -81,13 +71,6 @@ export function InstallPreviewDialog({
 
 	// Cancel session on escape or background close
 	const handleCancel = useCallback(async () => {
-		if (source.kind === "nexus") {
-			try {
-				await CancelNexusDownload();
-			} catch {
-				// Best-effort cleanup
-			}
-		}
 		const session = sessionIdRef.current;
 		if (session) {
 			try {
@@ -97,7 +80,7 @@ export function InstallPreviewDialog({
 			}
 		}
 		onCancel();
-	}, [onCancel, source.kind]);
+	}, [onCancel]);
 
 	const dialogRef = useDialogFocusTrap<HTMLElement>(() => {
 		if (phase !== "applying") {
@@ -113,15 +96,7 @@ export function InstallPreviewDialog({
 			setPhase("preparing");
 			setErrorMessage("");
 			try {
-				const result =
-					source.kind === "nexus"
-						? await PrepareNexusInstall(
-								modRoot,
-								source.modId,
-								source.fileId,
-								defaultFolder,
-							)
-						: await PrepareInstall(modRoot, source.paths, defaultFolder);
+				const result = await PrepareInstall(modRoot, paths, defaultFolder);
 				sessionIdRef.current = result.sessionId;
 
 				if (!isMounted) {
@@ -156,7 +131,7 @@ export function InstallPreviewDialog({
 		return () => {
 			isMounted = false;
 		};
-	}, [modRoot, source, defaultFolder]);
+	}, [modRoot, paths, defaultFolder]);
 
 	const items = previewResult?.items ?? [];
 
@@ -310,34 +285,7 @@ export function InstallPreviewDialog({
 				{phase === "preparing" && (
 					<div className={styles["install-preview-status-state"]}>
 						<Loader2 className="spinning-loader" aria-hidden="true" />
-						<p>
-							{source.kind === "nexus"
-								? formatInstallProgress(downloadProgress)
-								: "Extracting archives and discovering mod bundles..."}
-						</p>
-						{source.kind === "nexus" ? (
-							<div
-								className={styles["install-download-progress"]}
-								role="progressbar"
-								aria-valuemin={0}
-								aria-valuemax={100}
-								aria-valuenow={
-									typeof downloadProgress?.percent === "number"
-										? Math.min(100, Math.round(downloadProgress.percent))
-										: undefined
-								}
-							>
-								<div
-									className={styles["install-download-progress-fill"]}
-									style={{
-										width:
-											typeof downloadProgress?.percent === "number"
-												? `${Math.min(100, Math.max(0, downloadProgress.percent))}%`
-												: "15%",
-									}}
-								/>
-							</div>
-						) : null}
+						<p>Extracting archives and discovering mod bundles...</p>
 					</div>
 				)}
 
@@ -725,8 +673,8 @@ export function InstallPreviewDialog({
 						<div className={styles["install-preview-footer"]}>
 							{phase === "applying" && (
 								<p className={styles["install-encryption-hint"]} role="status">
-									{downloadProgress?.phase === "encrypting"
-										? downloadProgress.message
+									{progress?.phase === "encrypting"
+										? progress.message
 										: "Install mods..."}
 								</p>
 							)}

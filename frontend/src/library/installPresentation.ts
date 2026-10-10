@@ -1,5 +1,11 @@
 import type { discovery, install } from "../../wailsjs/go/models";
 
+export type InstallProgressView = {
+	phase?: string;
+	message?: string;
+	percent?: number;
+};
+
 export type ModConfig = {
 	id: string;
 	selected: boolean;

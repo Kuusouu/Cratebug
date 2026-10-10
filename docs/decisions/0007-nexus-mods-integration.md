@@ -1,6 +1,6 @@
 # 0007: Nexus Mods integration
 
-- Status: Accepted
+- Status: Superseded by the 2026-10-07 removal addendum below
 - Date: 2026-09-06
 
 ## Context
@@ -83,9 +83,9 @@ the installed mod so a later phase can check for updates.
 
 ## Alternatives considered
 
-SSO or a Cratebug-owned Nexus application credential. Rejected. It
-would put a shared secret in the client and contradict the
-Acceptable Use Policy rule against storing user API keys on a server.
+SSO was deferred because Cratebug was not registered with Nexus Mods.
+Registered-app SSO issues a separate key for each user and application;
+it does not require a shared client secret or storing user keys on a server.
 
 Keeping a generic "Install from URL" beside Nexus. Rejected. The
 weakest link in that path was trusting a user-supplied URL and
@@ -134,3 +134,17 @@ hidden mod, or GraphQL adult flags are refused unless the account
 has adult content on and Content Blocking off. If that GraphQL lookup
 fails, the mod is treated as adult so a REST miss cannot bypass the
 site. Tag and author content blocks are out of scope.
+
+## Addendum 2026-10-07: remove Nexus API access
+
+Nexus Mods support requires a review build with personal API key usage removed
+before application registration can proceed. Remove the Nexus client, credential
+storage, download dialogs, account settings, and `nxm://` download intake.
+There is no replacement authentication flow or disabled API implementation in
+this build. Users download archives manually and use the local install preview.
+
+Keep only cleanup for credentials and protocol registrations from older builds.
+Startup and uninstall delete `nexus.key` without decrypting it and restore the
+recorded previous handler only while Cratebug still owns `nxm://`. The Linux
+desktop entry no longer advertises the scheme. Existing metadata, including
+historical source IDs and handler snapshots, is preserved.

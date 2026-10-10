@@ -1,70 +1,48 @@
 package main
 
 import (
-	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/wailsapp/wails/v2/pkg/options"
 )
 
-func TestParseLaunchArgs(t *testing.T) {
-	const nxm = "nxm://marvelrivals/mods/1/files/2"
+func TestUninstallCleanupRequested(t *testing.T) {
+	// Arrange
+	const nxm = "nxm://marvelrivals/mods/1/files/2?key=SENTINEL&expires=1"
 	tests := []struct {
-		name        string
-		args        []string
-		wantURL     string
-		wantCleanup bool
+		name string
+		args []string
+		want bool
 	}{
 		{name: "empty"},
-		{name: "cleanup flag", args: []string{uninstallCleanupFlag}, wantCleanup: true},
-		{name: "nxm url", args: []string{nxm}, wantURL: nxm},
-		{name: "windows path then nxm", args: []string{`C:\Mods\file.pak`, nxm}, wantURL: nxm},
-		{name: "cleanup wins over nxm", args: []string{uninstallCleanupFlag, nxm}, wantCleanup: true},
-		{name: "unrelated flag", args: []string{"--help"}},
+		{name: "cleanup", args: []string{uninstallCleanupFlag}, want: true},
+		{name: "legacy download ignored", args: []string{nxm}},
+		{name: "cleanup with legacy download", args: []string{nxm, uninstallCleanupFlag}, want: true},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Act
-			gotURL, gotCleanup := parseLaunchArgs(test.args)
+			got := uninstallCleanupRequested(test.args)
 
 			// Assert
-			if gotURL != test.wantURL {
-				t.Errorf("url = %q, want %q", gotURL, test.wantURL)
-			}
-			if gotCleanup != test.wantCleanup {
-				t.Errorf("cleanup = %v, want %v", gotCleanup, test.wantCleanup)
+			if got != test.want {
+				t.Errorf("uninstallCleanupRequested() = %v, want %v", got, test.want)
 			}
 		})
 	}
 }
 
-func TestOnSecondInstanceLaunchBuffersWhenContextIsNotReady(t *testing.T) {
+func TestSecondInstanceBeforeStartupIgnoresLegacyDownload(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	if app.ctxReady {
-		t.Fatal("ctxReady = true on a fresh test app, want false")
-	}
 
-	// Act
+	// Act: A legacy URL must not create a pending download or require a runtime.
 	app.onSecondInstanceLaunch(options.SecondInstanceData{
-		Args: []string{`nxm://marvelrivals/mods/9/files/8?key=SENTINEL&expires=SENTINEL`},
+		Args: []string{"nxm://marvelrivals/mods/9/files/8?key=SENTINEL&expires=1"},
 	})
 
 	// Assert
-	link, err := app.TakePendingNexusLink()
-	if err != nil {
-		t.Fatalf("TakePendingNexusLink() = %v", err)
-	}
-	if !link.Present || link.ModID != 9 || link.FileID != 8 {
-		t.Fatalf("pending link = %+v, want mod 9 file 8", link)
-	}
-	payload, err := json.Marshal(link)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(payload), "SENTINEL") {
-		t.Fatalf("second-instance payload %s contains SENTINEL", payload)
+	if app.ctx != nil {
+		t.Fatal("second-instance launch changed the runtime context")
 	}
 }

@@ -18,13 +18,9 @@ func TestAppImageProtocolUsesPersistentExecutablePath(t *testing.T) {
 
 	// Act
 	protocolPath, err := protocolExecutablePath()
-	installed := looksLikeInstalledBuild()
 
 	// Assert
 	if err != nil || protocolPath != appImage {
 		t.Errorf("protocolExecutablePath() = %q, %v, want %q", protocolPath, err, appImage)
-	}
-	if !installed {
-		t.Error("looksLikeInstalledBuild() = false for AppImage")
 	}
 }

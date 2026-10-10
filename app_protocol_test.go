@@ -1,280 +1,179 @@
 package main
 
 import (
+	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/urlscheme"
 )
 
-func TestRegisterNexusProtocolRejectedWhenNotAllowed(t *testing.T) {
-	// Arrange
-	app := testApp(t, false)
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
-
-	// Act
-	_, err := app.RegisterNexusProtocol(false)
-
-	// Assert
-	if err == nil {
-		t.Fatal("RegisterNexusProtocol() succeeded in a dev build, want an error")
-	}
-}
-
-func TestRegisterNexusProtocolPersistsADisplacedOwner(t *testing.T) {
-	// Arrange
-	selfExe := `C:\Apps\Cratebug\Cratebug.exe`
-	otherExe := `C:\Apps\Vortex\Vortex.exe`
-	app := testApp(t, false)
-	app.allowProtocol = true
-	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
-		return path == selfExe || path == otherExe
-	})
-	if _, err := registrar.Register(false); err != nil {
-		t.Fatal(err)
-	}
-	// Pretend Vortex wrote the scheme first by taking over from ourselves
-	// with a foreign snapshot, then re-pointing the registrar at Cratebug.
-	foreign := urlscheme.Snapshot{
-		Command:     `"` + otherExe + `" "%1"`,
-		Icon:        `"` + otherExe + `"`,
-		Description: "URL:cratebug-test-app Protocol",
-	}
-	if err := registrar.Unregister(foreign); err != nil {
-		t.Fatal(err)
-	}
-	app.protocol = registrar
-
-	// Act
-	state, err := app.RegisterNexusProtocol(true)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("RegisterNexusProtocol() = %v", err)
-	}
-	if !state.Enabled {
-		t.Fatal("Enabled = false after register, want true")
-	}
-	doc := app.LoadMetadata().Document
-	if doc.Settings.NexusProtocol.Command != foreign.Command {
-		t.Errorf("persisted command = %q, want the displaced Vortex command", doc.Settings.NexusProtocol.Command)
-	}
-	if doc.Settings.NexusProtocolOptOut {
-		t.Fatal("NexusProtocolOptOut = true after register, want false")
-	}
-}
-
-func TestPersistProtocolSnapshotPreservesDesktopFile(t *testing.T) {
-	app := testApp(t, false)
-	want := urlscheme.Snapshot{
-		Command:     "flatpak run --branch=stable org.vortex.App %u",
-		DesktopFile: "org.vortex.App.desktop",
-	}
-	if err := app.persistProtocolSnapshot(want); err != nil {
-		t.Fatal(err)
-	}
-
-	got := app.LoadMetadata().Document.Settings.NexusProtocol
-	if got.Command != want.Command || got.DesktopFile != want.DesktopFile {
-		t.Errorf("persisted snapshot = %+v, want command and desktop file", got)
-	}
-}
-
-func TestRegisterNexusProtocolRollsBackWhenSnapshotCannotBeSaved(t *testing.T) {
+func TestCleanupLegacyNexusRestoresHandlerAndPreservesMetadata(t *testing.T) {
 	// Arrange
 	dir := t.TempDir()
-	selfExe := filepath.Join(dir, "Cratebug.exe")
-	otherExe := filepath.Join(dir, "Vortex.exe")
-	app := testApp(t, false)
-	app.allowProtocol = true
-	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
-		return path == selfExe || path == otherExe
-	})
+	keyPath := filepath.Join(dir, "nexus.key")
+	if err := os.WriteFile(keyPath, []byte("unreadable-legacy-credential"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	metadataPath := filepath.Join(dir, "metadata.json")
+	store := metadata.NewStore(metadataPath)
+	doc := metadata.Document{
+		Settings: metadata.Settings{
+			ModRoot: dir,
+			Theme:   "dark",
+			NexusProtocol: metadata.NexusProtocolSnapshot{
+				Command:     `"C:\Apps\Vortex\Vortex.exe" "%1"`,
+				DesktopFile: "vortex.desktop",
+			},
+		},
+		Mods: map[string]metadata.ModRecord{
+			"existing-mod": {ScannerID: "mod:skin", Tags: []string{"tag-1"}, NexusModID: 12, NexusFileID: 34, NexusVersion: "1.0"},
+		},
+		Tags: []metadata.Tag{{ID: "tag-1", Name: "Skin"}},
+	}
+	if err := store.Save(doc); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	registrar := urlscheme.NewForTest("cratebug-test-cleanup", `C:\Apps\Cratebug\Cratebug.exe`, nil)
 	if _, err := registrar.Register(false); err != nil {
 		t.Fatal(err)
 	}
-	foreign := urlscheme.Snapshot{
-		Command:     `"` + otherExe + `" "%1"`,
-		Icon:        `"` + otherExe + `"`,
-		Description: "URL:cratebug-test-app Protocol",
-	}
-	if err := registrar.Unregister(foreign); err != nil {
-		t.Fatal(err)
-	}
-	app.protocol = registrar
-	app.metadataStore = failingMetadataStore(t)
 
 	// Act
-	_, err := app.RegisterNexusProtocol(true)
+	for range 2 {
+		if err := cleanupLegacyNexus(store, registrar, keyPath); err != nil {
+			t.Fatalf("cleanupLegacyNexus() = %v", err)
+		}
+	}
+
+	// Assert
+	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
+		t.Fatalf("legacy credential still exists: %v", err)
+	}
+	status, err := registrar.Status()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ownership != urlscheme.OwnershipOther || status.Snapshot.Command != doc.Settings.NexusProtocol.Command {
+		t.Fatalf("handler = %+v, want the previous Vortex handler", status)
+	}
+	after, err := os.ReadFile(metadataPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("cleanup changed metadata, including existing tags or Nexus source IDs")
+	}
+}
+
+func TestCleanupLegacyNexusLeavesUnownedHandlersAlone(t *testing.T) {
+	for _, otherOwner := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no handler", true: "another manager"}[otherOwner], func(t *testing.T) {
+			// Arrange
+			dir := t.TempDir()
+			metadataPath := filepath.Join(dir, "metadata.json")
+			store := metadata.NewStore(metadataPath)
+			registrar := urlscheme.NewForTest("cratebug-test-cleanup", `C:\Apps\Cratebug\Cratebug.exe`, nil)
+			want := urlscheme.OwnershipNone
+			foreign := urlscheme.Snapshot{Command: `"C:\Apps\Other\Other.exe" "%1"`}
+			if otherOwner {
+				if _, err := registrar.Register(false); err != nil {
+					t.Fatal(err)
+				}
+				if err := registrar.Unregister(foreign); err != nil {
+					t.Fatal(err)
+				}
+				want = urlscheme.OwnershipOther
+			}
+
+			// Act
+			if err := cleanupLegacyNexus(store, registrar, filepath.Join(dir, "nexus.key")); err != nil {
+				t.Fatal(err)
+			}
+
+			// Assert
+			status, err := registrar.Status()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if status.Ownership != want {
+				t.Fatalf("ownership = %q, want %q", status.Ownership, want)
+			}
+			if otherOwner && status.Snapshot.Command != foreign.Command {
+				t.Fatal("cleanup replaced another manager's handler")
+			}
+			if _, err := os.Stat(metadataPath); !os.IsNotExist(err) {
+				t.Fatalf("cleanup created metadata for a fresh installation: %v", err)
+			}
+		})
+	}
+}
+
+func TestCleanupLegacyNexusRestoresHandlerWhenCredentialRemovalFails(t *testing.T) {
+	// Arrange
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "nexus.key")
+	if err := os.Mkdir(keyPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(keyPath, "keep"), []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store := metadata.NewStore(filepath.Join(dir, "metadata.json"))
+	registrar := urlscheme.NewForTest("cratebug-test-cleanup", `C:\Apps\Cratebug\Cratebug.exe`, nil)
+	if _, err := registrar.Register(false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	err := cleanupLegacyNexus(store, registrar, keyPath)
 
 	// Assert
 	if err == nil {
-		t.Fatal("RegisterNexusProtocol() succeeded, want an error when the displaced owner cannot be recorded")
+		t.Fatal("cleanup succeeded despite failing to remove the legacy credential path")
 	}
-	state, statusErr := app.NexusProtocolStatus()
+	status, statusErr := registrar.Status()
 	if statusErr != nil {
-		t.Fatalf("NexusProtocolStatus() = %v", statusErr)
+		t.Fatal(statusErr)
 	}
-	if state.Ownership != string(urlscheme.OwnershipOther) {
-		t.Errorf("Ownership = %q, want other after a failed persist rolled back", state.Ownership)
+	if status.Ownership != urlscheme.OwnershipNone {
+		t.Fatal("credential removal failure prevented handler cleanup")
 	}
-	if filepath.Base(state.OwnerPath) != "Vortex.exe" {
-		t.Errorf("OwnerPath = %q, want Vortex.exe restored", state.OwnerPath)
+	if _, err := os.Stat(filepath.Join(keyPath, "keep")); err != nil {
+		t.Fatalf("cleanup removed unrelated contents: %v", err)
 	}
 }
 
-func TestUnregisterNexusProtocolRestoresThePersistedOwner(t *testing.T) {
+func TestCleanupLegacyNexusLeavesAnotherCratebugInstallationAlone(t *testing.T) {
 	// Arrange
 	dir := t.TempDir()
-	selfExe := filepath.Join(dir, "Cratebug.exe")
-	otherExe := filepath.Join(dir, "Vortex.exe")
-	app := testApp(t, false)
-	app.allowProtocol = true
-	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
-		return path == selfExe || path == otherExe
-	})
-	app.protocol = registrar
-	if _, err := app.RegisterNexusProtocol(false); err != nil {
-		t.Fatal(err)
-	}
-	if err := app.persistProtocolSnapshot(urlscheme.Snapshot{
-		Command:     `"` + otherExe + `" "%1"`,
-		Icon:        `"` + otherExe + `"`,
-		Description: "URL:cratebug-test-app Protocol",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Act
-	state, err := app.UnregisterNexusProtocol()
-
-	// Assert
-	if err != nil {
-		t.Fatalf("UnregisterNexusProtocol() = %v", err)
-	}
-	if state.Enabled {
-		t.Fatal("Enabled = true after unregister, want false")
-	}
-	if state.Ownership != string(urlscheme.OwnershipOther) {
-		t.Errorf("Ownership = %q, want other", state.Ownership)
-	}
-	if filepath.Base(state.OwnerPath) != "Vortex.exe" {
-		t.Errorf("OwnerName path = %q, want Vortex.exe", state.OwnerPath)
-	}
-	if !app.LoadMetadata().Document.Settings.NexusProtocolOptOut {
-		t.Fatal("NexusProtocolOptOut = false after unregister, want true")
-	}
-}
-
-func TestEnsureNexusProtocolRegistersWhenNothingOwnsTheScheme(t *testing.T) {
-	// Arrange
-	app := testApp(t, false)
-	app.allowProtocol = true
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
-
-	// Act
-	app.startup(t.Context())
-
-	// Assert
-	state, err := app.NexusProtocolStatus()
-	if err != nil {
-		t.Fatalf("NexusProtocolStatus() = %v", err)
-	}
-	if !state.Enabled {
-		t.Fatal("Enabled = false after startup, want silent registration when nothing owns the scheme")
-	}
-}
-
-func TestEnsureNexusProtocolDoesNotTakeOverAnotherOwner(t *testing.T) {
-	// Arrange
-	selfExe := `C:\Apps\Cratebug\Cratebug.exe`
-	otherExe := `C:\Apps\Vortex\Vortex.exe`
-	app := testApp(t, false)
-	app.allowProtocol = true
-	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
-		return path == selfExe || path == otherExe
-	})
+	registrar := urlscheme.NewForTest("cratebug-test-cleanup", filepath.Join(dir, "installed", "Cratebug.exe"), nil)
 	if _, err := registrar.Register(false); err != nil {
 		t.Fatal(err)
 	}
-	foreign := urlscheme.Snapshot{
-		Command:     `"` + otherExe + `" "%1"`,
-		Icon:        `"` + otherExe + `"`,
-		Description: "URL:cratebug-test-app Protocol",
-	}
-	if err := registrar.Unregister(foreign); err != nil {
+	before, err := registrar.Status()
+	if err != nil {
 		t.Fatal(err)
 	}
-	app.protocol = registrar
+	registrar.Exe = filepath.Join(dir, "dev", "Cratebug.exe")
 
 	// Act
-	app.startup(t.Context())
-
-	// Assert
-	state, err := app.NexusProtocolStatus()
-	if err != nil {
-		t.Fatalf("NexusProtocolStatus() = %v", err)
-	}
-	if state.Ownership != string(urlscheme.OwnershipOther) {
-		t.Errorf("Ownership = %q, want other; silent startup must not take over", state.Ownership)
-	}
-}
-
-func TestEnsureNexusProtocolSkipsAfterUnregister(t *testing.T) {
-	// Arrange
-	app := testApp(t, false)
-	app.allowProtocol = true
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
-	if _, err := app.RegisterNexusProtocol(false); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := app.UnregisterNexusProtocol(); err != nil {
+	if err := cleanupLegacyNexus(metadata.NewStore(filepath.Join(dir, "metadata.json")), registrar, filepath.Join(dir, "nexus.key")); err != nil {
 		t.Fatal(err)
 	}
 
-	// Act
-	app.ensureNexusProtocol()
-
 	// Assert
-	state, err := app.NexusProtocolStatus()
+	after, err := registrar.Status()
 	if err != nil {
-		t.Fatalf("NexusProtocolStatus() = %v", err)
+		t.Fatal(err)
 	}
-	if state.Enabled {
-		t.Fatal("Enabled = true after unregister, want the opt-out to block silent registration")
-	}
-}
-
-func TestEnsureNexusProtocolSkipsDevBuilds(t *testing.T) {
-	// Arrange
-	app := testApp(t, false)
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
-
-	// Act
-	app.ensureNexusProtocol()
-
-	// Assert
-	state, err := app.NexusProtocolStatus()
-	if err != nil {
-		t.Fatalf("NexusProtocolStatus() = %v", err)
-	}
-	if state.Enabled {
-		t.Fatal("Enabled = true in a dev build, want no registration")
-	}
-}
-
-func TestNexusProtocolStatusWithoutRegistrar(t *testing.T) {
-	// Arrange
-	app := testApp(t, false)
-
-	// Act
-	state, err := app.NexusProtocolStatus()
-
-	// Assert
-	if err != nil {
-		t.Fatalf("NexusProtocolStatus() = %v, want a disabled state", err)
-	}
-	if state.CanRegister || state.Enabled {
-		t.Fatalf("state = %+v, want CanRegister and Enabled false", state)
+	if after.Snapshot.Command != before.Snapshot.Command {
+		t.Fatal("cleanup removed another Cratebug installation's handler")
 	}
 }

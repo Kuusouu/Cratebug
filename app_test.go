@@ -17,7 +17,6 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/mutation"
-	"github.com/Kuusouu/Cratebug/internal/secret"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/watcher"
 )
@@ -48,21 +47,16 @@ func testMetadataStore(t *testing.T) metadata.Store {
 	return metadata.NewStore(filepath.Join(t.TempDir(), "metadata.json"))
 }
 
-func testSecretStore(t *testing.T) secret.Store {
-	t.Helper()
-	return secret.NewPlainStore(filepath.Join(t.TempDir(), "nexus.key"), []byte("test-entropy"))
-}
-
 func testApp(t *testing.T, gameRunning bool) *App {
 	t.Helper()
 	emptyTable := modtype.CharacterTable{}
-	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, testMetadataStore(t), nil, &emptyTable, nil, testSecretStore(t))
+	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, testMetadataStore(t), nil, &emptyTable, nil)
 }
 
 func testAppWithStore(t *testing.T, gameRunning bool, store metadata.Store) *App {
 	t.Helper()
 	emptyTable := modtype.CharacterTable{}
-	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, store, nil, &emptyTable, nil, testSecretStore(t))
+	return newApp(staticGameRunningChecker{gameRunning: gameRunning}, store, nil, &emptyTable, nil)
 }
 
 func failingMetadataStore(t *testing.T) metadata.Store {
@@ -506,7 +500,7 @@ func TestClassifyLibrary(t *testing.T) {
 	table := modtype.CharacterTable{
 		CharacterNames: map[string]string{"1044": "Blade"},
 	}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table, nil, testSecretStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table, nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -565,7 +559,7 @@ func TestDetectConflictsFindsSamePriorityGroupAndReusesCache(t *testing.T) {
 	defer classifier.Close()
 
 	table := modtype.CharacterTable{}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), classifier, &table, nil, testSecretStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), classifier, &table, nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
@@ -606,7 +600,7 @@ func TestDetectConflictsReportsUnavailableWithoutALiveWorker(t *testing.T) {
 	writePakFixture(t, root, "ModA_9999999_P.pak")
 
 	table := modtype.CharacterTable{}
-	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table, nil, testSecretStore(t))
+	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), nil, &table, nil)
 	library, err := app.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)

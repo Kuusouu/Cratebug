@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -26,8 +25,7 @@ const (
 )
 
 func main() {
-	launchURL, cleanup := parseLaunchArgs(os.Args[1:])
-	if cleanup {
+	if uninstallCleanupRequested(os.Args[1:]) {
 		if err := runUninstallCleanup(); err != nil {
 			log.Fatal(err)
 		}
@@ -37,9 +35,6 @@ func main() {
 	app, err := NewApp()
 	if err != nil {
 		log.Fatal(err)
-	}
-	if launchURL != "" {
-		app.setLaunchURL(launchURL)
 	}
 
 	window := defaultWindowSize()
@@ -77,11 +72,11 @@ func main() {
 	}
 }
 
-func parseLaunchArgs(args []string) (nxmURL string, uninstallCleanup bool) {
+func uninstallCleanupRequested(args []string) bool {
 	for _, arg := range args {
 		if arg == uninstallCleanupFlag {
-			return "", true
+			return true
 		}
 	}
-	return nexus.FirstDownloadURL(args), false
+	return false
 }

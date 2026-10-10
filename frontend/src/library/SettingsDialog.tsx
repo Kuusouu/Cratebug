@@ -1,17 +1,6 @@
 import { Check, Monitor, Moon, RefreshCw, RotateCcw, Sun, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	ClearNexusAPIKey,
-	NexusAccount,
-	NexusProtocolStatus,
-	RegisterNexusProtocol,
-	SetNexusAPIKey,
-	UnregisterNexusProtocol,
-} from "../../wailsjs/go/main/App";
-import type { main } from "../../wailsjs/go/models";
-import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import { accentPresets, isValidHexColor } from "./accentColor";
-import { formatWailsError } from "./installPresentation";
 import {
 	type LibraryProvider,
 	libraryProviderLabels,
@@ -20,13 +9,6 @@ import {
 	themeLabels,
 	themes,
 } from "./libraryTypes";
-import {
-	formatNexusRateLimit,
-	formatProtocolOwner,
-	nexusAccountKind,
-	nexusApiKeyPageURL,
-	protocolSwitchDisabledReason,
-} from "./nexusSettingsPresentation";
 import styles from "./SettingsDialog.module.css";
 import { providerLogos } from "./StoreLogos";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
@@ -73,13 +55,6 @@ export function SettingsDialog({
 	const handleEscape = useCallback(() => onClose(), [onClose]);
 	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const [hexDraft, setHexDraft] = useState(accentColor);
-	const [account, setAccount] = useState<main.NexusAccountState | null>(null);
-	const [protocol, setProtocol] = useState<main.NexusProtocolState | null>(null);
-	const [keyDraft, setKeyDraft] = useState("");
-	const [nexusBusy, setNexusBusy] = useState(false);
-	const [nexusError, setNexusError] = useState("");
-	const [takeOverOwner, setTakeOverOwner] = useState<string | null>(null);
-
 	useEffect(() => {
 		closeButtonRef.current?.focus();
 	}, []);
@@ -97,104 +72,6 @@ export function SettingsDialog({
 			onSelectAccentColor(value);
 		}
 	}
-
-	const refreshNexus = useCallback(async () => {
-		const [nextAccount, nextProtocol] = await Promise.all([
-			NexusAccount(),
-			NexusProtocolStatus(),
-		]);
-		setAccount(nextAccount);
-		setProtocol(nextProtocol);
-	}, []);
-
-	useEffect(() => {
-		let cancelled = false;
-		async function load() {
-			for (let attempt = 0; attempt < 8; attempt++) {
-				try {
-					await refreshNexus();
-					return;
-				} catch (error) {
-					if (attempt === 7) {
-						if (!cancelled) setNexusError(formatWailsError(error));
-						return;
-					}
-					await new Promise((resolve) => window.setTimeout(resolve, 200));
-					if (cancelled) return;
-				}
-			}
-		}
-		void load();
-		return () => {
-			cancelled = true;
-		};
-	}, [refreshNexus]);
-
-	async function connectNexus() {
-		if (keyDraft === "" || nexusBusy) return;
-		setNexusBusy(true);
-		setNexusError("");
-		try {
-			await SetNexusAPIKey(keyDraft);
-			setKeyDraft("");
-			await refreshNexus();
-		} catch (error) {
-			setNexusError(formatWailsError(error));
-		} finally {
-			setNexusBusy(false);
-		}
-	}
-
-	async function disconnectNexus() {
-		if (nexusBusy) return;
-		setNexusBusy(true);
-		setNexusError("");
-		try {
-			await ClearNexusAPIKey();
-			await refreshNexus();
-		} catch (error) {
-			setNexusError(formatWailsError(error));
-		} finally {
-			setNexusBusy(false);
-		}
-	}
-
-	async function applyHandler(enabled: boolean, takeOver: boolean) {
-		if (!protocol || nexusBusy) return;
-		const previous = protocol;
-		setProtocol({
-			...previous,
-			enabled,
-			ownership: enabled ? "self" : "none",
-		});
-		setNexusError("");
-		try {
-			const next = enabled
-				? await RegisterNexusProtocol(takeOver)
-				: await UnregisterNexusProtocol();
-			setProtocol(next);
-		} catch (error) {
-			setProtocol(previous);
-			setNexusError(formatWailsError(error));
-		}
-	}
-
-	async function toggleHandler() {
-		if (!protocol) return;
-		if (protocol.enabled) {
-			await applyHandler(false, false);
-			return;
-		}
-		if (protocol.ownership === "other") {
-			setTakeOverOwner(formatProtocolOwner(protocol));
-			return;
-		}
-		await applyHandler(true, false);
-	}
-
-	const accountKind = nexusAccountKind(account);
-	const handlerDisabledReason = protocolSwitchDisabledReason(protocol);
-	const handlerEnabled = protocol?.enabled ?? false;
 
 	return (
 		<div className="mutation-dialog-backdrop">
@@ -390,150 +267,6 @@ export function SettingsDialog({
 								/>
 							</button>
 						</div>
-					</div>
-					<div className={styles["setting-section"]}>
-						<h3>Nexus Mods</h3>
-						<p className={styles["setting-section-hint"]}>
-							Paste a personal API key. Cratebug stores it only on this machine.
-						</p>
-						<p className={styles["setting-section-hint"]}>
-							On Linux, Cratebug uses Secret Service when available. Otherwise, it
-							stores the key in a file that only your account can read.
-						</p>
-						<button
-							type="button"
-							className={styles["nexus-link"]}
-							onClick={() => BrowserOpenURL(nexusApiKeyPageURL)}
-						>
-							Get an API key on Nexus Mods
-						</button>
-						{accountKind === "premium" || accountKind === "free" ? (
-							<div className={styles["nexus-account"]}>
-								<p>
-									Connected as <strong>{account?.name || "Nexus user"}</strong>
-									{" · "}
-									{accountKind === "premium" ? "Premium" : "Free"}
-								</p>
-								{account ? (
-									<p className={styles["nexus-rate-limit"]}>
-										{formatNexusRateLimit(account)}
-									</p>
-								) : null}
-								<button
-									type="button"
-									className="quiet-button"
-									disabled={nexusBusy}
-									onClick={() => void disconnectNexus()}
-								>
-									Disconnect
-								</button>
-							</div>
-						) : (
-							<div className={styles["nexus-key-row"]}>
-								{accountKind === "unverified" ? (
-									<p className={styles["nexus-warning"]} role="status">
-										The saved key could not be verified. Paste it again.
-									</p>
-								) : null}
-								<label className={styles["nexus-key-field"]}>
-									<span className="visually-hidden">Nexus Mods API key</span>
-									<input
-										type="password"
-										value={keyDraft}
-										autoComplete="off"
-										spellCheck={false}
-										placeholder="API key"
-										disabled={nexusBusy}
-										onChange={(event) => setKeyDraft(event.target.value)}
-										onKeyDown={(event) => {
-											if (event.key === "Enter") {
-												event.preventDefault();
-												void connectNexus();
-											}
-										}}
-									/>
-								</label>
-								<button
-									type="button"
-									disabled={nexusBusy || keyDraft === ""}
-									onClick={() => void connectNexus()}
-								>
-									{nexusBusy ? "Connecting..." : "Connect"}
-								</button>
-							</div>
-						)}
-						<div className={styles["setting-switch-row"]}>
-							<div>
-								<p className={styles["setting-switch-label"]}>
-									Open Nexus downloads in Cratebug
-								</p>
-								<p className={styles["setting-section-hint"]}>
-									Registers Cratebug as the nxm:// handler for Marvel Rivals.
-								</p>
-							</div>
-							<button
-								type="button"
-								role="switch"
-								aria-checked={handlerEnabled}
-								aria-label="Open Nexus downloads in Cratebug"
-								className={styles["setting-switch"]}
-								disabled={nexusBusy || handlerDisabledReason !== null}
-								onClick={() => void toggleHandler()}
-							>
-								<span
-									className={styles["setting-switch-knob"]}
-									aria-hidden="true"
-								/>
-							</button>
-						</div>
-						{handlerDisabledReason ? (
-							<p className={styles["setting-section-hint"]}>
-								{handlerDisabledReason}
-							</p>
-						) : null}
-						{protocol?.userChoice ? (
-							<p className={styles["nexus-warning"]} role="status">
-								Windows is set to open nxm:// links in another app. Change that in
-								Settings → Apps → Default apps.
-							</p>
-						) : null}
-						{protocol?.machineWide && protocol.ownership === "none" ? (
-							<p className={styles["setting-section-hint"]}>
-								A machine-wide nxm:// handler is also installed. Registering here
-								only changes it for this user.
-							</p>
-						) : null}
-						{takeOverOwner ? (
-							<div className={styles["nexus-takeover"]}>
-								<p>
-									{takeOverOwner} is currently the nxm:// handler. Take over?
-									Cratebug can restore it if you turn this off later.
-								</p>
-								<div className={styles["nexus-takeover-actions"]}>
-									<button
-										type="button"
-										className="quiet-button"
-										onClick={() => setTakeOverOwner(null)}
-									>
-										Cancel
-									</button>
-									<button
-										type="button"
-										onClick={() => {
-											setTakeOverOwner(null);
-											void applyHandler(true, true);
-										}}
-									>
-										Take over
-									</button>
-								</div>
-							</div>
-						) : null}
-						{nexusError ? (
-							<p className="mutation-dialog-error" role="alert">
-								{nexusError}
-							</p>
-						) : null}
 					</div>
 					<div className={styles["setting-section"]}>
 						<h3>Updates</h3>

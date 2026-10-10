@@ -1,5 +1,4 @@
 import {
-	Download,
 	Grid2X2,
 	List,
 	PackagePlus,
@@ -33,7 +32,6 @@ import {
 	DeleteTag,
 	DetectConflicts,
 	DetectLibrary,
-	DiscardNexusLink,
 	DownloadUpdate,
 	FindModsNeedingEncryption,
 	FindUnsupportedCompanionPaks,
@@ -59,7 +57,6 @@ import {
 	SetSkipDestructiveDelay,
 	SetTheme,
 	StripCompanionPaks,
-	TakePendingNexusLink,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import {
@@ -99,9 +96,8 @@ import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
 import { type FilterSection, FilterMenu } from "./FilterMenu";
 import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
-import { InstallFromNexusDialog } from "./InstallFromNexusDialog";
-import { InstallPreviewDialog, type InstallSource } from "./InstallPreviewDialog";
-import { formatWailsError as errorMessage } from "./installPresentation";
+import { InstallPreviewDialog } from "./InstallPreviewDialog";
+import { formatWailsError as errorMessage, type InstallProgressView } from "./installPresentation";
 import styles from "./LibraryScreen.module.css";
 import { detectionOutcome } from "./libraryDetection";
 import {
@@ -121,13 +117,6 @@ import { ModCatalog } from "./ModCatalog";
 import { ModMutationDialog } from "./ModMutationDialog";
 import { ModTagDialog } from "./ModTagDialog";
 import { type MutationFeedback, MutationToast } from "./MutationToast";
-import { NexusAdultBlockedDialog } from "./NexusAdultBlockedDialog";
-import { NexusLinkDialog } from "./NexusLinkDialog";
-import {
-	formatNexusInstallError,
-	type InstallProgressView,
-	isAdultContentBlockedError,
-} from "./nexusPresentation";
 import { SelectedModPanel } from "./SelectedModPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { providerLogos } from "./StoreLogos";
@@ -149,22 +138,6 @@ type ViewModeButtonProps = {
 };
 
 type MutationDialog = "priority" | "rename" | "move" | "delete" | "tags" | "encrypt";
-
-let firstNexusLinkIntake: Promise<main.NexusLink> | null = null;
-let firstNexusLinkIntakeDone = false;
-
-function takeNexusLink(initial: boolean): Promise<main.NexusLink> {
-	if (!firstNexusLinkIntakeDone) {
-		firstNexusLinkIntake ??= TakePendingNexusLink().finally(() => {
-			firstNexusLinkIntakeDone = true;
-		});
-		return firstNexusLinkIntake;
-	}
-	if (initial && firstNexusLinkIntake) {
-		return firstNexusLinkIntake;
-	}
-	return TakePendingNexusLink();
-}
 
 type DialogScope = "viewed" | "checked";
 
@@ -447,10 +420,7 @@ export function LibraryScreen() {
 		detection: gamedetect.Detection;
 	} | null>(null);
 	const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
-	const [installSource, setInstallSource] = useState<InstallSource | null>(null);
-	const [installFromNexusOpen, setInstallFromNexusOpen] = useState(false);
-	const [pendingNexusLink, setPendingNexusLink] = useState<main.NexusLink | null>(null);
-	const [adultContentBlocked, setAdultContentBlocked] = useState(false);
+	const [installPaths, setInstallPaths] = useState<string[] | null>(null);
 	const [installProgress, setInstallProgress] = useState<InstallProgressView | null>(null);
 	const [isDraggingExternalFiles, setIsDraggingExternalFiles] = useState(false);
 	const externalDragDepthRef = useRef(0);
@@ -593,46 +563,12 @@ export function LibraryScreen() {
 		try {
 			const files = await SelectFilesForInstall();
 			if (files && files.length > 0) {
-				setInstallSource({ kind: "files", paths: files });
+				setInstallPaths(files);
 			}
 		} catch (error) {
 			showMutationFeedback("error", `Could not open file selector: ${errorMessage(error)}`);
 		}
 	}, [showMutationFeedback]);
-	const startNexusInstall = useCallback((modId: number, fileId: number) => {
-		setInstallFromNexusOpen(false);
-		setPendingNexusLink(null);
-		setInstallProgress(null);
-		setInstallSource({ kind: "nexus", modId, fileId });
-	}, []);
-	const installSourceRef = useRef<InstallSource | null>(null);
-	installSourceRef.current = installSource;
-	const ingestPendingNexusLink = useCallback(
-		async (initial: boolean) => {
-			try {
-				const link = await takeNexusLink(initial);
-				if (!link.present) return;
-				if (installSourceRef.current) {
-					showMutationFeedback("error", "Finish or cancel the current install first.");
-					if (link.modId && link.fileId) {
-						DiscardNexusLink(link.modId, link.fileId);
-					}
-					return;
-				}
-				setInstallFromNexusOpen(false);
-				setPendingNexusLink(link);
-			} catch (error) {
-				if (isAdultContentBlockedError(error)) {
-					setInstallFromNexusOpen(false);
-					setPendingNexusLink(null);
-					setAdultContentBlocked(true);
-					return;
-				}
-				showMutationFeedback("error", formatNexusInstallError(error));
-			}
-		},
-		[showMutationFeedback],
-	);
 	const handleDroppedFiles = useCallback(
 		(_x: number, _y: number, paths: string[]) => {
 			if (paths.length === 0) return;
@@ -640,7 +576,7 @@ export function LibraryScreen() {
 				showMutationFeedback("error", "Set a mod library folder before installing.");
 				return;
 			}
-			setInstallSource({ kind: "files", paths });
+			setInstallPaths(paths);
 		},
 		[libraryRoot, showMutationFeedback],
 	);
@@ -675,16 +611,6 @@ export function LibraryScreen() {
 			setInstallProgress(progress);
 		});
 	}, []);
-
-	useEffect(() => {
-		return EventsOn("nexus:link", () => {
-			void ingestPendingNexusLink(false);
-		});
-	}, [ingestPendingNexusLink]);
-
-	useEffect(() => {
-		void ingestPendingNexusLink(true);
-	}, [ingestPendingNexusLink]);
 
 	// Best-effort welcome notice: a failure here should not surface as an
 	// error toast, since there is nothing the user needs to act on.
@@ -2277,7 +2203,7 @@ export function LibraryScreen() {
 				!activeDialog &&
 				!activeFolderDialog &&
 				!detectionDialog &&
-				!installSource &&
+				!installPaths &&
 				!settingsOpen &&
 				!toolsOpen
 			) {
@@ -2293,7 +2219,7 @@ export function LibraryScreen() {
 		activeDialog,
 		activeFolderDialog,
 		detectionDialog,
-		installSource,
+		installPaths,
 		isMutationLocked,
 		libraryRoot,
 		libraryState,
@@ -2616,16 +2542,6 @@ export function LibraryScreen() {
 						title="Install mod from archive or pak file"
 					>
 						<PackagePlus aria-hidden="true" />
-					</button>
-					<button
-						type="button"
-						className="icon-button"
-						onClick={() => setInstallFromNexusOpen(true)}
-						disabled={!libraryRoot || libraryState === "loading"}
-						aria-label="Install from Nexus Mods"
-						title="Install a mod from Nexus Mods"
-					>
-						<Download aria-hidden="true" />
 					</button>
 					<button
 						type="button"
@@ -3159,64 +3075,16 @@ export function LibraryScreen() {
 						/>
 					);
 				})()}
-			{installFromNexusOpen && (
-				<InstallFromNexusDialog
-					onReady={startNexusInstall}
-					onOpenSettings={() => {
-						setInstallFromNexusOpen(false);
-						setSettingsOpen(true);
-					}}
-					onCancel={() => setInstallFromNexusOpen(false)}
-				/>
-			)}
-			{adultContentBlocked && (
-				<NexusAdultBlockedDialog onClose={() => setAdultContentBlocked(false)} />
-			)}
-			{pendingNexusLink && (
-				<NexusLinkDialog
-					link={pendingNexusLink}
-					libraryReady={Boolean(libraryRoot)}
-					onConfirm={() => {
-						const modId = pendingNexusLink.modId ?? 0;
-						const fileId = pendingNexusLink.fileId ?? 0;
-						if (!libraryRoot) {
-							showMutationFeedback(
-								"error",
-								"Set a mod library folder before installing.",
-							);
-							return;
-						}
-						if (modId <= 0 || fileId <= 0) {
-							showMutationFeedback("error", "That Nexus link is missing a file.");
-							return;
-						}
-						startNexusInstall(modId, fileId);
-					}}
-					onCancel={() => {
-						if (pendingNexusLink.modId && pendingNexusLink.fileId) {
-							DiscardNexusLink(pendingNexusLink.modId, pendingNexusLink.fileId);
-						}
-						setPendingNexusLink(null);
-					}}
-					onOpenSettings={() => {
-						if (pendingNexusLink.modId && pendingNexusLink.fileId) {
-							DiscardNexusLink(pendingNexusLink.modId, pendingNexusLink.fileId);
-						}
-						setPendingNexusLink(null);
-						setSettingsOpen(true);
-					}}
-				/>
-			)}
-			{installSource && libraryRoot && (
+			{installPaths && libraryRoot && (
 				<InstallPreviewDialog
 					modRoot={libraryRoot}
-					source={installSource}
-					downloadProgress={installProgress}
+					paths={installPaths}
+					progress={installProgress}
 					defaultFolder={selectedFolder === "all" ? "" : selectedFolder}
 					folders={libraryIndex.folders}
 					libraryEntries={library.entries}
 					onDone={(result) => {
-						setInstallSource(null);
+						setInstallPaths(null);
 						setInstallProgress(null);
 						setLibrary(result.reconciledLibrary);
 						setLibraryState(
@@ -3235,7 +3103,7 @@ export function LibraryScreen() {
 						}
 					}}
 					onCancel={() => {
-						setInstallSource(null);
+						setInstallPaths(null);
 						setInstallProgress(null);
 					}}
 				/>
@@ -3247,11 +3115,8 @@ export function LibraryScreen() {
 				!toolsOpen &&
 				!conflictDetailsOpen &&
 				!updateDialogMode &&
-				!installFromNexusOpen &&
-				!pendingNexusLink &&
-				!adultContentBlocked &&
 				!detectionDialog &&
-				!installSource && (
+				!installPaths && (
 					<div className={styles["drop-overlay"]} aria-hidden="true">
 						<div className={styles["drop-overlay-card"]}>
 							<PackagePlus aria-hidden="true" />

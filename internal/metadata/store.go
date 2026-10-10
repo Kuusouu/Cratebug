@@ -23,9 +23,8 @@ type Recovery struct {
 	Cause     error
 }
 
-// NexusProtocolSnapshot is the previous nxm:// handler command, recorded so
-// unregister can restore it. It is paths and display text, not a secret, and
-// is safe to return through LoadMetadata.
+// Keeps the previous nxm:// handler from older builds so upgrade and uninstall
+// cleanup can restore it. It contains paths and display text, not credentials.
 type NexusProtocolSnapshot struct {
 	Command     string `json:"command,omitempty"`
 	Icon        string `json:"icon,omitempty"`
@@ -51,15 +50,11 @@ type Settings struct {
 	// hasn't been shown for the running build yet.
 	LastSeenVersion string `json:"lastSeenVersion,omitempty"`
 
-	// The previous nxm:// handler command, recorded so unregister can restore
-	// it. This is not a secret: LoadMetadata returns the whole document. A
-	// missing field (every document written before this existed) is the zero
-	// value, not an error.
+	// Retained for cleanup of older builds that registered as an nxm:// handler.
 	NexusProtocol NexusProtocolSnapshot `json:"nexusProtocol,omitempty"`
 
-	// When true, startup will not silently claim nxm://. Missing (every
-	// document written before this field existed) means the handler defaults
-	// on, matching the Phase 16 decision.
+	// Preserve the old preference when reading and saving existing metadata.
+	// Current builds never register as an nxm:// handler.
 	NexusProtocolOptOut bool `json:"nexusProtocolOptOut,omitempty"`
 
 	// When true, destructive confirmation dialogs enable their confirm button
