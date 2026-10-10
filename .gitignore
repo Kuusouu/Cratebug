@@ -33,6 +33,7 @@ coverage.out
 /build/bin/
 /build/uassettool/
 /build/uassettool-linux/
+/build/sigbypass/
 /build/linux/AppDir/
 /build/windows/installer/wails_tools.nsh
 
