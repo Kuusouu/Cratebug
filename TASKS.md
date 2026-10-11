@@ -1,7 +1,7 @@
 # Cratebug Active Tasks
 
 **Phase:** 21 - Backup and restore
-**Status:** Tasks 21.1 and 21.2 are implemented. Task 21.3 is in progress.
+**Status:** Tasks 21.1 and 21.2 are implemented. Task 21.3 is in progress. Task 22.1 (signature bypass tool, Phase 22) is in progress alongside it.
 
 Phase 20 is complete (see `ROADMAP.md` for the summary). Phase 19 stays deferred.
 
@@ -78,3 +78,26 @@ Replace the placeholder cards with one "Backup / Restore" card holding side-by-s
 - Screenshots: `.playwright-cli/screenshots/phase21/task-21.3-review-rollback-error.png` and `task-21.3-review-late-cancel-success.png`. Native file dialogs remain unverified.
 
 The generated backup models have no trailing whitespace in the reviewed diff. `git diff --check` passed.
+
+## 22.1 Signature bypass tool [IN PROGRESS]
+
+Offer DeathChaos25's 1.0.0 UTOC Signature Bypass from the Tools dialog, fetched from the author's GitHub release at build time and bundled into the installer (Option 1, decision 0011). A "Signature bypass" card shows the backend state and offers Install / Remove; the status loads in the dialog opener (the card itself has no read effect) and refreshes after every action. `internal/sigbypass` owns the game-directory rules: verified Win64 target, hash-verified payload, no foreign overwrites, game-running guard in the bindings. Sources under `docs/decisions/0011-signature-bypass-tool.md`.
+
+**Verify:**
+
+1. New Go tests cover status states, install copy, conflict refusal, payload rejection, partial repair, rollback, foreign-file removal refusal, shared `plugins` preservation, and the game-running block.
+2. Frontend presentation tests cover the action choice and status lines.
+3. Run `check.ps1` and the frontend tests.
+4. Drive the app: the Tools dialog shows the card; install/remove run only against real installs by explicit choice (never test mutations against the real Marvel Rivals install without permission).
+5. Stop for review.
+
+**Results (2026-10-10):**
+
+- New `internal/sigbypass` package: Win64 target derived from provider detection with executable verification, hash-verified payload, conflict refusal before any write, partial-install repair, install rollback, foreign-file removal refusal, shared `plugins` preservation, plus payload directory resolution (env override, production `<exe>/sigbypass`, dev `build/sigbypass`).
+- 16 new Go tests cover all of the above against disposable fixtures, plus an integration guard that verifies the pinned digests against the fetched release.
+- New `app_sigbypass.go` bindings (`SignatureBypassStatus`, `InstallSignatureBypass`, `RemoveSignatureBypass`) with the game-running guard; 4 new app tests cover the round trip, the guard, the missing game, and the missing payload.
+- Tools dialog "Signature bypass" card: the status loads in the dialog opener (the card itself has no read effect) and refreshes after every action. 12 new frontend presentation tests.
+- Packaging: `fetch-sigbypass.ps1` fetches and verifies the zip and the LGPL license text; CI/release run it after the worker fetch; NSIS ships `build/sigbypass` as `$INSTDIR\sigbypass`; decision 0011 and a `THIRD_PARTY_NOTICES.md` section record pins and licenses.
+- `check.ps1` passed. All 92 frontend tests passed (12 new).
+- App drive through the dev server: the Tools dialog shows the card reading "Required for mods to load." / "Not installed." with an Install button (dialog text verified through the DOM). Install/remove were not run against the real game install.
+- Screenshot: `.playwright-cli/screenshots/phase22/task-22.1-tools-sigbypass-card.png` (browser-pipeline blurred; text verified through the DOM).

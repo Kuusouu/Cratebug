@@ -13,6 +13,10 @@ actually notice, not internal refactors.
 
 ## [Unreleased]
 
+### Added
+
+- Signature bypass tool in the Tools dialog. It installs DeathChaos25's UTOC Signature Bypass (Ultimate ASI Loader plus plugin) into the detected game's Win64 folder so mods load at all, verifies every file by checksum first, never overwrites files it does not own, and removes its own files on request. Blocked while Marvel Rivals runs.
+
 ### Removed
 
 - Nexus Mods login, personal API keys, in-app downloads, and Mod Manager Download support. Download mod archives manually on Nexus, then use Cratebug's install button or drag and drop.
