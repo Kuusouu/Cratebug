@@ -1,0 +1,55 @@
+name: Fetch hero portraits
+
+# Manual run: downloads any missing hero portrait / skin icon with
+# fetch-hero-portraits.ps1 and opens (or updates) a pull request with the result.
+# Incremental like a local run: existing assets are skipped, so a run with
+# nothing new only re-reads the character table and exits without a PR.
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Re-download and re-encode every portrait (-Force)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write       # push the bot branch
+  pull-requests: write  # open or update the PR
+
+jobs:
+  fetch:
+    # windows-2025 ships ImageMagick 7 (`magick`) and the gh CLI.
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run fetch-hero-portraits.ps1
+        shell: pwsh
+        run: |
+          $scriptArgs = @()
+          if ('${{ inputs.force }}' -eq 'true') { $scriptArgs += '-Force' }
+          ./fetch-hero-portraits.ps1 @scriptArgs
+
+      - name: Open or update the pull request
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if (-not (git status --porcelain)) {
+            Write-Host "No asset changes; nothing to propose."
+            exit 0
+          }
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B chore/portrait-refresh
+          git add frontend/src/assets/heroes
+          git commit -m "chore: refresh hero portraits and skin icons"
+          git push --force origin chore/portrait-refresh
+
+          $open = @(gh pr list --head chore/portrait-refresh --state open --json number | ConvertFrom-Json)
+          if ($open.Count -gt 0) {
+            Write-Host "PR #$($open[0].number) already open; the push updated it."
+          } else {
+            gh pr create --base master --title "chore: refresh hero portraits and skin icons" --body "Automated run of fetch-hero-portraits.ps1."
+          }
