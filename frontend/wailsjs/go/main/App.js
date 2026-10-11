@@ -126,6 +126,10 @@ export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }
 
+export function InstallSignatureBypass() {
+  return window['go']['main']['App']['InstallSignatureBypass']();
+}
+
 export function IsFolderEmpty(arg1, arg2) {
   return window['go']['main']['App']['IsFolderEmpty'](arg1, arg2);
 }
@@ -152,6 +156,10 @@ export function OpenModInExplorer(arg1, arg2) {
 
 export function PrepareInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['PrepareInstall'](arg1, arg2, arg3);
+}
+
+export function RemoveSignatureBypass() {
+  return window['go']['main']['App']['RemoveSignatureBypass']();
 }
 
 export function RenameFolder(arg1, arg2, arg3) {
@@ -232,6 +240,14 @@ export function SetSkipDestructiveDelay(arg1) {
 
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function SignatureBypassStatus() {
+  return window['go']['main']['App']['SignatureBypassStatus']();
+}
+
+export function SignatureBypassStatusType() {
+  return window['go']['main']['App']['SignatureBypassStatusType']();
 }
 
 export function StripCompanionPaks(arg1, arg2) {

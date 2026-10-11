@@ -10,6 +10,7 @@ import {conflict} from '../models';
 import {metadata} from '../models';
 import {gamedetect} from '../models';
 import {update} from '../models';
+import {sigbypass} from '../models';
 
 export function ApplyInstall(arg1:string,arg2:string,arg3:Array<install.ApplyItem>):Promise<install.ApplyResult>;
 
@@ -73,6 +74,8 @@ export function FindUnsupportedCompanionPaks(arg1:string):Promise<Array<string>>
 
 export function GetAppVersion():Promise<string>;
 
+export function InstallSignatureBypass():Promise<sigbypass.Status>;
+
 export function IsFolderEmpty(arg1:string,arg2:string):Promise<boolean>;
 
 export function LoadMetadata():Promise<main.MetadataState>;
@@ -86,6 +89,8 @@ export function OpenFolderInExplorer(arg1:string,arg2:string):Promise<void>;
 export function OpenModInExplorer(arg1:string,arg2:string):Promise<void>;
 
 export function PrepareInstall(arg1:string,arg2:Array<string>,arg3:string):Promise<install.PreviewResult>;
+
+export function RemoveSignatureBypass():Promise<sigbypass.Status>;
 
 export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
@@ -126,6 +131,10 @@ export function SetModRoot(arg1:string):Promise<void>;
 export function SetSkipDestructiveDelay(arg1:boolean):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
+
+export function SignatureBypassStatus():Promise<sigbypass.Status>;
+
+export function SignatureBypassStatusType():Promise<sigbypass.Status>;
 
 export function StripCompanionPaks(arg1:string,arg2:Array<string>):Promise<mutation.CompanionCleanupResult>;
 

@@ -922,6 +922,61 @@ export namespace mutation {
 
 }
 
+export namespace sigbypass {
+	
+	export class FileStatus {
+	    relativePath: string;
+	    state: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FileStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.relativePath = source["relativePath"];
+	        this.state = source["state"];
+	    }
+	}
+	export class Status {
+	    state: string;
+	    gameDir?: string;
+	    payloadAvailable: boolean;
+	    files?: FileStatus[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Status(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.gameDir = source["gameDir"];
+	        this.payloadAvailable = source["payloadAvailable"];
+	        this.files = this.convertValues(source["files"], FileStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace update {
 	
 	export class ReleaseAsset {

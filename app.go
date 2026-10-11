@@ -56,6 +56,7 @@ type App struct {
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
 	watcher               *watcher.Watcher
+	sigbypassTool         sigbypassToolkit
 
 	ctxMu sync.Mutex
 }
@@ -105,6 +106,7 @@ func newApp(
 		detector:              gamedetect.NewDefaultRegistry(),
 		restoreSessions:       backup.NewSessionManager(),
 		companionCache:        mutation.NewCompanionCache(),
+		sigbypassTool:         defaultSigbypassToolkit(),
 	}
 	if characterTable != nil {
 		app.characterTable = *characterTable
