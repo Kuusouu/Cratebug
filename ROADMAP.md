@@ -568,9 +568,9 @@ Task 20.4 records the release pin, tests, and app checks.
 
 ## Phase 21 - Backup and restore
 
-**Status:** Tasks 21.1 and 21.2 are implemented. Task 21.3 is in progress, with native file-dialog verification pending.
+**Status:** Complete. Review approved 2026-10-11.
 
-Review fixes are implemented. Tests cover exclusive restore ownership, safe retry, preserved recovery files, and watcher concurrency. Browser checks cover cancellation outcomes and restored metadata.
+Review fixes are implemented. Tests cover exclusive restore ownership, safe retry, preserved recovery files, and watcher concurrency. Browser checks cover cancellation outcomes and restored metadata. Native file-dialog verification remains pending.
 
 **Outcome:** Users can back up the whole mod library to a portable zip file and restore it later from the Tools menu, with honest counts on both ends.
 
@@ -596,7 +596,9 @@ Review fixes are implemented. Tests cover exclusive restore ownership, safe retr
 
 ## Phase 22 - Signature bypass tool
 
-**Status:** Task 22.1 is in progress.
+**Status:** Complete. Review approved 2026-10-11.
+
+Install and remove were exercised against disposable fixtures and through the dev-server dialog. They were not run against the real game install.
 
 **Outcome:** Users can install the UTOC signature bypass Marvel Rivals needs to load mods, and remove it again, from the Tools menu without extracting anything by hand.
 
