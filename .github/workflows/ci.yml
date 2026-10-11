@@ -56,6 +56,10 @@ jobs:
               shell: pwsh
               run: .\fetch-uassettool.ps1
 
+            - name: Fetch pinned signature bypass
+              shell: pwsh
+              run: .\fetch-sigbypass.ps1
+
             - name: Install NSIS
               shell: pwsh
               run: |
