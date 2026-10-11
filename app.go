@@ -58,6 +58,7 @@ type App struct {
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
 	watcher               *watcher.Watcher
+	sigbypassTool         sigbypassToolkit
 
 	secretStore secret.Store
 
@@ -124,6 +125,7 @@ func newApp(
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 		companionCache:        mutation.NewCompanionCache(),
+		sigbypassTool:         defaultSigbypassToolkit(),
 	}
 	if characterTable != nil {
 		app.characterTable = *characterTable
