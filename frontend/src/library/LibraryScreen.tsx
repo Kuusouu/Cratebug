@@ -56,6 +56,7 @@ import {
 	SetModRoot,
 	SetSkipDestructiveDelay,
 	SetTheme,
+	SignatureBypassStatus,
 	StripCompanionPaks,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
@@ -67,6 +68,7 @@ import {
 	type metadata,
 	type modtype,
 	type mutation,
+	type sigbypass,
 } from "../../wailsjs/go/models";
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
 import { contrastingInk, isValidHexColor } from "./accentColor";
@@ -388,6 +390,7 @@ export function LibraryScreen() {
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [toolsOpen, setToolsOpen] = useState(false);
+	const [initialBypassStatus, setInitialBypassStatus] = useState<sigbypass.Status | null>(null);
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
 	const [encryptionFilter, setEncryptionFilter] = useState<EncryptionFilter>("all");
@@ -912,6 +915,15 @@ export function LibraryScreen() {
 	async function openTools() {
 		try {
 			await SetLibraryWatcherSuspended(true);
+			// The bypass card has no loading effect of its own: the status is
+			// read here, before the dialog renders, and the card refreshes it
+			// after every action.
+			try {
+				setInitialBypassStatus(await SignatureBypassStatus());
+			} catch {
+				// The card reports the failure itself with a retry button.
+				setInitialBypassStatus(null);
+			}
 			setToolsOpen(true);
 		} catch (error) {
 			showMutationFeedback("error", `Could not open Tools: ${errorMessage(error)}`);
@@ -3030,6 +3042,7 @@ export function LibraryScreen() {
 					libraryRoot={libraryRoot ?? null}
 					libraryEntryCount={library?.entries.length ?? 0}
 					onRestored={handleRestored}
+					initialBypassStatus={initialBypassStatus}
 				/>
 			)}
 			{detectionDialog && (
