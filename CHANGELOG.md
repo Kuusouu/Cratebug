@@ -11,6 +11,12 @@ Each version's section below is what the release workflow copies into that
 version's GitHub release notes, so write entries for what a user would
 actually notice, not internal refactors.
 
+## [Unreleased]
+
+### Added
+
+- Signature bypass tool in the Tools dialog. It installs DeathChaos25's UTOC Signature Bypass (Ultimate ASI Loader plus plugin) into the detected game's Win64 folder so mods load at all, verifies every file by checksum first, never overwrites files it does not own, and removes its own files on request. Blocked while Marvel Rivals runs.
+
 ## [2026.10.05]
 
 ### Decrypted crates stay intact

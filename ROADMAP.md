@@ -594,6 +594,30 @@ Review fixes are implemented. Tests cover exclusive restore ownership, safe retr
 - Failed or cancelled restores leave the previous library intact and say so.
 - Canonical checks pass; running-app backup, preview, and restore states are screenshotted and reviewed.
 
+## Phase 22 - Signature bypass tool
+
+**Status:** Task 22.1 is in progress.
+
+**Outcome:** Users can install the UTOC signature bypass Marvel Rivals needs to load mods, and remove it again, from the Tools menu without extracting anything by hand.
+
+**Includes:**
+
+- One "Signature bypass" entry in the Tools dialog, next to Backup / Restore: a description of the third-party files with a source-and-license link, a status line, and Install / Remove buttons.
+- The pinned DeathChaos25 1.0.0 payload (Ultimate ASI Loader 7.7.0 plus the bypass plugin), fetched from the author's GitHub release at build time by `fetch-sigbypass.ps1` and bundled into the installer as `sigbypass/`; never committed. See `docs/decisions/0011-signature-bypass-tool.md`.
+- `internal/sigbypass`: the target Win64 directory derives from provider detection and must hold the game executable; the payload is hash-verified before any copy; a pre-existing foreign file refuses the install instead of being overwritten; removal deletes only files that still match the pinned checksums and keeps a `plugins` directory that other ASI mods use; everything is blocked while Marvel Rivals runs.
+- Status truth comes from the files on disk: a hand-installed bypass reads as installed, and game reinstalls or file verification read as not installed.
+- Disposable-fixture Go tests plus frontend presentation tests for the card.
+
+**Excludes:** Runtime downloading or self-updating of the payload (a bypass update ships with a Cratebug release), Unmount Blocker and other ASI mods, installing into anything other than a detected installation, and removing files the tool does not own.
+
+**Exit criteria:**
+
+- Installation copies exactly `dsound.dll` and `plugins\MarvelRivalsUTOCSignatureBypass.asi` into a detected Win64 folder, byte-identical to the pinned release.
+- A foreign file at either path refuses install and remove without touching it.
+- Removal deletes both files and drops an empty `plugins` directory while leaving another ASI mod's files alone.
+- Install and remove are refused while the game runs.
+- Canonical checks pass; the running app's Tools dialog shows the card and its states.
+
 ## Deferred post-release work
 
 Deferred work includes Phase 19 (Linux AppImage self-updating), BentoMod/Repak-X state migration, game launching, crash monitoring, character data updates, recompression, VFX updating, virtual collections, permanent deletion, and advanced external-rename reconciliation.
