@@ -108,6 +108,15 @@ Section
     # which Cratebug has no license to redistribute.
     File /r /x "*.zip" /x "oo2core*.dll" "..\..\uassettool\*.*"
 
+    # Install the pinned signature bypass payload into a sigbypass/
+    # subdirectory, fetched at build time from the author's release (see
+    # fetch-sigbypass.ps1) rather than committed. Only the pinned archive,
+    # kept for the fetch script's checksum fast path, is left out; the
+    # license copies travel with the payload. Cratebug installs these files
+    # into a detected game installation on request.
+    SetOutPath "$INSTDIR\sigbypass"
+    File /r /x "*.zip" "..\..\sigbypass\*.*"
+
     # Reset output path back to root installation directory
     SetOutPath $INSTDIR
 
