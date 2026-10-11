@@ -1,4 +1,4 @@
-import { Download, Upload, X } from "lucide-react";
+import { Download, RefreshCw, ShieldAlert, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	BackupLibrary,
@@ -6,11 +6,14 @@ import {
 	CancelBackup,
 	CancelRestore,
 	DiscardRestorePreview,
+	InstallSignatureBypass,
+	RemoveSignatureBypass,
 	RestoreApply,
 	RestorePreview,
+	SignatureBypassStatus,
 } from "../../wailsjs/go/main/App";
-import type { backup } from "../../wailsjs/go/models";
-import { EventsOn } from "../../wailsjs/runtime/runtime";
+import type { backup, sigbypass } from "../../wailsjs/go/models";
+import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import {
 	type BackupProgressView,
 	formatBackupFileDate,
@@ -20,6 +23,11 @@ import {
 	formatStagedCounts,
 } from "./backupPresentation";
 import { formatWailsError } from "./installPresentation";
+import {
+	formatSignatureBypassStatus,
+	signatureBypassAction,
+	signatureBypassSourceURL,
+} from "./signatureBypassPresentation";
 import styles from "./ToolsDialog.module.css";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
@@ -28,6 +36,7 @@ type ToolsDialogProps = {
 	libraryRoot: string | null;
 	libraryEntryCount: number;
 	onRestored: (metadataRestored: boolean) => Promise<void>;
+	initialBypassStatus: sigbypass.Status | null;
 };
 
 type BackupRestoreState =
@@ -40,12 +49,19 @@ type BackupRestoreState =
 	| { phase: "restore-done"; summary: string; metadataNote: string }
 	| { phase: "error"; message: string; retry: boolean };
 
+type SignatureBypassCardState =
+	| { phase: "loading" }
+	| { phase: "ready"; status: sigbypass.Status }
+	| { phase: "busy"; status: sigbypass.Status }
+	| { phase: "error"; message: string };
+
 // Tools dialog. Backup and Restore share one live card.
 export function ToolsDialog({
 	onClose,
 	libraryRoot,
 	libraryEntryCount,
 	onRestored,
+	initialBypassStatus,
 }: ToolsDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
 	const cancelRequestedRef = useRef(false);
@@ -330,10 +346,109 @@ export function ToolsDialog({
 								</p>
 							)}
 						</li>
+						<SignatureBypassCard initial={initialBypassStatus} />
 					</ul>
 				</div>
 			</section>
 		</div>
+	);
+}
+
+// Starts from the status the opener read and refreshes it after every
+// action. Everything here runs in event handlers; the card has no read
+// effect of its own.
+function SignatureBypassCard({ initial }: { initial: sigbypass.Status | null }) {
+	const [card, setCard] = useState<SignatureBypassCardState>(
+		initial
+			? { phase: "ready", status: initial }
+			: { phase: "error", message: "The bypass state could not be read." },
+	);
+
+	async function reload() {
+		setCard({ phase: "loading" });
+		try {
+			const status = await SignatureBypassStatus();
+			setCard({ phase: "ready", status });
+		} catch (error) {
+			setCard({ phase: "error", message: formatWailsError(error) });
+		}
+	}
+
+	async function run(action: "install" | "remove") {
+		const current = card.phase === "ready" || card.phase === "busy" ? card.status : null;
+		if (!current) return;
+		setCard({ phase: "busy", status: current });
+		try {
+			const status =
+				action === "install"
+					? await InstallSignatureBypass()
+					: await RemoveSignatureBypass();
+			setCard({ phase: "ready", status });
+		} catch (error) {
+			setCard({ phase: "error", message: formatWailsError(error) });
+		}
+	}
+
+	const status = card.phase === "ready" || card.phase === "busy" ? card.status : null;
+	const action = status ? signatureBypassAction(status) : "none";
+	const active = action === "install" || action === "remove";
+
+	const statusText =
+		card.phase === "loading"
+			? "Reading the bypass state…"
+			: status
+				? formatSignatureBypassStatus(status)
+				: "The bypass state could not be read.";
+
+	return (
+		<li className={styles["tool-card"]}>
+			<div className={styles["tool-card-text"]}>
+				<p className={styles["tool-card-title"]}>Signature bypass</p>
+				<p className={styles["tool-card-description"]}>Required for mods to load.</p>
+				<button
+					type="button"
+					className="quiet-button"
+					onClick={() => BrowserOpenURL(signatureBypassSourceURL)}
+				>
+					Source and license
+				</button>
+				{card.phase === "error" ? (
+					<p className="mutation-dialog-error" role="alert">
+						{card.message}
+					</p>
+				) : (
+					<p className={styles["tool-card-status"]} role="status">
+						{statusText}
+					</p>
+				)}
+			</div>
+			<div className={styles["tool-card-actions"]}>
+				{card.phase === "error" ? (
+					<button type="button" className="quiet-button" onClick={() => void reload()}>
+						<RefreshCw aria-hidden="true" />
+						Try again
+					</button>
+				) : (
+					active && (
+						<button
+							type="button"
+							className="quiet-button"
+							disabled={card.phase !== "ready"}
+							onClick={() => void run(action)}
+						>
+							<ShieldAlert aria-hidden="true" />
+							{action === "install"
+								? card.phase === "busy"
+									? "Installing…"
+									: "Install"
+								: card.phase === "busy"
+									? "Removing…"
+									: "Remove"}
+						</button>
+					)
+				)}
+			</div>
+		</li>
 	);
 }
 
