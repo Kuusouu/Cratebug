@@ -17,6 +17,12 @@ actually notice, not internal refactors.
 
 - Signature bypass tool in the Tools dialog. It installs DeathChaos25's UTOC Signature Bypass (Ultimate ASI Loader plus plugin) into the detected game's Win64 folder so mods load at all, verifies every file by checksum first, never overwrites files it does not own, and removes its own files on request. Blocked while Marvel Rivals runs.
 
+### Changed
+
+- Cratebug has a fresh coat of paint. Dark mode is Midnight Iris: deep night navy with a violet kick. Light mode is porcelain: white cards on soft blue-gray, with quieter trim. Buttons, switches, focus rings, and badges all dress to match.
+- Six accent presets now tint the app, each with its own shade for light and dark: Iris (the new default), Coral, Amber, Mint, Rose, and Azure. Presets follow whichever theme you are using.
+- Picked a custom color before? It sticks around. A saved color from the old preset lineup stays as your custom accent until you choose a new one.
+
 ## [2026.10.05]
 
 ### Decrypted crates stay intact
