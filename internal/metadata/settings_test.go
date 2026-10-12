@@ -100,7 +100,7 @@ func TestThemeAndDefaultViewModeSurviveASaveLoadRoundTrip(t *testing.T) {
 }
 
 func TestSetAccentColorRejectsAnUnsupportedValue(t *testing.T) {
-	for _, color := range []string{"orange", "#fff", "#gggggg", "f0a54d", "#f0a54d0"} {
+	for _, color := range []string{"orange", "Iris", "#fff", "#gggggg", "f0a54d", "#f0a54d0"} {
 		t.Run(color, func(t *testing.T) {
 			// Arrange
 			var doc Document
@@ -129,6 +129,22 @@ func TestSetAccentColorAcceptsA6DigitHexValue(t *testing.T) {
 	}
 	if doc.Settings.AccentColor != "#f0a54d" {
 		t.Errorf("Settings.AccentColor = %q, want %q", doc.Settings.AccentColor, "#f0a54d")
+	}
+}
+
+func TestSetAccentColorAcceptsAPresetID(t *testing.T) {
+	// Arrange
+	var doc Document
+
+	// Act
+	err := doc.SetAccentColor("coral")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("SetAccentColor(%q) = %v, want no error", "coral", err)
+	}
+	if doc.Settings.AccentColor != "coral" {
+		t.Errorf("Settings.AccentColor = %q, want %q", doc.Settings.AccentColor, "coral")
 	}
 }
 

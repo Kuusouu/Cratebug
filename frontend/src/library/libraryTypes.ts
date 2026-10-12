@@ -39,6 +39,9 @@ export const themes = ["system", "light", "dark"] as const;
 
 export type Theme = (typeof themes)[number];
 
+// The concrete theme behind a "system" choice, once the OS preference is known.
+export type ResolvedTheme = Exclude<Theme, "system">;
+
 export const themeLabels: Record<Theme, string> = {
 	system: "System",
 	light: "Light",

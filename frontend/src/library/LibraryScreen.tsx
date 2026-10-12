@@ -74,7 +74,7 @@ import {
 	type sigbypass,
 } from "../../wailsjs/go/models";
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
-import { contrastingInk, isValidHexColor } from "./accentColor";
+import { isSupportedAccentChoice, resolveAccent } from "./accentColor";
 import { BatchActionsMenu } from "./BatchActionsMenu";
 import { CompanionPakDialog } from "./CompanionPakDialog";
 import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
@@ -113,6 +113,7 @@ import {
 	type LibraryState,
 	libraryProviderLabels,
 	libraryProviders,
+	type ResolvedTheme,
 	type Theme,
 	themes,
 	type ViewMode,
@@ -414,6 +415,11 @@ export function LibraryScreen() {
 	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 	const [isFolderMutating, setIsFolderMutating] = useState(false);
 	const [theme, setTheme] = useState<Theme>("system");
+	// The OS color scheme while the user keeps the system theme selected;
+	// preset accents use it to pick their light or dark value.
+	const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+		window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+	);
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [toolsOpen, setToolsOpen] = useState(false);
@@ -654,6 +660,18 @@ export function LibraryScreen() {
 		OnFileDrop(handleDroppedFiles, false);
 		return () => OnFileDropOff();
 	}, [handleDroppedFiles]);
+
+	// Mirrors the CSS "system" resolution in JS: preset accent overrides carry
+	// separate light and dark values and need the theme that is actually shown.
+	useEffect(() => {
+		if (theme !== "system") return;
+
+		const query = window.matchMedia("(prefers-color-scheme: dark)");
+		const apply = () => setResolvedTheme(query.matches ? "dark" : "light");
+		apply();
+		query.addEventListener("change", apply);
+		return () => query.removeEventListener("change", apply);
+	}, [theme]);
 
 	useEffect(() => {
 		return EventsOn("update:downloadProgress", (progress: UpdateDownloadProgress) => {
@@ -1035,7 +1053,7 @@ export function LibraryScreen() {
 				: "compact",
 		);
 		const restoredAccentColor = document.settings.accentColor ?? "";
-		setAccentColor(isValidHexColor(restoredAccentColor) ? restoredAccentColor : "");
+		setAccentColor(isSupportedAccentChoice(restoredAccentColor) ? restoredAccentColor : "");
 		setLibraryProvider(
 			libraryProviders.includes(document.settings.libraryProvider as LibraryProvider)
 				? (document.settings.libraryProvider as LibraryProvider)
@@ -2582,6 +2600,11 @@ export function LibraryScreen() {
 		);
 	}, [library, metadataDocument, showMutationFeedback]);
 
+	// An explicit theme choice is already concrete; only "system" needs the
+	// tracked OS preference.
+	const activeTheme = theme === "system" ? resolvedTheme : theme;
+	const resolvedAccent = resolveAccent(accentColor, activeTheme);
+
 	return (
 		<main
 			className="app-shell"
@@ -2589,8 +2612,8 @@ export function LibraryScreen() {
 			style={
 				accentColor
 					? ({
-							"--accent": accentColor,
-							"--accent-ink": contrastingInk(accentColor),
+							"--accent": resolvedAccent.hex,
+							"--accent-ink": resolvedAccent.ink,
 						} as CSSProperties)
 					: undefined
 			}
@@ -3107,6 +3130,7 @@ export function LibraryScreen() {
 			{settingsOpen && (
 				<SettingsDialog
 					theme={theme}
+					resolvedTheme={activeTheme}
 					accentColor={accentColor}
 					appVersion={appVersion}
 					isCheckingForUpdate={isCheckingForUpdate}

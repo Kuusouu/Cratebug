@@ -24,6 +24,17 @@ var validViewModes = map[string]bool{
 	"list":    true,
 }
 
+// Accent presets the frontend offers. Each resolves to its own light and dark
+// hex in components, so the stored value is the preset's name, not a color.
+var validAccentPresets = map[string]bool{
+	"iris":  true,
+	"coral": true,
+	"amber": true,
+	"mint":  true,
+	"rose":  true,
+	"azure": true,
+}
+
 var hexColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 // Sets the persisted appearance theme. Rejects any value outside the fixed
@@ -46,12 +57,12 @@ func (doc *Document) SetDefaultViewMode(mode string) error {
 	return nil
 }
 
-// Sets the accent color override, a 6-digit hex string like "#f0a54d". An
-// empty string clears the override and restores the active theme's own
-// default accent, so this doubles as the reset path.
+// Sets the persisted accent choice: a preset id from validAccentPresets, a
+// custom 6-digit hex string like "#f0a54d", or an empty string for the
+// default preset. Empty doubles as the reset path.
 func (doc *Document) SetAccentColor(color string) error {
-	if color != "" && !hexColorPattern.MatchString(color) {
-		return fmt.Errorf("accent color must be a 6-digit hex value like #f0a54d, got %q", color)
+	if color != "" && !hexColorPattern.MatchString(color) && !validAccentPresets[color] {
+		return fmt.Errorf("accent color must be a preset id, a 6-digit hex value like #f0a54d, or empty, got %q", color)
 	}
 	doc.Settings.AccentColor = color
 	return nil

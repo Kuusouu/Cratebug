@@ -38,7 +38,9 @@ type Settings struct {
 	ModRoot         string `json:"modRoot,omitempty"`
 	Theme           string `json:"theme,omitempty"`
 	DefaultViewMode string `json:"defaultViewMode,omitempty"`
-	AccentColor     string `json:"accentColor,omitempty"`
+	// The user's accent choice: a preset id, a custom 6-digit hex color, or
+	// empty for the default preset.
+	AccentColor string `json:"accentColor,omitempty"`
 
 	// The store provider library auto-detection targets. An empty value
 	// (including every document written before this field existed) means the

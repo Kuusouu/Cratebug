@@ -736,7 +736,8 @@ func (a *App) SetDefaultViewMode(mode string) error {
 	return a.metadataStore.Save(doc)
 }
 
-// Persists the accent color override, or clears it if color is empty.
+// Persists the accent choice: a preset id, a custom hex color, or empty for
+// the default preset.
 func (a *App) SetAccentColor(color string) error {
 	doc := a.loadMetadataDocument()
 	if err := doc.SetAccentColor(color); err != nil {

@@ -1,15 +1,15 @@
 .app-shell {
-	--page: #0d1119;
-	--panel: #151c28;
-	--panel-raised: #1b2432;
-	--text: #f5f7fb;
-	--muted: #9ca8ba;
-	--line: rgba(255, 255, 255, 0.11);
-	--accent: #d9a066;
-	--accent-ink: #231509;
-	--good: #74d29b;
-	--warn: #eed468;
-	--bad: #ee8d83;
+	--page: #0d1117;
+	--panel: #19212c;
+	--panel-raised: #242e3c;
+	--text: #f1f4fa;
+	--muted: #a5b2c5;
+	--line: #354154;
+	--accent: #a78bfa;
+	--accent-ink: #1b1408;
+	--good: #35c7a1;
+	--warn: #e9b568;
+	--bad: #ec5b70;
 
 	color-scheme: dark;
 	display: flex;
@@ -17,44 +17,63 @@
 	min-height: 0;
 	flex-direction: column;
 	overflow: hidden;
-	background: radial-gradient(circle at 0 0, #273b59 0, transparent 31rem), var(--page);
+	/* The corner wash follows the active accent instead of a fixed hue. */
+	background:
+		radial-gradient(
+			circle at 0 0,
+			color-mix(in srgb, var(--accent), transparent 86%) 0,
+			transparent 31rem
+		),
+		var(--page);
 	color: var(--text);
 }
 
 .app-shell[data-theme="light"] {
-	--page: #f2f4f8;
+	--page: #f5f7fb;
 	--panel: #ffffff;
-	--panel-raised: #f7f8fa;
-	--text: #1b2230;
-	--muted: #5e6a7d;
-	--line: rgba(25, 36, 52, 0.14);
-	--accent: #9c6b2f;
-	--accent-ink: #ffffff;
-	--good: #23834c;
-	--warn: #946800;
-	--bad: #bd3d37;
+	--panel-raised: #f0f3f9;
+	--text: #182230;
+	--muted: #526176;
+	--line: #dce2ec;
+	--accent: #7552d2;
+	--accent-ink: #fdfaf5;
+	--good: #167b61;
+	--warn: #9b6200;
+	--bad: #c43b53;
 
 	color-scheme: light;
-	background: radial-gradient(circle at 0 0, #dceaff 0, transparent 31rem), var(--page);
+	background:
+		radial-gradient(
+			circle at 0 0,
+			color-mix(in srgb, var(--accent), transparent 86%) 0,
+			transparent 31rem
+		),
+		var(--page);
 }
 
 @media (prefers-color-scheme: light) {
 	.app-shell[data-theme="system"] {
-		--page: #f2f4f8;
+		--page: #f5f7fb;
 		--panel: #ffffff;
-		--panel-raised: #f7f8fa;
-		--text: #1b2230;
-		--muted: #5e6a7d;
-		--line: rgba(25, 36, 52, 0.14);
-		--accent: #9c6b2f;
-		--accent-ink: #ffffff;
-		--good: #23834c;
-		--warn: #946800;
-		--bad: #bd3d37;
+		--panel-raised: #f0f3f9;
+		--text: #182230;
+		--muted: #526176;
+		--line: #dce2ec;
+		--accent: #7552d2;
+		--accent-ink: #fdfaf5;
+		--good: #167b61;
+		--warn: #9b6200;
+		--bad: #c43b53;
 
 		color-scheme: light;
 
-		background: radial-gradient(circle at 0 0, #dceaff 0, transparent 31rem), var(--page);
+		background:
+			radial-gradient(
+				circle at 0 0,
+				color-mix(in srgb, var(--accent), transparent 86%) 0,
+				transparent 31rem
+			),
+			var(--page);
 	}
 }
 

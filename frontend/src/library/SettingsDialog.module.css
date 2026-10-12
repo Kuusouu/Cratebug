@@ -153,9 +153,8 @@
 	place-items: center;
 	border: 1px solid var(--line);
 	border-radius: 999px;
-	/* Preset swatches set their own background inline (the color itself is
-	   the content); this is only the "Default" reset button's ground. */
-	background: var(--panel-raised);
+	/* The swatch color itself is the content; it and its check-mark ink are
+	   set inline so each preset stays readable in both themes. */
 }
 
 .accent-swatch:hover:not(:disabled) {
@@ -169,24 +168,9 @@
 	outline-offset: 2px;
 }
 
-.accent-swatch.reset {
-	color: var(--muted);
-}
-
-.accent-swatch.reset:hover:not(:disabled) {
-	color: var(--text);
-}
-
 .accent-swatch svg {
 	width: 1rem;
 	height: 1rem;
-	color: #fff;
-	filter: drop-shadow(0 0 0.1rem rgba(0, 0, 0, 0.6));
-}
-
-.accent-swatch.reset svg {
-	color: inherit;
-	filter: none;
 }
 
 .accent-hex-field {

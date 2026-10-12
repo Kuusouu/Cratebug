@@ -1,4 +1,4 @@
-import { Check, Monitor, Moon, RefreshCw, RotateCcw, Sun, X } from "lucide-react";
+import { Check, Monitor, Moon, RefreshCw, Sun, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ClearNexusAPIKey,
@@ -10,12 +10,19 @@ import {
 } from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
-import { accentPresets, isValidHexColor } from "./accentColor";
+import {
+	accentPresets,
+	contrastingInk,
+	isValidHexColor,
+	resolveAccent,
+	selectedPresetID,
+} from "./accentColor";
 import { formatWailsError } from "./installPresentation";
 import {
 	type LibraryProvider,
 	libraryProviderLabels,
 	libraryProviders,
+	type ResolvedTheme,
 	type Theme,
 	themeLabels,
 	themes,
@@ -33,6 +40,7 @@ import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type SettingsDialogProps = {
 	theme: Theme;
+	resolvedTheme: ResolvedTheme;
 	accentColor: string;
 	appVersion: string;
 	isCheckingForUpdate: boolean;
@@ -57,6 +65,7 @@ const themeIcons = {
 // theme, so this has no Save/Cancel pair. Escape or the header X closes it.
 export function SettingsDialog({
 	theme,
+	resolvedTheme,
 	accentColor,
 	appVersion,
 	isCheckingForUpdate,
@@ -72,7 +81,7 @@ export function SettingsDialog({
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
 	const handleEscape = useCallback(() => onClose(), [onClose]);
 	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-	const [hexDraft, setHexDraft] = useState(accentColor);
+	const [hexDraft, setHexDraft] = useState(() => resolveAccent(accentColor, resolvedTheme).hex);
 	const [account, setAccount] = useState<main.NexusAccountState | null>(null);
 	const [protocol, setProtocol] = useState<main.NexusProtocolState | null>(null);
 	const [keyDraft, setKeyDraft] = useState("");
@@ -84,12 +93,14 @@ export function SettingsDialog({
 		closeButtonRef.current?.focus();
 	}, []);
 
-	// Keeps the text field in sync when a preset swatch changes accentColor
-	// out from under it, without fighting the user's own keystrokes: only
-	// external changes (preset clicks, reset) should overwrite the draft.
+	// Keeps the text field showing the color currently in effect when a preset
+	// swatch (or a system theme change) replaces the stored accent out from
+	// under it, without fighting the user's own keystrokes: only external
+	// changes should overwrite the draft.
+	const appliedHex = resolveAccent(accentColor, resolvedTheme).hex;
 	useEffect(() => {
-		setHexDraft(accentColor);
-	}, [accentColor]);
+		setHexDraft(appliedHex);
+	}, [appliedHex]);
 
 	function handleHexInput(value: string) {
 		setHexDraft(value);
@@ -263,28 +274,13 @@ export function SettingsDialog({
 					<div className={styles["setting-section"]}>
 						<h3>Accent color</h3>
 						<div className={styles["accent-picker"]}>
-							<button
-								type="button"
-								className={[
-									styles["accent-swatch"],
-									styles.reset,
-									accentColor === "" ? styles.selected : "",
-								]
-									.filter(Boolean)
-									.join(" ")}
-								aria-pressed={accentColor === ""}
-								onClick={() => onSelectAccentColor("")}
-								title="Default"
-							>
-								<RotateCcw aria-hidden="true" />
-								<span className="visually-hidden">Default</span>
-							</button>
 							{accentPresets.map((preset) => {
-								const selected =
-									accentColor.toLowerCase() === preset.hex.toLowerCase();
+								const selected = selectedPresetID(accentColor) === preset.id;
+								const swatchHex =
+									resolvedTheme === "dark" ? preset.dark : preset.light;
 								return (
 									<button
-										key={preset.hex}
+										key={preset.id}
 										type="button"
 										className={[
 											styles["accent-swatch"],
@@ -293,8 +289,11 @@ export function SettingsDialog({
 											.filter(Boolean)
 											.join(" ")}
 										aria-pressed={selected}
-										style={{ background: preset.hex }}
-										onClick={() => onSelectAccentColor(preset.hex)}
+										style={{
+											background: swatchHex,
+											color: contrastingInk(swatchHex),
+										}}
+										onClick={() => onSelectAccentColor(preset.id)}
 										title={preset.name}
 									>
 										{selected && <Check aria-hidden="true" />}
