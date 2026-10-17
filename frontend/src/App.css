@@ -1,4 +1,6 @@
-.app-shell {
+/* Tokens live on the root so portaled UI (dialogs, menus, tooltips rendered
+   into document.body) inherits the active theme and accent preset too. */
+:root {
 	--page: #0d1117;
 	--panel: #19212c;
 	--panel-raised: #242e3c;
@@ -12,6 +14,9 @@
 	--bad: #ec5b70;
 
 	color-scheme: dark;
+}
+
+.app-shell {
 	display: flex;
 	height: 100vh;
 	min-height: 0;
@@ -28,7 +33,7 @@
 	color: var(--text);
 }
 
-.app-shell[data-theme="light"] {
+:root[data-theme="light"] {
 	--page: #f5f7fb;
 	--panel: #ffffff;
 	--panel-raised: #f0f3f9;
@@ -52,7 +57,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-	.app-shell[data-theme="system"] {
+	:root[data-theme="system"] {
 		--page: #f5f7fb;
 		--panel: #ffffff;
 		--panel-raised: #f0f3f9;

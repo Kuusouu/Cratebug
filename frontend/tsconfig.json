@@ -23,6 +23,9 @@
 		"noEmit": true,
 		"jsx": "react-jsx",
 		"types": ["vite/client", "bun"],
+		"paths": {
+			"@/*": ["./src/*"]
+		},
 		"rootDir": "."
 	},
 	"include": ["src", "vite.config.ts"]

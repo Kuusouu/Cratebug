@@ -8,15 +8,7 @@ import {
 	ShieldAlert,
 	Wrench,
 } from "lucide-react";
-import {
-	type CSSProperties,
-	type MouseEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ApplyUpdate,
 	AssignModTag,
@@ -2605,19 +2597,25 @@ export function LibraryScreen() {
 	const activeTheme = theme === "system" ? resolvedTheme : theme;
 	const resolvedAccent = resolveAccent(accentColor, activeTheme);
 
+	useEffect(() => {
+		document.documentElement.dataset.theme = theme;
+	}, [theme]);
+
+	// The accent preset is a runtime override, so it is written to the root
+	// element where portaled UI (dialogs, menus, tooltips) can inherit it.
+	useEffect(() => {
+		const root = document.documentElement;
+		if (!accentColor) {
+			root.style.removeProperty("--accent");
+			root.style.removeProperty("--accent-ink");
+			return;
+		}
+		root.style.setProperty("--accent", resolvedAccent.hex);
+		root.style.setProperty("--accent-ink", resolvedAccent.ink);
+	}, [accentColor, resolvedAccent.hex, resolvedAccent.ink]);
+
 	return (
-		<main
-			className="app-shell"
-			data-theme={theme}
-			style={
-				accentColor
-					? ({
-							"--accent": resolvedAccent.hex,
-							"--accent-ink": resolvedAccent.ink,
-						} as CSSProperties)
-					: undefined
-			}
-		>
+		<main className="app-shell">
 			<header className="app-header">
 				<div className={styles.brand}>
 					<div className={styles["brand-mark"]} aria-hidden="true">

@@ -11,5 +11,9 @@
 	"arrowParens": "always",
 	"bracketSameLine": false,
 	"bracketSpacing": true,
+	"sortTailwindcss": {
+		"stylesheet": "./src/tailwind.css",
+		"functions": ["cn", "clsx", "cva"]
+	},
 	"ignorePatterns": ["node_modules", "wailsjs", "dist", "bun.lock", "*.log", ".env", ".env.*"]
 }
