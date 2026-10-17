@@ -48,7 +48,7 @@ Before editing, identify the active task and confirm that the work belongs in th
 - Do not add dependencies unless the active task requires them.
 - Do not upgrade pinned dependencies during unrelated work.
 - Use Bun for frontend dependencies and scripts.
-- Use Biome for frontend formatting and linting.
+- Use oxfmt and oxlint for frontend formatting and linting.
 - Clean up unused code created by the current change, but do not remove unrelated existing code.
 
 ## Safety

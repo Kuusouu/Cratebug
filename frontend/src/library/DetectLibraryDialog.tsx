@@ -40,7 +40,7 @@ export function DetectLibraryDialog({
 	const cancelButtonRef = useRef<HTMLButtonElement>(null);
 	const primaryButtonRef = useRef<HTMLButtonElement>(null);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: ref.current is stable; effect intentionally re-runs only on isWorking/mode for focus management
+	// ref.current is stable; effect intentionally re-runs only on isWorking/mode for focus management
 	useEffect(() => {
 		const primary = primaryButtonRef.current;
 		if (primary && !primary.disabled) {

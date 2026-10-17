@@ -2544,7 +2544,7 @@ export function LibraryScreen() {
 	// recovered metadata file as a non-crashing warning instead of losing track
 	// of it. Fires after scan() so its own feedback reset cannot clear this
 	// warning immediately after it is shown.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: scan is a plain function recreated every render, not a useCallback; depending on it would rerun this effect on every render instead of once on mount.
+	// scan is a plain function recreated every render, not a useCallback; depending on it would rerun this effect on every render instead of once on mount.
 	useEffect(() => {
 		if (hasLoadedInitialMetadataRef.current) return;
 		hasLoadedInitialMetadataRef.current = true;

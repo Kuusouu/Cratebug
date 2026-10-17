@@ -1,0 +1,32 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"categories": {
+		"correctness": "warn",
+		"nursery": "off",
+		"pedantic": "off",
+		"perf": "off",
+		"restriction": "off",
+		"style": "off",
+		"suspicious": "warn"
+	},
+	"rules": {
+		"no-unused-vars": "error",
+		"no-console": "off",
+		"unicorn/consistent-function-scoping": "off",
+		"unicorn/no-array-sort": "off",
+		"unicorn/no-useless-spread": "off"
+	},
+	"ignorePatterns": [
+		"/node_modules",
+		"/wailsjs",
+		"/dist",
+		"/bun.lock",
+		"/*.log",
+		"/.env",
+		"/.env.*"
+	],
+	"env": {
+		"browser": true,
+		"node": true
+	}
+}

@@ -24,7 +24,8 @@ Pin the following runtime and application-tool versions:
 | TypeScript | `7.0.2` |
 | Vite | `8.1.5` |
 | `@vitejs/plugin-react` | `6.0.4` |
-| Biome | `2.5.6` |
+| oxfmt | `0.73.0` |
+| oxlint | `1.88.0` |
 | `@types/react` | `19.2.17` |
 | `@types/react-dom` | `19.2.3` |
 
@@ -68,7 +69,7 @@ After task 0.3, verify that `go.mod`, `package.json`, and `bun.lock` agree with 
 
 ## Upgrade policy
 
-- Use stable releases only. Do not pin alpha, beta, release-candidate, nightly, canary, or preview builds.
+- Use stable releases only. Do not pin alpha, beta, release-candidate, nightly, canary, or preview builds. The `oxfmt` `0.73.0` pin is a reviewed exception until a stable release is evaluated.
 - Use exact versions for direct frontend dependencies; do not use `^`, `~`, `latest`, or floating major tags.
 - Commit `bun.lock` and use frozen-lockfile installation in CI.
 - Treat upgrades as deliberate maintenance work. Update this decision, runtime configuration, dependency declarations, lockfiles, and CI together.
@@ -83,7 +84,7 @@ After task 0.3, verify that `go.mod`, `package.json`, and `bun.lock` agree with 
 - [React versions](https://react.dev/versions)
 - [TypeScript 7.0 announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/)
 - [Vite 8.1 announcement](https://vite.dev/blog/announcing-vite8-1)
-- [Biome 2.5 announcement](https://biomejs.dev/blog/biome-v2-5/)
+- [Oxc releases (oxfmt, oxlint)](https://github.com/oxc-project/oxc/releases)
 - Exact frontend patch versions were checked against each package's `latest` metadata from the npm registry on 2026-07-30.
 
 ## Consequences

@@ -34,7 +34,7 @@ These guidelines define the shared readability and maintainability standards for
 - Use optional chaining and nullish coalescing when they express the intended nullability behavior.
 - Use `camelCase` for variables, functions, and non-component filenames. Use `PascalCase` for React components, their filenames, and types. Use `UPPER_SNAKE_CASE` for environment variables and regular-expression patterns.
 - Keep React components focused on rendering and interaction. Filesystem policy and mutations belong in Go.
-- Use Biome for formatting and linting; do not manually fight its output.
+- Use oxfmt for formatting and oxlint for linting; do not manually fight their output.
 - One exported React component per file. Unexported helpers may stay in that file.
 - Colocate component styles as `Component.module.css` next to `Component.tsx`. Skip the module file when the component uses only shared primitives.
 

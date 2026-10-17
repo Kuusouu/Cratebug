@@ -58,7 +58,8 @@ The initial stack is:
 - TypeScript
 - Vite 8
 - Bun
-- Biome
+- oxlint
+- oxfmt
 
 The repository must pin stable, non-preview tool and dependency versions. Upgrades are deliberate maintenance work, not incidental feature changes.
 

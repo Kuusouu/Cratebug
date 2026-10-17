@@ -18,7 +18,7 @@ This roadmap defines implementation order. Detailed work belongs in `TASKS.md`, 
 
 **Includes:**
 
-- Go, Wails v2, React, TypeScript, Vite 8, Bun, and Biome
+- Go, Wails v2, React, TypeScript, Vite 8, Bun, oxlint, and oxfmt
 - Pinned stable versions
 - Minimal Wails application shell
 - Canonical validation commands

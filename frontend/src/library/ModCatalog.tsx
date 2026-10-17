@@ -405,7 +405,7 @@ const ModCard = memo(function ModCard({
 
 	if (viewMode === "list")
 		return (
-			// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the row click only extends selection to its empty pointer area.
+			// The dedicated card button remains the keyboard control; the row click only extends selection to its empty pointer area.
 			<article
 				aria-busy={isMutating}
 				className={[
@@ -440,7 +440,7 @@ const ModCard = memo(function ModCard({
 			</article>
 		);
 	return (
-		// biome-ignore lint/a11y/useKeyWithClickEvents: The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
+		// The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
 		<article
 			aria-busy={isMutating}
 			className={[

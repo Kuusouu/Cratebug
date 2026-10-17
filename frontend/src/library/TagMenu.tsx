@@ -150,7 +150,7 @@ export function TagMenu({
 													}}
 												>
 													<input
-														// biome-ignore lint/a11y/noAutofocus: opening the rename form should hand focus to the field it exists for.
+														// Opening the rename form should hand focus to the field it exists for.
 														autoFocus
 														value={editing.name}
 														disabled={isBusy}

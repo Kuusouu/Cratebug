@@ -77,15 +77,15 @@ Run every required check before submitting anything:
 .\check.ps1
 ```
 
-That runs `gofmt`, Biome format and lint, the TypeScript typecheck, the Vite build, `go vet`, and the full Go test suite. Frontend scripts (run from `frontend`):
+That runs `gofmt`, oxfmt formatting and oxlint linting, the TypeScript typecheck, the Vite build, `go vet`, and the full Go test suite. Frontend scripts (run from `frontend`):
 
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Start the Vite development server |
 | `bun run build` | Type-check and build the frontend |
-| `bun run format` | Apply Biome formatting |
-| `bun run format:check` | Check Biome formatting without changes |
-| `bun run lint` | Run Biome lint rules |
+| `bun run format` | Apply oxfmt formatting |
+| `bun run format:check` | Check oxfmt formatting without changes |
+| `bun run lint` | Run oxlint lint rules |
 | `bun run typecheck` | Run TypeScript without emitting files |
 | `bun run check` | Run all frontend checks and the build |
 
@@ -118,7 +118,7 @@ The installer is written to `build/bin/Cratebug-amd64-installer.exe`.
 Follow [CODING_GUIDELINES.md](CODING_GUIDELINES.md). The short version:
 
 - Go is formatted with `gofmt`, idiomatic, and keeps domain and filesystem behavior independent of Wails and React.
-- The frontend is TypeScript and React checked by Biome; components render and interact, and filesystem policy lives in Go.
+- The frontend is TypeScript and React checked by oxlint and oxfmt; components render and interact, and filesystem policy lives in Go.
 - Tests use disposable fixtures (`t.TempDir`) and never touch a real Marvel Rivals mod directory.
 - Changes stay small and reviewable; comments explain why, not what.
 
