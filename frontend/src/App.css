@@ -149,10 +149,37 @@ h1 {
 	color: var(--accent);
 }
 
-select,
-input,
-button {
-	font: inherit;
+/* Element defaults live in the base layer so Tailwind utilities can style new
+   components; unlayered class rules in this file keep their priority. */
+@layer base {
+	select,
+	input,
+	button {
+		font: inherit;
+	}
+
+	button {
+		border: 0;
+		border-radius: 0.55rem;
+		background: var(--accent);
+		color: var(--accent-ink);
+		cursor: pointer;
+		font-weight: 800;
+	}
+
+	button:hover:not(:disabled) {
+		filter: brightness(1.08);
+	}
+
+	button:focus-visible {
+		outline: 3px solid color-mix(in srgb, var(--accent), transparent 55%);
+		outline-offset: 2px;
+	}
+
+	button:disabled {
+		cursor: default;
+		opacity: 0.58;
+	}
 }
 
 select,
@@ -212,29 +239,10 @@ select option {
 	background: color-mix(in srgb, var(--panel), transparent 5%);
 }
 
-button {
-	border: 0;
-	border-radius: 0.55rem;
-	background: var(--accent);
-	color: var(--accent-ink);
-	cursor: pointer;
-	font-weight: 800;
-}
-
-button:hover:not(:disabled) {
-	filter: brightness(1.08);
-}
-
-button:focus-visible,
 input:focus-visible,
 select:focus-visible {
 	outline: 3px solid color-mix(in srgb, var(--accent), transparent 55%);
 	outline-offset: 2px;
-}
-
-button:disabled {
-	cursor: default;
-	opacity: 0.58;
 }
 
 .quiet-button {
@@ -261,6 +269,29 @@ button:disabled {
 	padding: 0.65rem 0.9rem;
 	background: var(--bad);
 	color: var(--page);
+}
+
+/* Action-row metrics carried over from the retired .mutation-dialog-actions rule.
+   Buttons keep the legacy styling system until they join the Tailwind migration. */
+.dialog-actions {
+	display: flex;
+	justify-content: end;
+	gap: 0.65rem;
+	margin-top: 0.35rem;
+}
+
+.dialog-actions button {
+	min-height: 2.7rem;
+	padding: 0.6rem 0.85rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.dialog-actions button svg {
+	width: 1rem;
+	height: 1rem;
+	flex-shrink: 0;
 }
 
 .library-layout {
@@ -411,140 +442,6 @@ button:disabled {
 	50% {
 		opacity: 0.8;
 	}
-}
-
-.mutation-dialog-backdrop {
-	display: grid;
-	position: fixed;
-	z-index: 30;
-	inset: 0;
-	place-items: center;
-	padding: 1rem;
-	background: color-mix(in srgb, var(--page), transparent 32%);
-	backdrop-filter: blur(0.35rem);
-	-webkit-backdrop-filter: blur(0.35rem);
-	overscroll-behavior: contain;
-	touch-action: none;
-}
-
-.mutation-dialog {
-	display: flex;
-	flex-direction: column;
-	gap: 1.15rem;
-	width: min(100%, 30rem);
-	padding: 1.5rem;
-	border: 1px solid color-mix(in srgb, var(--accent), transparent 52%);
-	border-radius: 0.85rem;
-	background: color-mix(in srgb, var(--panel-raised), var(--page) 8%);
-	box-shadow: 0 1.25rem 3.5rem rgba(0, 0, 0, 0.34);
-	overscroll-behavior: contain;
-}
-
-.mutation-dialog h2 {
-	margin: 0.35rem 0 0.15rem;
-	font-size: 1.25rem;
-}
-
-.mutation-dialog-subtitle {
-	margin: 0;
-	color: var(--muted);
-	font-size: 0.82rem;
-	overflow-wrap: anywhere;
-}
-
-.mutation-dialog form {
-	display: grid;
-	gap: 1.15rem;
-}
-
-.mutation-dialog-field {
-	display: grid;
-	gap: 0.4rem;
-	color: var(--muted);
-	font-size: 0.78rem;
-	font-weight: 750;
-}
-
-.mutation-dialog-field input,
-.mutation-dialog-field select {
-	min-width: 0;
-	padding: 0.65rem 0.75rem;
-}
-
-.mutation-dialog-field select[size] {
-	padding: 0.35rem;
-	overflow-x: hidden;
-	overflow-y: auto;
-}
-
-.mutation-dialog-error {
-	margin: 0;
-	color: var(--bad);
-	font-size: 0.8rem;
-	font-weight: 650;
-	line-height: 1.4;
-}
-
-.mutation-dialog-warning {
-	margin: 0;
-	color: var(--warn);
-	font-size: 0.8rem;
-	font-weight: 650;
-	line-height: 1.4;
-}
-
-.delete-confirm-summary {
-	margin: 0;
-	color: var(--muted);
-	font-size: 0.85rem;
-	line-height: 1.5;
-}
-
-.delete-confirm-warning {
-	margin: 0;
-	color: var(--bad);
-	font-size: 0.8rem;
-	font-weight: 650;
-	line-height: 1.4;
-}
-
-.mutation-dialog-actions {
-	display: flex;
-	justify-content: end;
-	gap: 0.65rem;
-	margin-top: 0.35rem;
-}
-
-.mutation-dialog-actions button {
-	min-height: 2.7rem;
-	padding: 0.6rem 0.85rem;
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-}
-
-.mutation-dialog-actions button svg {
-	width: 1rem;
-	height: 1rem;
-	flex-shrink: 0;
-}
-
-.conflict-dialog-header {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	gap: 1rem;
-	padding-bottom: 0.85rem;
-	border-bottom: 1px solid var(--line);
-	margin-bottom: 0.85rem;
-}
-
-.conflict-dialog-header h2 {
-	margin-bottom: 0.35rem;
-}
-
-.conflict-dialog-close {
-	flex-shrink: 0;
 }
 
 .spinning-loader {

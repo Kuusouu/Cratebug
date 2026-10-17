@@ -1,7 +1,7 @@
 import { ChevronRight, Folder, FolderRoot, LibraryBig } from "lucide-react";
 import styles from "./FolderNavigation.module.css";
-import { memo, type MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { memo, type MouseEvent, useCallback, useMemo, useState } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type DraggedItem, isValidDropTarget } from "./libraryTypes";
 
 type FolderNode = {
@@ -25,13 +25,6 @@ type FolderNavigationProps = {
 	folderEntryCounts: ReadonlyMap<string, number>;
 };
 
-type TooltipState = {
-	content: string;
-	container: HTMLElement;
-	x: number;
-	y: number;
-};
-
 type FolderTreeItemProps = {
 	node: FolderNode;
 	selectedFolder: string;
@@ -42,8 +35,6 @@ type FolderTreeItemProps = {
 	dragDisabled: boolean;
 	onSelect: (folder: string) => void;
 	onContextMenu: (folder: string, event: MouseEvent) => void;
-	onHideTooltip: () => void;
-	onShowTooltip: (content: string, target: HTMLElement) => void;
 	onToggle: (folder: string) => void;
 	onDragStartFolder: (path: string) => void;
 	onDragEnd: () => void;
@@ -96,7 +87,6 @@ export const FolderNavigation = memo(function FolderNavigation({
 }: FolderNavigationProps) {
 	const tree = useMemo(() => buildFolderTree(folders), [folders]);
 	const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set());
-	const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 	const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
 
 	const handleDragOverTarget = useCallback((folder: string) => {
@@ -127,32 +117,6 @@ export const FolderNavigation = memo(function FolderNavigation({
 			return next;
 		});
 	}, []);
-
-	const showTooltip = useCallback((content: string, target: HTMLElement) => {
-		const container = target.closest<HTMLElement>(".app-shell");
-		if (!container) {
-			return;
-		}
-
-		const { right, top, height } = target.getBoundingClientRect();
-		setTooltip({ content, container, x: right, y: top + height / 2 });
-	}, []);
-
-	const hideTooltip = useCallback(() => setTooltip(null), []);
-
-	// Fixed-position tooltips must disappear when their source row moves.
-	useEffect(() => {
-		if (!tooltip) {
-			return;
-		}
-
-		window.addEventListener("scroll", hideTooltip, true);
-		window.addEventListener("resize", hideTooltip);
-		return () => {
-			window.removeEventListener("scroll", hideTooltip, true);
-			window.removeEventListener("resize", hideTooltip);
-		};
-	}, [hideTooltip, tooltip]);
 
 	return (
 		<nav className={styles["folder-navigation"]}>
@@ -231,8 +195,6 @@ export const FolderNavigation = memo(function FolderNavigation({
 					dragDisabled={dragDisabled}
 					onSelect={onSelect}
 					onContextMenu={onContextMenu}
-					onHideTooltip={hideTooltip}
-					onShowTooltip={showTooltip}
 					onToggle={toggleFolder}
 					onDragStartFolder={onDragStartFolder}
 					onDragEnd={handleDragEnd}
@@ -241,17 +203,6 @@ export const FolderNavigation = memo(function FolderNavigation({
 					selectedFolder={selectedFolder}
 				/>
 			))}
-			{tooltip &&
-				createPortal(
-					<div
-						aria-hidden="true"
-						className={styles["app-tooltip"]}
-						style={{ left: tooltip.x, top: tooltip.y }}
-					>
-						{tooltip.content}
-					</div>,
-					tooltip.container,
-				)}
 		</nav>
 	);
 });
@@ -309,8 +260,6 @@ function sameFolderTreeItemProps(
 		previous.dragDisabled !== next.dragDisabled ||
 		previous.onSelect !== next.onSelect ||
 		previous.onContextMenu !== next.onContextMenu ||
-		previous.onHideTooltip !== next.onHideTooltip ||
-		previous.onShowTooltip !== next.onShowTooltip ||
 		previous.onToggle !== next.onToggle ||
 		previous.onDragStartFolder !== next.onDragStartFolder ||
 		previous.onDragEnd !== next.onDragEnd ||
@@ -352,8 +301,6 @@ const FolderTreeItem = memo(function FolderTreeItem({
 	dragDisabled,
 	onSelect,
 	onContextMenu,
-	onHideTooltip,
-	onShowTooltip,
 	onToggle,
 	onDragStartFolder,
 	onDragEnd,
@@ -394,43 +341,51 @@ const FolderTreeItem = memo(function FolderTreeItem({
 				) : (
 					<span className={styles["folder-toggle-placeholder"]} aria-hidden="true" />
 				)}
-				<button
-					className={styles["folder-select"]}
-					type="button"
-					draggable={!dragDisabled}
-					onBlur={onHideTooltip}
-					onFocus={(event) => onShowTooltip(node.name, event.currentTarget)}
-					onClick={() => onSelect(node.path)}
-					onContextMenu={(event) => {
-						event.preventDefault();
-						onContextMenu(node.path, event);
-					}}
-					onMouseEnter={(event) => onShowTooltip(node.name, event.currentTarget)}
-					onMouseLeave={onHideTooltip}
-					onDragStart={(event) => {
-						event.dataTransfer.effectAllowed = "move";
-						event.dataTransfer.setData("text/plain", node.path);
-						onDragStartFolder(node.path);
-					}}
-					onDragEnd={onDragEnd}
-					onDragOver={(event) => {
-						if (!canDropHere) return;
-						event.preventDefault();
-						event.dataTransfer.dropEffect = "move";
-						onDragOverTarget(node.path);
-					}}
-					onDrop={(event) => {
-						if (!canDropHere) return;
-						event.preventDefault();
-						onDropOnFolder(node.path);
-					}}
-				>
-					<Folder aria-hidden="true" className={styles["folder-icon"]} />
-					<span className={styles["folder-name"]}>{node.name}</span>
-					<span className={styles["folder-count"]}>
-						{entryCounts.get(node.path) ?? 0}
-					</span>
-				</button>
+				{/* Row clicks select the folder, so Base UI's default dismiss-on-click
+				    would change when this tooltip is visible; keep hover/focus-only. */}
+				<Tooltip>
+					<TooltipTrigger
+						closeOnClick={false}
+						render={
+							<button
+								className={styles["folder-select"]}
+								type="button"
+								draggable={!dragDisabled}
+								onClick={() => onSelect(node.path)}
+								onContextMenu={(event) => {
+									event.preventDefault();
+									onContextMenu(node.path, event);
+								}}
+								onDragStart={(event) => {
+									event.dataTransfer.effectAllowed = "move";
+									event.dataTransfer.setData("text/plain", node.path);
+									onDragStartFolder(node.path);
+								}}
+								onDragEnd={onDragEnd}
+								onDragOver={(event) => {
+									if (!canDropHere) return;
+									event.preventDefault();
+									event.dataTransfer.dropEffect = "move";
+									onDragOverTarget(node.path);
+								}}
+								onDrop={(event) => {
+									if (!canDropHere) return;
+									event.preventDefault();
+									onDropOnFolder(node.path);
+								}}
+							>
+								<Folder aria-hidden="true" className={styles["folder-icon"]} />
+								<span className={styles["folder-name"]}>{node.name}</span>
+								<span className={styles["folder-count"]}>
+									{entryCounts.get(node.path) ?? 0}
+								</span>
+							</button>
+						}
+					/>
+					<TooltipContent side="right" align="center">
+						{node.name}
+					</TooltipContent>
+				</Tooltip>
 			</div>
 			{hasChildren && expanded && (
 				<div className={styles["folder-children"]}>
@@ -445,8 +400,6 @@ const FolderTreeItem = memo(function FolderTreeItem({
 							dragDisabled={dragDisabled}
 							onSelect={onSelect}
 							onContextMenu={onContextMenu}
-							onHideTooltip={onHideTooltip}
-							onShowTooltip={onShowTooltip}
 							onToggle={onToggle}
 							onDragStartFolder={onDragStartFolder}
 							onDragEnd={onDragEnd}

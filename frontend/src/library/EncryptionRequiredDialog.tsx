@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import type { discovery } from "../../wailsjs/go/models";
 import { useConfirmDelay } from "./useConfirmDelay";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type EncryptionRequiredDialogProps = {
 	entries: discovery.Entry[];
@@ -34,39 +40,37 @@ export function EncryptionRequiredDialog({
 		cancelRef.current?.focus();
 	}, []);
 
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
 	async function handleConfirm() {
 		if (await onConfirm()) onClose();
 	}
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="encryption-required-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen, eventDetails) => {
+				if (nextOpen) return;
+				// Escape must not dismiss while the rebuild is running.
+				if (isMutating) eventDetails.cancel();
+				else onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent>
+				<DialogHeader>
 					<p className="eyebrow">Mod action</p>
-					<h2 id="encryption-required-dialog-title">Mods need encryption</h2>
-					<p className="mutation-dialog-subtitle">{modsLabel}</p>
-				</div>
-				<p className="delete-confirm-summary">
+					<DialogTitle>Mods need encryption</DialogTitle>
+					<DialogDescription>{modsLabel}</DialogDescription>
+				</DialogHeader>
+				<p className="text-[0.85rem] leading-normal text-muted-foreground">
 					Mods that change files outside <code>/Game/Marvel/Characters</code> will not
 					load unless the IoStore container is encrypted with the game key. {listed}{" "}
 					{entries.length === 1 ? "needs" : "need"} encryption.
 				</p>
-				<p className="mutation-dialog-warning" role="status">
+				<p className="text-[0.8rem] leading-snug font-semibold text-warn" role="status">
 					This rebuilds each complete IoStore bundle. Close Marvel Rivals first. A failed
 					rebuild leaves that mod as it was.
 				</p>
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button
 						ref={cancelRef}
 						type="button"
@@ -88,7 +92,7 @@ export function EncryptionRequiredDialog({
 								: `Encrypt (${secondsRemaining})`}
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

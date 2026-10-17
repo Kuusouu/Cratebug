@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Check, Monitor, Moon, RefreshCw, Sun, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -36,7 +37,6 @@ import {
 } from "./nexusSettingsPresentation";
 import styles from "./SettingsDialog.module.css";
 import { providerLogos } from "./StoreLogos";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type SettingsDialogProps = {
 	theme: Theme;
@@ -79,8 +79,6 @@ export function SettingsDialog({
 	onCheckForUpdate,
 }: SettingsDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
-	const handleEscape = useCallback(() => onClose(), [onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const [hexDraft, setHexDraft] = useState(() => resolveAccent(accentColor, resolvedTheme).hex);
 	const [account, setAccount] = useState<main.NexusAccountState | null>(null);
 	const [protocol, setProtocol] = useState<main.NexusProtocolState | null>(null);
@@ -208,30 +206,32 @@ export function SettingsDialog({
 	const handlerEnabled = protocol?.enabled ?? false;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className={`mutation-dialog ${styles["settings-dialog"]}`}
-				aria-labelledby="settings-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div className="conflict-dialog-header">
-					<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen) onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent className="max-h-[min(90vh,46rem)] overflow-hidden">
+				<div className="flex items-start justify-between gap-4">
+					<DialogHeader>
 						<p className="eyebrow">Cratebug</p>
-						<h2 id="settings-dialog-title">Settings</h2>
-					</div>
+						<DialogTitle>Settings</DialogTitle>
+					</DialogHeader>
 					<button
 						ref={closeButtonRef}
 						type="button"
-						className="icon-button conflict-dialog-close"
+						className="icon-button shrink-0"
 						onClick={onClose}
 						aria-label="Close"
 					>
 						<X aria-hidden="true" />
 					</button>
 				</div>
-				<div className={[styles["settings-body"], "scroll-y"].join(" ")}>
+				{/* The negative margin pushes the scrollbar into the dialog's own
+					padding so the content width stays the same while it scrolls. */}
+				<div className="scroll-y -me-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto pe-3">
 					<div className={styles["setting-section"]}>
 						<h3>Appearance</h3>
 						<div
@@ -529,7 +529,10 @@ export function SettingsDialog({
 							</div>
 						) : null}
 						{nexusError ? (
-							<p className="mutation-dialog-error" role="alert">
+							<p
+								className="text-[0.8rem] leading-snug font-semibold text-destructive"
+								role="alert"
+							>
 								{nexusError}
 							</p>
 						) : null}
@@ -555,7 +558,7 @@ export function SettingsDialog({
 						</div>
 					</div>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

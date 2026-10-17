@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, RefreshCw, ShieldAlert, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -29,7 +30,6 @@ import {
 	signatureBypassSourceURL,
 } from "./signatureBypassPresentation";
 import styles from "./ToolsDialog.module.css";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type ToolsDialogProps = {
 	onClose: () => Promise<void>;
@@ -86,11 +86,6 @@ export function ToolsDialog({
 			setBackupRestore({ phase: "error", message: formatWailsError(error), retry: false });
 		}
 	}, [busy, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(
-		useCallback(() => {
-			void close();
-		}, [close]),
-	);
 
 	useEffect(() => {
 		closeButtonRef.current?.focus();
@@ -216,23 +211,23 @@ export function ToolsDialog({
 			: null;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className={`mutation-dialog ${styles["tools-dialog"]}`}
-				aria-labelledby="tools-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div className="conflict-dialog-header">
-					<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen) void close();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent className="max-h-[min(90vh,46rem)] overflow-hidden">
+				<div className="flex items-start justify-between gap-4">
+					<DialogHeader>
 						<p className="eyebrow">Cratebug</p>
-						<h2 id="tools-dialog-title">Tools</h2>
-					</div>
+						<DialogTitle>Tools</DialogTitle>
+					</DialogHeader>
 					<button
 						ref={closeButtonRef}
 						type="button"
-						className="icon-button conflict-dialog-close"
+						className="icon-button shrink-0"
 						onClick={() => void close()}
 						disabled={busy}
 						aria-label="Close"
@@ -240,7 +235,9 @@ export function ToolsDialog({
 						<X aria-hidden="true" />
 					</button>
 				</div>
-				<div className={[styles["tools-body"], "scroll-y"].join(" ")}>
+				{/* The negative margin pushes the scrollbar into the dialog's own
+					padding so the content width stays the same while it scrolls. */}
+				<div className="scroll-y -me-3 grid min-h-0 flex-1 content-start gap-4 overflow-x-hidden overflow-y-auto pe-3">
 					<ul className={styles["tools-list"]}>
 						<li className={styles["tool-card"]}>
 							<div className={styles["tool-card-text"]}>
@@ -349,8 +346,8 @@ export function ToolsDialog({
 						<SignatureBypassCard initial={initialBypassStatus} />
 					</ul>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
@@ -413,7 +410,10 @@ function SignatureBypassCard({ initial }: { initial: sigbypass.Status | null }) 
 					Source and license
 				</button>
 				{card.phase === "error" ? (
-					<p className="mutation-dialog-error" role="alert">
+					<p
+						className="text-[0.8rem] leading-snug font-semibold text-destructive"
+						role="alert"
+					>
 						{card.message}
 					</p>
 				) : (
@@ -494,7 +494,10 @@ function BackupRestoreStatus({
 						{formatRestoreMetadataClause(state.preview.metadataPresent)}
 					</p>
 					{libraryEntryCount > 0 && (
-						<p className="mutation-dialog-error" role="alert">
+						<p
+							className="text-[0.8rem] leading-snug font-semibold text-destructive"
+							role="alert"
+						>
 							This will replace the {libraryEntryCount}{" "}
 							{libraryEntryCount === 1 ? "mod" : "mods"} currently in the library.
 							Only continue if that is what you want.
@@ -517,7 +520,10 @@ function BackupRestoreStatus({
 			);
 		case "error":
 			return (
-				<p className="mutation-dialog-error" role="alert">
+				<p
+					className="text-[0.8rem] leading-snug font-semibold text-destructive"
+					role="alert"
+				>
 					{state.message}
 				</p>
 			);

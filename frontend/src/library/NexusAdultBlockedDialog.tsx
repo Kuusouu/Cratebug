@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import { nexusAdultContentBlockedMessage, nexusContentBlockingURL } from "./nexusPresentation";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type NexusAdultBlockedDialogProps = {
 	onClose: () => void;
@@ -9,30 +15,28 @@ type NexusAdultBlockedDialogProps = {
 
 export function NexusAdultBlockedDialog({ onClose }: NexusAdultBlockedDialogProps) {
 	const closeRef = useRef<HTMLButtonElement>(null);
-	const handleEscape = useCallback(() => onClose(), [onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	useEffect(() => {
 		closeRef.current?.focus();
 	}, []);
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="nexus-adult-blocked-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen) onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent>
+				<DialogHeader>
 					<p className="eyebrow">Nexus Mods</p>
-					<h2 id="nexus-adult-blocked-title">Adult content is hidden</h2>
-				</div>
-				<p className="mutation-dialog-subtitle" role="alert">
+					<DialogTitle>Adult content is hidden</DialogTitle>
+				</DialogHeader>
+				<DialogDescription className="wrap-anywhere" role="alert">
 					{nexusAdultContentBlockedMessage}
-				</p>
-				<div className="mutation-dialog-actions">
+				</DialogDescription>
+				<div className="dialog-actions">
 					<button ref={closeRef} type="button" className="quiet-button" onClick={onClose}>
 						Close
 					</button>
@@ -40,7 +44,7 @@ export function NexusAdultBlockedDialog({ onClose }: NexusAdultBlockedDialogProp
 						Open Content Blocking
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

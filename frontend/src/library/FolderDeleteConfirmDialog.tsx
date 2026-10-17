@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { IsFolderEmpty } from "../../wailsjs/go/main/App";
 import { useConfirmDelay } from "./useConfirmDelay";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type FolderDeleteConfirmDialogProps = {
 	folder: string;
@@ -28,10 +34,7 @@ export function FolderDeleteConfirmDialog({
 	const ready = delayReady && isEmpty !== null;
 	const cancelRef = useRef<HTMLButtonElement>(null);
 
-	// Cancel, not the destructive action, gets initial focus. This also puts
-	// focus inside the dialog so the shared focus trap's Escape/Tab handling
-	// (which listens on the dialog element and relies on the keydown bubbling
-	// from whatever currently has focus) actually has something to bubble from.
+	// Cancel, not the destructive action, gets initial focus.
 	useEffect(() => {
 		cancelRef.current?.focus();
 	}, []);
@@ -51,11 +54,6 @@ export function FolderDeleteConfirmDialog({
 		};
 	}, [folder, libraryRoot]);
 
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
 	const folderName = folder.split("/").at(-1) ?? folder;
 
 	async function handleConfirm() {
@@ -70,28 +68,33 @@ export function FolderDeleteConfirmDialog({
 				: `The folder ${folderName} is not empty. All of its contents will be deleted with it. The entire folder can be restored from the Recycle Bin.`;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="folder-delete-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen, eventDetails) => {
+				if (nextOpen) return;
+				// Escape must not dismiss while the deletion is running.
+				if (isMutating) eventDetails.cancel();
+				else onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent>
+				<DialogHeader>
 					<p className="eyebrow">Folder action</p>
-					<h2 id="folder-delete-dialog-title">Delete folder</h2>
-					<p className="mutation-dialog-subtitle">{folder}</p>
-				</div>
+					<DialogTitle>Delete folder</DialogTitle>
+					<DialogDescription className="wrap-anywhere">{folder}</DialogDescription>
+				</DialogHeader>
 				<p
 					className={
-						isEmpty === false ? "delete-confirm-warning" : "delete-confirm-summary"
+						isEmpty === false
+							? "text-[0.8rem] leading-snug font-semibold text-destructive"
+							: "text-[0.85rem] leading-normal text-muted-foreground"
 					}
 					role={isEmpty === false ? "alert" : undefined}
 				>
 					{summary}
 				</p>
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button
 						ref={cancelRef}
 						type="button"
@@ -116,7 +119,7 @@ export function FolderDeleteConfirmDialog({
 									: `Delete (${secondsRemaining})`}
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

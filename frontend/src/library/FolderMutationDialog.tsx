@@ -1,12 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { renameValidationError } from "./nameValidation";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 export type FolderMutationMode = "create" | "rename" | "move";
-
-// Native <select> dropdown popups paint their own scrollbar, so the themed
-// .scroll-y rules never reach them. size>1 keeps the picker in-page.
-const FOLDER_PICKER_VISIBLE_ROWS = 10;
 
 type FolderMutationDialogProps = {
 	folders: string[];
@@ -35,7 +44,7 @@ export function FolderMutationDialog({
 	onRename,
 }: FolderMutationDialogProps) {
 	const inputRef = useRef<HTMLInputElement>(null);
-	const selectRef = useRef<HTMLSelectElement>(null);
+	const selectRef = useRef<HTMLButtonElement>(null);
 	const createMode = mode === "create";
 	const renameMode = mode === "rename";
 	const moveMode = mode === "move";
@@ -44,10 +53,6 @@ export function FolderMutationDialog({
 	const [name, setName] = useState(renameMode ? currentName : "");
 	const [destinationParent, setDestinationParent] = useState(currentParent);
 	const [validationError, setValidationError] = useState("");
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const title = createMode ? "New folder" : renameMode ? "Rename folder" : "Move folder";
 	const subtitle = createMode
 		? targetFolder
@@ -103,57 +108,70 @@ export function FolderMutationDialog({
 	}
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="folder-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Folder action</p>
-					<h2 id="folder-dialog-title">{title}</h2>
-					<p className="mutation-dialog-subtitle">{subtitle}</p>
-				</div>
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen && !isMutating) onClose();
+			}}
+		>
+			<DialogContent>
+				<DialogHeader>
+					<p className="text-[0.7rem] font-extrabold tracking-[0.12em] text-primary uppercase">
+						Folder action
+					</p>
+					<DialogTitle>{title}</DialogTitle>
+					<DialogDescription className="wrap-anywhere">{subtitle}</DialogDescription>
+				</DialogHeader>
 				<form
+					className="grid gap-5"
 					onSubmit={(event) => {
 						event.preventDefault();
 						void submit();
 					}}
 				>
 					{moveMode ? (
-						<label className="mutation-dialog-field" htmlFor="move-folder-destination">
+						<label
+							className="grid gap-[0.4rem] text-[0.78rem] font-bold text-muted-foreground"
+							htmlFor="move-folder-destination"
+						>
 							<span>Destination folder</span>
-							<select
-								id="move-folder-destination"
-								ref={selectRef}
-								className="scroll-y"
-								size={Math.max(
-									2,
-									Math.min(
-										moveDestinations.length + 1,
-										FOLDER_PICKER_VISIBLE_ROWS,
-									),
-								)}
+							<Select
 								value={destinationParent}
-								onChange={(event) => {
-									setDestinationParent(event.target.value);
+								onValueChange={(value) => {
+									// "" is the library root; Base UI treats it as an empty
+									// value, so its label can't come from the item list.
+									setDestinationParent(value ?? "");
 									setValidationError("");
 								}}
 							>
-								<option value="">Library root</option>
-								{moveDestinations.map((folder) => (
-									<option key={folder} value={folder}>
-										{folder}
-									</option>
-								))}
-							</select>
+								<SelectTrigger
+									className="h-auto w-full rounded-md px-3 py-[0.65rem] data-placeholder:text-foreground data-[size=default]:h-auto"
+									id="move-folder-destination"
+									ref={selectRef}
+								>
+									<SelectValue>
+										{(value: string) => (value === "" ? "Library root" : value)}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="">Library root</SelectItem>
+									{moveDestinations.map((folder) => (
+										<SelectItem key={folder} value={folder}>
+											{folder}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 						</label>
 					) : (
-						<label className="mutation-dialog-field" htmlFor="folder-name">
+						<label
+							className="grid gap-[0.4rem] text-[0.78rem] font-bold text-muted-foreground"
+							htmlFor="folder-name"
+						>
 							<span>{createMode ? "Folder name" : "New name"}</span>
 							<input
+								className="min-w-0 px-3 py-[0.65rem]"
 								id="folder-name"
 								ref={inputRef}
 								value={name}
@@ -165,17 +183,17 @@ export function FolderMutationDialog({
 						</label>
 					)}
 					{moveMode && (
-						<p className="mutation-dialog-subtitle">
+						<p className="text-[0.82rem] text-muted-foreground">
 							If this list is a little cluttered, you can drag and drop the folder
 							onto another folder in the sidebar! ^^
 						</p>
 					)}
 					{validationError && (
-						<p className="mutation-dialog-error" role="alert">
+						<p className="text-[0.8rem] font-semibold text-destructive" role="alert">
 							{validationError}
 						</p>
 					)}
-					<div className="mutation-dialog-actions">
+					<div className="dialog-actions">
 						<button
 							type="button"
 							className="quiet-button"
@@ -195,7 +213,7 @@ export function FolderMutationDialog({
 						</button>
 					</div>
 				</form>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

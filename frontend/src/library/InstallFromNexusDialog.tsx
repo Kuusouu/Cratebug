@@ -1,8 +1,9 @@
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NexusAccount, ResolveNexusModPage } from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import styles from "./InstallFromNexusDialog.module.css";
 import {
 	defaultNexusFileId,
@@ -15,7 +16,6 @@ import {
 	nexusModPageURL,
 	parseNexusModPageInput,
 } from "./nexusPresentation";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type InstallFromNexusDialogProps = {
 	onReady: (modId: number, fileId: number) => void;
@@ -46,10 +46,6 @@ export function InstallFromNexusDialog({
 	const [busy, setBusy] = useState(false);
 	const [errorMessage, setErrorMessage] = useState("");
 	const inputRef = useRef<HTMLInputElement>(null);
-	const handleEscape = useCallback(() => {
-		if (!busy) onCancel();
-	}, [busy, onCancel]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -140,17 +136,17 @@ export function InstallFromNexusDialog({
 	const adultBlocked = errorMessage === nexusAdultContentBlockedMessage;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="install-nexus-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen && !busy) onCancel();
+			}}
+		>
+			<DialogContent>
 				<div>
 					<p className="eyebrow">Cratebug</p>
-					<h2 id="install-nexus-dialog-title">Install from Nexus Mods</h2>
+					<DialogTitle>Install from Nexus Mods</DialogTitle>
 				</div>
 
 				{step === "loading" && !errorMessage ? (
@@ -165,6 +161,7 @@ export function InstallFromNexusDialog({
 
 				{step === "paste" || (step === "pick-file" && !waitingPage) ? (
 					<form
+						className="grid gap-5"
 						onSubmit={(event) => {
 							event.preventDefault();
 							if (step === "pick-file") {
@@ -175,12 +172,16 @@ export function InstallFromNexusDialog({
 						}}
 					>
 						{step === "paste" ? (
-							<label className="mutation-dialog-field" htmlFor="install-nexus-url">
+							<label
+								className="grid gap-1.5 text-xs font-bold text-muted-foreground"
+								htmlFor="install-nexus-url"
+							>
 								<span>Nexus Mods page URL</span>
 								<input
 									ref={inputRef}
 									id="install-nexus-url"
 									type="text"
+									className="min-w-0 px-3 py-2.5"
 									value={url}
 									placeholder="https://www.nexusmods.com/marvelrivals/mods/..."
 									spellCheck={false}
@@ -257,12 +258,15 @@ export function InstallFromNexusDialog({
 						) : null}
 
 						{errorMessage ? (
-							<p className="mutation-dialog-error" role="alert">
+							<p
+								className="text-[0.8rem] leading-snug font-semibold text-destructive"
+								role="alert"
+							>
 								{errorMessage}
 							</p>
 						) : null}
 
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button
 								type="button"
 								className="quiet-button"
@@ -315,11 +319,14 @@ export function InstallFromNexusDialog({
 							</button>
 						) : null}
 						{errorMessage ? (
-							<p className="mutation-dialog-error" role="alert">
+							<p
+								className="text-[0.8rem] leading-snug font-semibold text-destructive"
+								role="alert"
+							>
 								{errorMessage}
 							</p>
 						) : null}
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button type="button" className="quiet-button" onClick={onCancel}>
 								Cancel
 							</button>
@@ -330,11 +337,14 @@ export function InstallFromNexusDialog({
 				{step === "connect" || (step === "loading" && errorMessage) ? (
 					<>
 						{errorMessage ? (
-							<p className="mutation-dialog-error" role="alert">
+							<p
+								className="text-[0.8rem] leading-snug font-semibold text-destructive"
+								role="alert"
+							>
 								{errorMessage}
 							</p>
 						) : null}
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button type="button" className="quiet-button" onClick={onCancel}>
 								Close
 							</button>
@@ -348,7 +358,10 @@ export function InstallFromNexusDialog({
 				{step === "no-files" ? (
 					<>
 						{errorMessage ? (
-							<p className="mutation-dialog-error" role="alert">
+							<p
+								className="text-[0.8rem] leading-snug font-semibold text-destructive"
+								role="alert"
+							>
 								{errorMessage}
 							</p>
 						) : (
@@ -356,14 +369,14 @@ export function InstallFromNexusDialog({
 								This mod has no installable MAIN or OPTIONAL files.
 							</p>
 						)}
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button type="button" className="quiet-button" onClick={onCancel}>
 								Close
 							</button>
 						</div>
 					</>
 				) : null}
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

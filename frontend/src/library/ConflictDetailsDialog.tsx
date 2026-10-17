@@ -1,10 +1,16 @@
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { ChevronRight, Package, X } from "lucide-react";
 import styles from "./ConflictDetailsDialog.module.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { conflict, discovery, modtype } from "../../wailsjs/go/models";
 import { canOrganizeMod, characterHeroPortraitUrl } from "./entryPresentation";
 import { maximumPriorityFor } from "./modPriority";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type ConflictDetailsDialogProps = {
 	result: conflict.Result;
@@ -84,8 +90,6 @@ export function ConflictDetailsDialog({
 	onSetPriority,
 }: ConflictDetailsDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
-	const handleEscape = useCallback(() => onClose(), [onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	useEffect(() => {
 		closeButtonRef.current?.focus();
@@ -104,24 +108,19 @@ export function ConflictDetailsDialog({
 	const crossPriorityCount = groups.length - samePriorityCount;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className={["mutation-dialog", styles["conflict-details-dialog"]].join(" ")}
-				aria-labelledby="conflict-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div className="conflict-dialog-header">
-					<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen) onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent className="max-h-[min(calc(100vh_-_3.5rem),56rem)] overflow-hidden sm:max-w-[44rem]">
+				<div className="flex items-start justify-between gap-4 border-b border-border pb-[0.85rem]">
+					<DialogHeader>
 						<p className="eyebrow">Conflict report</p>
-						<h2 id="conflict-dialog-title">Asset conflicts</h2>
-						<p
-							className={[
-								"mutation-dialog-subtitle",
-								styles["conflict-summary-pills"],
-							].join(" ")}
-						>
+						<DialogTitle>Asset conflicts</DialogTitle>
+						<DialogDescription className={styles["conflict-summary-pills"]}>
 							{samePriorityCount > 0 && (
 								<span
 									className={[
@@ -152,12 +151,12 @@ export function ConflictDetailsDialog({
 									{unavailable.length} unavailable
 								</span>
 							)}
-						</p>
-					</div>
+						</DialogDescription>
+					</DialogHeader>
 					<button
 						ref={closeButtonRef}
 						type="button"
-						className="icon-button conflict-dialog-close"
+						className="icon-button shrink-0"
 						onClick={onClose}
 						aria-label="Close conflict details"
 					>
@@ -173,7 +172,7 @@ export function ConflictDetailsDialog({
 					</p>
 				)}
 
-				<div className={[styles["conflict-groups-list"], "scroll-y"].join(" ")}>
+				<div className="scroll-y -me-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pe-3">
 					{characterBuckets.map((bucket) => (
 						<section
 							key={bucket.characterID}
@@ -196,13 +195,13 @@ export function ConflictDetailsDialog({
 					))}
 				</div>
 
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button type="button" className="quiet-button" onClick={onClose}>
 						Close
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }
 

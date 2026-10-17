@@ -1,8 +1,13 @@
-import { useCallback, useEffect, useRef } from "react";
-import styles from "./NexusLinkDialog.module.css";
+import { useEffect, useRef } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import type { main } from "../../wailsjs/go/models";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 import { formatNexusFileSize, formatNexusLinkTitle, nexusModPageURL } from "./nexusPresentation";
 
 type NexusLinkDialogProps = {
@@ -21,8 +26,6 @@ export function NexusLinkDialog({
 	onOpenSettings,
 }: NexusLinkDialogProps) {
 	const confirmRef = useRef<HTMLButtonElement>(null);
-	const handleEscape = useCallback(() => onCancel(), [onCancel]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const title = formatNexusLinkTitle(link);
 	const hasFile = (link.fileId ?? 0) > 0;
 	const needsAccount = !link.modName && !link.fileName;
@@ -38,43 +41,51 @@ export function NexusLinkDialog({
 		.join(" · ");
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="nexus-link-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Nexus Mods</p>
-					<h2 id="nexus-link-dialog-title">Install this download?</h2>
-				</div>
-				<div className={styles["nexus-link-summary"]}>
-					<p className={styles["nexus-link-title"]}>{title}</p>
-					{details ? <p className={styles["nexus-link-meta"]}>{details}</p> : null}
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen) onCancel();
+			}}
+		>
+			<DialogContent>
+				<DialogHeader>
+					<p className="text-[0.7rem] font-extrabold tracking-[0.12em] text-primary uppercase">
+						Nexus Mods
+					</p>
+					<DialogTitle>Install this download?</DialogTitle>
+				</DialogHeader>
+				<div className="grid gap-[0.35rem]">
+					<DialogDescription className="text-[0.95rem] font-bold text-foreground">
+						{title}
+					</DialogDescription>
+					{details ? (
+						<p className="text-[0.82rem] leading-[1.45] text-muted-foreground">
+							{details}
+						</p>
+					) : null}
 				</div>
 				{needsAccount ? (
-					<p className={styles["nexus-link-copy"]}>
+					<p className="text-[0.85rem] leading-normal text-muted-foreground">
 						Connect a Nexus Mods API key in Settings to confirm this download.
 					</p>
 				) : null}
 				{link.needsWebsite ? (
-					<p className={styles["nexus-link-copy"]}>
+					<p className="text-[0.85rem] leading-normal text-muted-foreground">
 						This link still needs a Mod Manager Download click on the Nexus website.
 					</p>
 				) : null}
 				{!libraryReady ? (
-					<p className={styles["nexus-link-copy"]}>
+					<p className="text-[0.85rem] leading-normal text-muted-foreground">
 						Set a mod library folder before installing.
 					</p>
 				) : null}
 				{!hasFile ? (
-					<p className="mutation-dialog-error" role="alert">
+					<p className="text-[0.8rem] font-semibold text-destructive" role="alert">
 						That Nexus link is missing a file.
 					</p>
 				) : null}
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button type="button" className="quiet-button" onClick={onCancel}>
 						Cancel
 					</button>
@@ -102,7 +113,7 @@ export function NexusLinkDialog({
 						Download &amp; install
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

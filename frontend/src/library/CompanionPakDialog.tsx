@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { useConfirmDelay } from "./useConfirmDelay";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type CompanionPakDialogProps = {
 	count: number;
@@ -29,35 +35,33 @@ export function CompanionPakDialog({
 		cancelRef.current?.focus();
 	}, []);
 
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
 	async function handleConfirm() {
 		if (await onConfirm()) onClose();
 	}
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="companion-pak-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen, eventDetails) => {
+				if (nextOpen) return;
+				// Escape must not dismiss while the rewrite is running.
+				if (isMutating) eventDetails.cancel();
+				else onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent>
+				<DialogHeader>
 					<p className="eyebrow">Mod action</p>
-					<h2 id="companion-pak-dialog-title">Unsupported companion PAK entries</h2>
-					<p className="mutation-dialog-subtitle">{modsLabel}</p>
-				</div>
-				<p className="delete-confirm-summary">
+					<DialogTitle>Unsupported companion PAK entries</DialogTitle>
+					<DialogDescription>{modsLabel}</DialogDescription>
+				</DialogHeader>
+				<p className="text-[0.85rem] leading-normal text-muted-foreground">
 					As of 3 September 2026, <code>chunknames</code> and <code>patched_files</code>{" "}
 					entries in a companion .pak cause anti-cheat crashes. {modsLabel} contain one or
 					both. Rewrite the affected .pak file(s)?
 				</p>
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button
 						ref={cancelRef}
 						type="button"
@@ -79,7 +83,7 @@ export function CompanionPakDialog({
 								: `Rewrite (${secondsRemaining})`}
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

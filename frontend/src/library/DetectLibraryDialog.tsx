@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef } from "react";
-import styles from "./DetectLibraryDialog.module.css";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { useEffect, useRef } from "react";
 import type { gamedetect } from "../../wailsjs/go/models";
 import { type LibraryProvider, libraryProviderLabels } from "./libraryTypes";
 import { providerLogos } from "./StoreLogos";
-import { focusableSelector, useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type DetectLibraryDialogProps = {
 	provider: LibraryProvider;
@@ -14,6 +13,11 @@ type DetectLibraryDialogProps = {
 	onCreate: () => void;
 	onClose: () => void;
 };
+
+// Paths are too long to sit inline: they render as a code chip that wraps
+// inside the dialog width.
+const pathCodeClass =
+	"my-1.5 block max-w-full rounded-md border border-border bg-secondary px-[0.6rem] py-[0.45rem] text-left text-[0.8rem] wrap-anywhere";
 
 // Shows the outcome of one auto-detection attempt that needs a decision:
 // switching to a found-but-different library, or creating the missing
@@ -30,17 +34,11 @@ export function DetectLibraryDialog({
 }: DetectLibraryDialogProps) {
 	const label = libraryProviderLabels[provider];
 	const Logo = providerLogos[provider];
-	const handleEscape = useCallback(() => {
-		// The Go side is mid-creation; closing now would hide the outcome
-		// without stopping it, the same reason Escape stays closed during an
-		// update download.
-		if (!isWorking) onClose();
-	}, [isWorking, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const cancelButtonRef = useRef<HTMLButtonElement>(null);
 	const primaryButtonRef = useRef<HTMLButtonElement>(null);
 
-	// ref.current is stable; effect intentionally re-runs only on isWorking/mode for focus management
+	// isWorking disables the focused button mid-flight, which drops focus to
+	// the page; bring it back to whichever action is still enabled.
 	useEffect(() => {
 		const primary = primaryButtonRef.current;
 		if (primary && !primary.disabled) {
@@ -50,57 +48,40 @@ export function DetectLibraryDialog({
 		const cancel = cancelButtonRef.current;
 		if (cancel && !cancel.disabled) {
 			cancel.focus();
-			return;
 		}
-		const dialog = dialogRef.current;
-		if (!dialog) return;
-		const fallback = dialog.querySelector<HTMLElement>(focusableSelector);
-		if (fallback) {
-			fallback.focus();
-			return;
-		}
-		// Both actions disabled during creation - keep focus inside dialog so
-		// the Escape listener on the container remains reachable.
-		dialog.focus();
 	}, [isWorking, mode]);
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="detect-library-dialog-title"
-				aria-modal="true"
-				role="dialog"
-				tabIndex={-1}
-			>
-				<div className={styles["detect-dialog-content"]}>
+		<Dialog
+			open
+			onOpenChange={(nextOpen) => {
+				// The Go side is mid-creation; closing now would hide the outcome
+				// without stopping it, the same reason Escape stays closed during an
+				// update download.
+				if (!nextOpen && !isWorking) onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent initialFocus={() => primaryButtonRef.current}>
+				<div className="flex flex-col gap-3">
 					<p className="eyebrow">
-						<Logo className={styles["detect-dialog-logo"] ?? ""} /> {label}
+						<Logo className="size-4 flex-none align-[-0.15em]" /> {label}
 					</p>
 					{mode === "apply" ? (
 						<>
-							<h2 id="detect-library-dialog-title">
-								Found your Marvel Rivals library
-							</h2>
+							<DialogTitle>Found your Marvel Rivals library</DialogTitle>
 							<p>
 								Your {label} library already exists at{" "}
-								<code className={styles["detect-dialog-path"]}>
-									{detection.libraryPath}
-								</code>
+								<code className={pathCodeClass}>{detection.libraryPath}</code>
 							</p>
 							<p>Use it as your mod library?</p>
 						</>
 					) : (
 						<>
-							<h2 id="detect-library-dialog-title">
-								No mod library was found for {label}
-							</h2>
+							<DialogTitle>No mod library was found for {label}</DialogTitle>
 							<p>
 								Cratebug found Marvel Rivals in your {label} installation at{" "}
-								<code className={styles["detect-dialog-path"]}>
-									{detection.paksPath}
-								</code>
+								<code className={pathCodeClass}>{detection.paksPath}</code>
 							</p>
 							<p>
 								The <code>~mods</code> folder it loads mods from does not exist yet.
@@ -112,7 +93,7 @@ export function DetectLibraryDialog({
 						</>
 					)}
 				</div>
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button
 						ref={cancelButtonRef}
 						type="button"
@@ -142,7 +123,7 @@ export function DetectLibraryDialog({
 						</button>
 					)}
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

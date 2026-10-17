@@ -1,8 +1,14 @@
-import { Check, ChevronDown, ListFilter } from "lucide-react";
+import { ChevronDown, ListFilter } from "lucide-react";
 import styles from "./FilterMenu.module.css";
-import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { usePositionedPopover } from "./usePositionedPopover";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 /** One single-select option inside a filter section. */
 export type FilterOption = {
@@ -34,93 +40,55 @@ type FilterMenuProps = {
 // thin popover over caller-supplied sections: new filters add data upstream,
 // not branches here.
 export function FilterMenu({ sections }: FilterMenuProps) {
-	const triggerRef = useRef<HTMLButtonElement>(null);
-	const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
-	const open = anchor !== null;
-
-	const close = useCallback(() => {
-		setAnchor(null);
-	}, []);
-
-	const { popoverRef, position } = usePositionedPopover<HTMLDivElement>(
-		anchor?.x ?? 0,
-		anchor?.y ?? 0,
-		close,
-	);
-
-	function toggleOpen() {
-		if (open) {
-			close();
-			return;
-		}
-		const rect = triggerRef.current?.getBoundingClientRect();
-		if (!rect) return;
-		setAnchor({ x: rect.left, y: rect.bottom + 6 });
-	}
-
 	const activeCount = sections.filter(
 		(section) => section.selectedValue !== section.defaultValue,
 	).length;
-	const container = triggerRef.current?.closest<HTMLElement>(".app-shell");
 
 	return (
-		<>
-			<button
-				type="button"
-				ref={triggerRef}
-				className={[styles["filter-menu-trigger"], activeCount > 0 ? styles.active : ""]
-					.filter(Boolean)
-					.join(" ")}
-				aria-haspopup="true"
-				aria-expanded={open}
-				aria-label="Filter catalog"
-				title="Filter catalog"
-				onClick={toggleOpen}
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={
+					<button
+						type="button"
+						className={[
+							styles["filter-menu-trigger"],
+							activeCount > 0 ? styles.active : "",
+						]
+							.filter(Boolean)
+							.join(" ")}
+						aria-label="Filter catalog"
+						title="Filter catalog"
+					/>
+				}
 			>
 				<ListFilter aria-hidden="true" />
 				{activeCount > 0 && <span>{activeCount}</span>}
 				<ChevronDown aria-hidden="true" />
-			</button>
-			{open &&
-				container &&
-				createPortal(
-					<div
-						ref={popoverRef}
-						className={styles["filter-menu-popover"]}
-						role="menu"
-						aria-label="Filter catalog"
-						style={{
-							left: position.left,
-							top: position.top,
-							visibility: position.ready ? "visible" : "hidden",
-						}}
-					>
-						{sections.map((section) => (
-							<section key={section.id} aria-label={section.title}>
-								<h3 className={styles["filter-menu-heading"]}>{section.title}</h3>
-								<ul className={styles["filter-menu-list"]}>
-									{section.options.map((option) => {
-										const selected = section.selectedValue === option.value;
-										return (
-											<li key={option.value}>
-												<button
-													type="button"
-													className={styles["filter-menu-option"]}
-													aria-pressed={selected}
-													onClick={() => section.onSelect(option.value)}
-												>
-													{selected && <Check aria-hidden="true" />}
-													<span>{option.label}</span>
-												</button>
-											</li>
-										);
-									})}
-								</ul>
-							</section>
-						))}
-					</div>,
-					container,
-				)}
-		</>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				sideOffset={6}
+				// Wide enough for the longest option label regardless of trigger width.
+				className="w-64"
+			>
+				{sections.map((section) => (
+					<DropdownMenuGroup key={section.id}>
+						<DropdownMenuLabel>{section.title}</DropdownMenuLabel>
+						{/* Picking an option is a filter change, not a menu action: the
+						    radio group and menu stay open while the caller updates. */}
+						<DropdownMenuRadioGroup value={section.selectedValue}>
+							{section.options.map((option) => (
+								<DropdownMenuRadioItem
+									key={option.value}
+									value={option.value}
+									onClick={() => section.onSelect(option.value)}
+								>
+									{option.label}
+								</DropdownMenuRadioItem>
+							))}
+						</DropdownMenuRadioGroup>
+					</DropdownMenuGroup>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

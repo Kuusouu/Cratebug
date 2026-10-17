@@ -1,9 +1,15 @@
 import { Download, Heart, X } from "lucide-react";
 import styles from "./UpdateDialog.module.css";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { update } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 
 export type UpdateDownloadProgress = {
 	downloaded: number;
@@ -124,12 +130,6 @@ export function UpdateDialog({
 	onClose,
 }: UpdateDialogProps) {
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
-	// Downloading is not cancellable yet, so Escape is ignored mid-download
-	// rather than abandoning a transfer the user can't resume.
-	const handleEscape = useCallback(() => {
-		if (!isDownloading) onClose();
-	}, [isDownloading, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	useEffect(() => {
 		closeButtonRef.current?.focus();
@@ -144,31 +144,33 @@ export function UpdateDialog({
 			: null;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className={["mutation-dialog", styles["update-dialog"]].join(" ")}
-				aria-labelledby="update-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div className="conflict-dialog-header">
-					<div>
+		// Downloading is not cancellable yet, so Escape is ignored mid-download
+		// rather than abandoning a transfer the user can't resume.
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen && !isDownloading) onClose();
+			}}
+		>
+			<DialogContent className="max-h-[min(calc(100vh_-_3.5rem),44rem)] overflow-hidden overscroll-contain sm:max-w-[32rem]">
+				<div className="flex items-start justify-between gap-4 border-b border-border pb-[0.85rem]">
+					<DialogHeader>
 						<p className="eyebrow">Cratebug</p>
-						<h2 id="update-dialog-title">
+						<DialogTitle>
 							{mode === "available"
 								? "What new crates are there?"
 								: "What's new in this crate"}
-						</h2>
-						<p className={styles["update-dialog-version"]}>
+						</DialogTitle>
+						<DialogDescription className={styles["update-dialog-version"]}>
 							Version {release.version.tag}
-						</p>
-					</div>
+						</DialogDescription>
+					</DialogHeader>
 					{!isDownloading && (
 						<button
 							ref={closeButtonRef}
 							type="button"
-							className="icon-button conflict-dialog-close"
+							className="icon-button shrink-0"
 							onClick={onClose}
 							aria-label="Close"
 						>
@@ -206,7 +208,7 @@ export function UpdateDialog({
 				</div>
 
 				{mode === "available" && (
-					<div className="mutation-dialog-actions">
+					<div className="dialog-actions">
 						{!isReady && (
 							<button
 								type="button"
@@ -236,7 +238,7 @@ export function UpdateDialog({
 					<Heart className={styles["update-heart"]} aria-hidden="true" /> by the
 					maintainer(s) of Cratebug
 				</p>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import type { discovery } from "../../wailsjs/go/models";
 import { maximumPriorityFor } from "./modPriority";
 import { renameValidationError } from "./nameValidation";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 export type ModMutationMode = "priority" | "rename" | "move";
-
-// Native <select> dropdown popups paint their own scrollbar, so the themed
-// .scroll-y rules never reach them. size>1 keeps the picker in-page.
-const FOLDER_PICKER_VISIBLE_ROWS = 10;
 
 type ModMutationDialogProps = {
 	entry: discovery.Entry;
@@ -35,15 +44,11 @@ export function ModMutationDialog({
 	onSetPriority,
 }: ModMutationDialogProps) {
 	const inputRef = useRef<HTMLInputElement>(null);
-	const selectRef = useRef<HTMLSelectElement>(null);
+	const selectRef = useRef<HTMLButtonElement>(null);
 	const [name, setName] = useState(entry.displayName);
 	const [priority, setPriority] = useState(String(entry.priority.value));
 	const [destinationFolder, setDestinationFolder] = useState(entry.relativeFolder);
 	const [validationError, setValidationError] = useState("");
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 	const renameMode = mode === "rename";
 	const priorityMode = mode === "priority";
 	const moveMode = mode === "move";
@@ -111,31 +116,38 @@ export function ModMutationDialog({
 	}
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="mutation-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Mod action</p>
-					<h2 id="mutation-dialog-title">{title}</h2>
-					<p className="mutation-dialog-subtitle">
-						{batchCount > 1 ? `${batchCount} mods` : entry.displayName}
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen && !isMutating) onClose();
+			}}
+		>
+			<DialogContent>
+				<DialogHeader>
+					<p className="text-[0.7rem] font-extrabold tracking-[0.12em] text-primary uppercase">
+						Mod action
 					</p>
-				</div>
+					<DialogTitle>{title}</DialogTitle>
+					<DialogDescription className="wrap-anywhere">
+						{batchCount > 1 ? `${batchCount} mods` : entry.displayName}
+					</DialogDescription>
+				</DialogHeader>
 				<form
+					className="grid gap-5"
 					onSubmit={(event) => {
 						event.preventDefault();
 						void submit();
 					}}
 				>
 					{renameMode ? (
-						<label className="mutation-dialog-field" htmlFor="rename-mod-name">
+						<label
+							className="grid gap-[0.4rem] text-[0.78rem] font-bold text-muted-foreground"
+							htmlFor="rename-mod-name"
+						>
 							<span>New name</span>
 							<input
+								className="min-w-0 px-3 py-[0.65rem]"
 								id="rename-mod-name"
 								ref={inputRef}
 								value={name}
@@ -146,34 +158,47 @@ export function ModMutationDialog({
 							/>
 						</label>
 					) : moveMode ? (
-						<label className="mutation-dialog-field" htmlFor="move-mod-folder">
+						<label
+							className="grid gap-[0.4rem] text-[0.78rem] font-bold text-muted-foreground"
+							htmlFor="move-mod-folder"
+						>
 							<span>Destination folder</span>
-							<select
-								id="move-mod-folder"
-								ref={selectRef}
-								className="scroll-y"
-								size={Math.max(
-									2,
-									Math.min(folders.length + 1, FOLDER_PICKER_VISIBLE_ROWS),
-								)}
+							<Select
 								value={destinationFolder}
-								onChange={(event) => {
-									setDestinationFolder(event.target.value);
+								onValueChange={(value) => {
+									// "" is the library root; Base UI treats it as an empty
+									// value, so its label can't come from the item list.
+									setDestinationFolder(value ?? "");
 									setValidationError("");
 								}}
 							>
-								<option value="">Library root</option>
-								{folders.map((folder) => (
-									<option key={folder} value={folder}>
-										{folder}
-									</option>
-								))}
-							</select>
+								<SelectTrigger
+									className="h-auto w-full rounded-md px-3 py-[0.65rem] data-placeholder:text-foreground data-[size=default]:h-auto"
+									id="move-mod-folder"
+									ref={selectRef}
+								>
+									<SelectValue>
+										{(value: string) => (value === "" ? "Library root" : value)}
+									</SelectValue>
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="">Library root</SelectItem>
+									{folders.map((folder) => (
+										<SelectItem key={folder} value={folder}>
+											{folder}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 						</label>
 					) : (
-						<label className="mutation-dialog-field" htmlFor="set-mod-priority">
+						<label
+							className="grid gap-[0.4rem] text-[0.78rem] font-bold text-muted-foreground"
+							htmlFor="set-mod-priority"
+						>
 							<span>Priority</span>
 							<input
+								className="min-w-0 px-3 py-[0.65rem]"
 								id="set-mod-priority"
 								inputMode="numeric"
 								min="0"
@@ -189,17 +214,17 @@ export function ModMutationDialog({
 						</label>
 					)}
 					{moveMode && (
-						<p className="mutation-dialog-subtitle">
+						<p className="text-[0.82rem] text-muted-foreground">
 							If this list is a little cluttered, you can drag and drop the mod onto a
 							folder in the sidebar! ^^
 						</p>
 					)}
 					{validationError && (
-						<p className="mutation-dialog-error" role="alert">
+						<p className="text-[0.8rem] font-semibold text-destructive" role="alert">
 							{validationError}
 						</p>
 					)}
-					<div className="mutation-dialog-actions">
+					<div className="dialog-actions">
 						<button
 							type="button"
 							className="quiet-button"
@@ -219,7 +244,7 @@ export function ModMutationDialog({
 						</button>
 					</div>
 				</form>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

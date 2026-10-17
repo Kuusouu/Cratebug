@@ -1,11 +1,3 @@
-:global(.mutation-dialog).update-dialog {
-	width: min(calc(100vw - 3rem), 32rem);
-	max-height: min(calc(100vh - 3.5rem), 44rem);
-	display: flex;
-	flex-direction: column;
-	overflow: hidden;
-}
-
 .update-dialog-version {
 	margin: 0.2rem 0 0;
 	font-size: 0.78rem;

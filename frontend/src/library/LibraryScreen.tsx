@@ -66,6 +66,13 @@ import {
 	type sigbypass,
 } from "../../wailsjs/go/models";
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { isSupportedAccentChoice, resolveAccent } from "./accentColor";
 import { BatchActionsMenu } from "./BatchActionsMenu";
 import { CompanionPakDialog } from "./CompanionPakDialog";
@@ -3037,24 +3044,19 @@ export function LibraryScreen() {
 					/>
 				)}
 			{companionProgress && (
-				<div className="mutation-dialog-backdrop">
-					<section
-						className="mutation-dialog"
-						aria-labelledby="companion-progress-title"
-						aria-modal="true"
-						role="dialog"
-					>
-						<div>
+				<Dialog open onOpenChange={() => {}} disablePointerDismissal>
+					<DialogContent>
+						<DialogHeader>
 							<p className="eyebrow">Mod action</p>
-							<h2 id="companion-progress-title">Rewriting companion PAK files</h2>
-							<p className="mutation-dialog-subtitle">
+							<DialogTitle>Rewriting companion PAK files</DialogTitle>
+							<DialogDescription className="wrap-anywhere">
 								{companionProgress.displayName || "Preparing..."}
-							</p>
-						</div>
-						<p className="delete-confirm-summary">
+							</DialogDescription>
+						</DialogHeader>
+						<p className="text-[0.85rem] leading-normal text-muted-foreground">
 							{companionProgress.current} of {companionProgress.total}
 						</p>
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button
 								type="button"
 								className="quiet-button"
@@ -3063,30 +3065,25 @@ export function LibraryScreen() {
 								Cancel
 							</button>
 						</div>
-					</section>
-				</div>
+					</DialogContent>
+				</Dialog>
 			)}
 			{encryptProgress && (
-				<div className="mutation-dialog-backdrop">
-					<section
-						className="mutation-dialog"
-						aria-labelledby="encrypt-progress-title"
-						aria-modal="true"
-						role="dialog"
-					>
-						<div>
+				<Dialog open onOpenChange={() => {}} disablePointerDismissal>
+					<DialogContent>
+						<DialogHeader>
 							<p className="eyebrow">Mod action</p>
-							<h2 id="encrypt-progress-title">
+							<DialogTitle>
 								{encryptActionIsEncrypt ? "Encrypting" : "Decrypting"}
-							</h2>
-							<p className="mutation-dialog-subtitle">
+							</DialogTitle>
+							<DialogDescription className="wrap-anywhere">
 								{encryptProgress.displayName || "Preparing..."}
-							</p>
-						</div>
-						<p className="delete-confirm-summary">
+							</DialogDescription>
+						</DialogHeader>
+						<p className="text-[0.85rem] leading-normal text-muted-foreground">
 							{encryptProgress.current} of {encryptProgress.total}
 						</p>
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button
 								type="button"
 								className="quiet-button"
@@ -3095,8 +3092,8 @@ export function LibraryScreen() {
 								Cancel
 							</button>
 						</div>
-					</section>
-				</div>
+					</DialogContent>
+				</Dialog>
 			)}
 			{activeFolderDialog && activeFolderDialog !== "delete" && library && (
 				<FolderMutationDialog

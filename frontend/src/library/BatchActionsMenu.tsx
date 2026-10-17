@@ -1,9 +1,12 @@
 import { EllipsisVertical } from "lucide-react";
 import styles from "./BatchActionsMenu.module.css";
-import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { EncryptionMenuState } from "./encryptionAction";
-import { usePositionedPopover } from "./usePositionedPopover";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type BatchActionsMenuProps = {
 	encryption: EncryptionMenuState;
@@ -33,127 +36,53 @@ export function BatchActionsMenu({
 	onMove,
 	onTags,
 }: BatchActionsMenuProps) {
-	const triggerRef = useRef<HTMLButtonElement>(null);
-	const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
-	const open = anchor !== null;
 	const empty = selectedCount === 0;
 	const encryptDisabled =
 		isBusy || (encryption.kind !== "encrypt" && encryption.kind !== "decrypt");
-
-	const close = useCallback(() => {
-		setAnchor(null);
-	}, []);
-
-	const { popoverRef, position } = usePositionedPopover<HTMLDivElement>(
-		anchor?.x ?? 0,
-		anchor?.y ?? 0,
-		close,
-	);
-
-	function toggleOpen() {
-		if (open) {
-			close();
-			return;
-		}
-		const rect = triggerRef.current?.getBoundingClientRect();
-		if (!rect) return;
-		setAnchor({ x: rect.left, y: rect.bottom + 6 });
-	}
-
-	function choose(action: () => void) {
-		close();
-		action();
-	}
-
 	const encryptLabel = encryption.kind === "decrypt" ? "Decrypt" : "Encrypt";
-	const container = triggerRef.current?.closest<HTMLElement>(".app-shell");
 
 	return (
-		<>
-			<button
-				type="button"
-				ref={triggerRef}
-				className={styles.trigger}
-				aria-haspopup="true"
-				aria-expanded={open}
-				aria-label="Batch actions"
+		<DropdownMenu>
+			<DropdownMenuTrigger
 				disabled={isBusy}
-				onClick={toggleOpen}
+				render={
+					<button type="button" className={styles.trigger} aria-label="Batch actions" />
+				}
 			>
 				<EllipsisVertical aria-hidden="true" />
-			</button>
-			{open &&
-				container &&
-				createPortal(
-					<div
-						className={styles.popover}
-						ref={popoverRef}
-						role="menu"
-						aria-label="Batch actions"
-						style={{
-							left: position.left,
-							top: position.top,
-							visibility: position.ready ? "visible" : "hidden",
-						}}
-					>
-						<button
-							type="button"
-							className={styles.item}
-							role="menuitem"
-							disabled={isBusy || empty}
-							onClick={() => choose(onEnable)}
-						>
-							Enable
-						</button>
-						<button
-							type="button"
-							className={styles.item}
-							role="menuitem"
-							disabled={isBusy || empty}
-							onClick={() => choose(onDisable)}
-						>
-							Disable
-						</button>
-						<button
-							type="button"
-							className={styles.item}
-							role="menuitem"
-							disabled={isBusy || empty}
-							onClick={() => choose(onMove)}
-						>
-							Move to...
-						</button>
-						<button
-							type="button"
-							className={styles.item}
-							role="menuitem"
-							disabled={isBusy || empty}
-							onClick={() => choose(onTags)}
-						>
-							Tags...
-						</button>
-						<button
-							type="button"
-							className={styles.item}
-							role="menuitem"
-							disabled={encryptDisabled}
-							title={encryptDisabled ? encryption.reason : undefined}
-							onClick={() => choose(onEncrypt)}
-						>
-							{encryptLabel}
-						</button>
-						<button
-							type="button"
-							className={`${styles.item} ${styles.destructive}`}
-							role="menuitem"
-							disabled={isBusy || empty}
-							onClick={() => choose(onDelete)}
-						>
-							Delete...
-						</button>
-					</div>,
-					container,
-				)}
-		</>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				sideOffset={6}
+				// Sized to the labels, not to the compact icon trigger.
+				className="w-auto min-w-46"
+			>
+				<DropdownMenuItem disabled={isBusy || empty} onClick={onEnable}>
+					Enable
+				</DropdownMenuItem>
+				<DropdownMenuItem disabled={isBusy || empty} onClick={onDisable}>
+					Disable
+				</DropdownMenuItem>
+				<DropdownMenuItem disabled={isBusy || empty} onClick={onMove}>
+					Move to...
+				</DropdownMenuItem>
+				<DropdownMenuItem disabled={isBusy || empty} onClick={onTags}>
+					Tags...
+				</DropdownMenuItem>
+				<DropdownMenuItem
+					disabled={encryptDisabled}
+					title={encryptDisabled ? encryption.reason : undefined}
+					onClick={onEncrypt}
+				>
+					{encryptLabel}
+				</DropdownMenuItem>
+				<DropdownMenuItem
+					variant="destructive"
+					disabled={isBusy || empty}
+					onClick={onDelete}
+				>
+					Delete...
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

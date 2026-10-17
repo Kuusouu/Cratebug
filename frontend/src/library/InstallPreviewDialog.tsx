@@ -9,7 +9,7 @@ import {
 	X,
 } from "lucide-react";
 import styles from "./InstallPreviewDialog.module.css";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	ApplyInstall,
 	CancelInstall,
@@ -18,6 +18,14 @@ import {
 	PrepareNexusInstall,
 } from "../../wailsjs/go/main/App";
 import { type discovery, install } from "../../wailsjs/go/models";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import {
 	categorySlug,
 	entryCategoryLabel,
@@ -37,7 +45,6 @@ import {
 	validateInstallModName,
 } from "./installPresentation";
 import { type InstallProgressView, formatInstallProgress } from "./nexusPresentation";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 export type InstallSource =
 	| { kind: "files"; paths: string[] }
@@ -56,6 +63,10 @@ export type InstallPreviewDialogProps = {
 
 type DialogPhase = "preparing" | "ready" | "applying" | "error";
 
+// Base UI treats "" as "no selection", so the library-root option carries a
+// sentinel that is translated back to "" before it reaches the install calls.
+const LIBRARY_ROOT_OPTION = "__cratebug_library_root__";
+
 export function InstallPreviewDialog({
 	modRoot,
 	source,
@@ -73,13 +84,12 @@ export function InstallPreviewDialog({
 	const [expandedFiles, setExpandedFiles] = useState<Record<string, boolean>>({});
 	const sessionIdRef = useRef<string | null>(null);
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
-	const titleId = useId();
 
 	useEffect(() => {
 		closeButtonRef.current?.focus();
 	}, []);
 
-	// Cancel session on escape or background close
+	// Cancel the staging session when the dialog closes (Escape or close button).
 	const handleCancel = useCallback(async () => {
 		if (source.kind === "nexus") {
 			try {
@@ -98,12 +108,6 @@ export function InstallPreviewDialog({
 		}
 		onCancel();
 	}, [onCancel, source.kind]);
-
-	const dialogRef = useDialogFocusTrap<HTMLElement>(() => {
-		if (phase !== "applying") {
-			void handleCancel();
-		}
-	});
 
 	// Stage files and generate preview on mount
 	useEffect(() => {
@@ -274,24 +278,24 @@ export function InstallPreviewDialog({
 	}, [selectedItems.length, items.length]);
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className={["mutation-dialog", styles["install-preview-dialog"]].join(" ")}
-				aria-labelledby={titleId}
-				aria-modal="true"
-				role="dialog"
-			>
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen && phase !== "applying") void handleCancel();
+			}}
+		>
+			<DialogContent className="max-h-[min(calc(100vh_-_3.5rem),52rem)] overflow-hidden overscroll-contain sm:max-w-[56rem]">
 				<div className={styles["install-preview-header"]}>
 					<div>
 						<p className="eyebrow">Mod installation</p>
-						<h2 id={titleId}>
+						<DialogTitle>
 							{phase === "preparing"
 								? "Inspecting files..."
 								: items.length === 1
 									? "Install 1 mod"
 									: `Install ${items.length} mods`}
-						</h2>
+						</DialogTitle>
 					</div>
 					{phase !== "applying" && (
 						<button
@@ -347,7 +351,7 @@ export function InstallPreviewDialog({
 					>
 						<CircleAlert aria-hidden="true" />
 						<p>{errorMessage || "An error occurred during installation."}</p>
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button
 								type="button"
 								className="quiet-button"
@@ -363,7 +367,7 @@ export function InstallPreviewDialog({
 					<div className={styles["install-preview-status-state"]}>
 						<Package aria-hidden="true" />
 						<p>No installable mod files were found in the selected files.</p>
-						<div className="mutation-dialog-actions">
+						<div className="dialog-actions">
 							<button
 								type="button"
 								className="quiet-button"
@@ -491,13 +495,14 @@ export function InstallPreviewDialog({
 
 										<div className={styles["install-mod-fields"]}>
 											<label
-												className="mutation-dialog-field"
+												className="grid gap-1.5 text-xs font-bold text-muted-foreground"
 												htmlFor={`mod-name-${item.id}`}
 											>
 												<span>Mod name</span>
 												<input
 													id={`mod-name-${item.id}`}
 													type="text"
+													className="min-w-0 px-3 py-2.5"
 													value={config.modName}
 													disabled={!isSelected || phase === "applying"}
 													onChange={(event) =>
@@ -509,28 +514,48 @@ export function InstallPreviewDialog({
 											</label>
 
 											<label
-												className="mutation-dialog-field"
+												className="grid gap-1.5 text-xs font-bold text-muted-foreground"
 												htmlFor={`mod-folder-${item.id}`}
 											>
 												<span>Destination folder</span>
-												<select
-													id={`mod-folder-${item.id}`}
-													className="scroll-y"
-													value={config.destinationFolder}
-													disabled={!isSelected || phase === "applying"}
-													onChange={(event) =>
-														handleConfigChange(item.id, {
-															destinationFolder: event.target.value,
-														})
+												<Select
+													value={
+														config.destinationFolder === ""
+															? LIBRARY_ROOT_OPTION
+															: config.destinationFolder
 													}
+													disabled={!isSelected || phase === "applying"}
+													onValueChange={(nextFolder) => {
+														if (nextFolder === null) return;
+														handleConfigChange(item.id, {
+															destinationFolder:
+																nextFolder === LIBRARY_ROOT_OPTION
+																	? ""
+																	: nextFolder,
+														});
+													}}
 												>
-													<option value="">Library root</option>
-													{folders.map((folder) => (
-														<option key={folder} value={folder}>
-															{folder}
-														</option>
-													))}
-												</select>
+													<SelectTrigger
+														id={`mod-folder-${item.id}`}
+														className="w-full"
+													>
+														<SelectValue>
+															{config.destinationFolder === ""
+																? "Library root"
+																: config.destinationFolder}
+														</SelectValue>
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value={LIBRARY_ROOT_OPTION}>
+															Library root
+														</SelectItem>
+														{folders.map((folder) => (
+															<SelectItem key={folder} value={folder}>
+																{folder}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
 											</label>
 										</div>
 
@@ -581,7 +606,10 @@ export function InstallPreviewDialog({
 										</div>
 
 										{error && (
-											<p className="mutation-dialog-error" role="alert">
+											<p
+												className="text-[0.8rem] leading-snug font-semibold text-destructive"
+												role="alert"
+											>
 												{error}
 											</p>
 										)}
@@ -758,7 +786,7 @@ export function InstallPreviewDialog({
 									Select at least 1 mod to install.
 								</p>
 							)}
-							<div className="mutation-dialog-actions">
+							<div className="dialog-actions">
 								<button
 									type="button"
 									className="quiet-button"
@@ -791,7 +819,7 @@ export function InstallPreviewDialog({
 						</div>
 					</>
 				)}
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

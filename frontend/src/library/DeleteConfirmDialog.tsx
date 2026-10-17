@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import type { discovery } from "../../wailsjs/go/models";
 import { hasMissingSidecar } from "./entryPresentation";
 import { useConfirmDelay } from "./useConfirmDelay";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type DeleteConfirmDialogProps = {
 	entries: discovery.Entry[];
@@ -27,10 +33,7 @@ export function DeleteConfirmDialog({
 	const { secondsRemaining, ready } = useConfirmDelay(skipConfirmDelay);
 	const cancelRef = useRef<HTMLButtonElement>(null);
 
-	// Cancel, not the destructive action, gets initial focus. This also puts
-	// focus inside the dialog so the shared focus trap's Escape/Tab handling
-	// (which listens on the dialog element and relies on the keydown bubbling
-	// from whatever currently has focus) actually has something to bubble from.
+	// Cancel, not the destructive action, gets initial focus.
 	useEffect(() => {
 		cancelRef.current?.focus();
 	}, []);
@@ -43,10 +46,6 @@ export function DeleteConfirmDialog({
 			.map((path) => path.split("/").pop() ?? path),
 	);
 	const names = entries.map((item) => item.displayName);
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	async function handleConfirm() {
 		if (await onConfirm(entries)) onClose();
@@ -55,35 +54,41 @@ export function DeleteConfirmDialog({
 	if (!entry) return null;
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="delete-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen, eventDetails) => {
+				if (nextOpen) return;
+				// Escape must not dismiss while the deletion is running.
+				if (isMutating) eventDetails.cancel();
+				else onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent>
+				<DialogHeader>
 					<p className="eyebrow">Mod action</p>
-					<h2 id="delete-dialog-title">
+					<DialogTitle>
 						{entries.length === 1 ? "Delete mod" : `Delete ${entries.length} mods`}
-					</h2>
-					<p className="mutation-dialog-subtitle">
+					</DialogTitle>
+					<DialogDescription className="wrap-anywhere">
 						{entries.length === 1 ? entry.displayName : names.join(", ")}
-					</p>
-				</div>
-				<p className="delete-confirm-summary">
+					</DialogDescription>
+				</DialogHeader>
+				<p className="text-[0.85rem] leading-normal text-muted-foreground">
 					Sends {entries.length === 1 ? bundleFiles.join(", ") : `${entries.length} mods`}{" "}
 					to the Recycle Bin. You can restore {entries.length === 1 ? "it" : "them"} from
 					there.
 				</p>
 				{missingSidecar && (
-					<p className="delete-confirm-warning" role="alert">
+					<p
+						className="text-[0.8rem] leading-snug font-semibold text-destructive"
+						role="alert"
+					>
 						{entries.length === 1 ? "This bundle is" : "One or more bundles are"}{" "}
 						missing a recognized file. Only the files listed above will be removed.
 					</p>
 				)}
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button
 						ref={cancelRef}
 						type="button"
@@ -106,7 +111,7 @@ export function DeleteConfirmDialog({
 								: `Delete (${secondsRemaining})`}
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

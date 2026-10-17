@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import styles from "./ModTagDialog.module.css";
+import { useEffect, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import type { discovery, metadata } from "../../wailsjs/go/models";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type ModTagDialogProps = {
 	entry: discovery.Entry;
@@ -34,10 +39,6 @@ export function ModTagDialog({
 	const [togglingTagID, setTogglingTagID] = useState<string | null>(null);
 	const [isCreating, setIsCreating] = useState(false);
 	const isBusy = isCreating || togglingTagID !== null;
-	const handleEscape = useCallback(() => {
-		if (!isBusy) onClose();
-	}, [isBusy, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
 
 	useEffect(() => {
 		inputRef.current?.focus();
@@ -71,30 +72,33 @@ export function ModTagDialog({
 	}
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="tag-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
-					<p className="eyebrow">Mod action</p>
-					<h2 id="tag-dialog-title">Tags</h2>
-					<p className="mutation-dialog-subtitle">
-						{batchCount > 1 ? `${batchCount} mods` : entry.displayName}
+		<Dialog
+			open
+			disablePointerDismissal
+			onOpenChange={(nextOpen) => {
+				if (!nextOpen && !isBusy) onClose();
+			}}
+		>
+			<DialogContent>
+				<DialogHeader>
+					<p className="text-[0.7rem] font-extrabold tracking-[0.12em] text-primary uppercase">
+						Mod action
 					</p>
-				</div>
+					<DialogTitle>Tags</DialogTitle>
+					<DialogDescription className="wrap-anywhere">
+						{batchCount > 1 ? `${batchCount} mods` : entry.displayName}
+					</DialogDescription>
+				</DialogHeader>
 				{catalog.length > 0 ? (
-					<ul className={styles["tag-checklist"]}>
+					<ul className="grid max-h-56 gap-[0.35rem] overflow-y-auto">
 						{catalog.map((tag) => {
 							const assigned = assignedTagIDs.has(tag.id);
 							return (
 								<li key={tag.id}>
-									<label>
+									<label className="flex items-center gap-[0.6rem] rounded-md border border-border px-[0.6rem] py-2 text-[0.85rem] font-semibold">
 										<input
 											type="checkbox"
+											className="w-auto"
 											checked={assigned}
 											disabled={isBusy}
 											onChange={() => void handleToggle(tag, !assigned)}
@@ -106,17 +110,24 @@ export function ModTagDialog({
 						})}
 					</ul>
 				) : (
-					<p className="mutation-dialog-subtitle">No tags yet. Create one below.</p>
+					<p className="text-[0.82rem] text-muted-foreground">
+						No tags yet. Create one below.
+					</p>
 				)}
 				<form
+					className="grid gap-5"
 					onSubmit={(event) => {
 						event.preventDefault();
 						void submitNewTag();
 					}}
 				>
-					<label className="mutation-dialog-field" htmlFor="new-tag-name">
+					<label
+						className="grid gap-[0.4rem] text-[0.78rem] font-bold text-muted-foreground"
+						htmlFor="new-tag-name"
+					>
 						<span>New tag</span>
 						<input
+							className="min-w-0 px-3 py-[0.65rem]"
 							id="new-tag-name"
 							ref={inputRef}
 							value={newTagName}
@@ -128,11 +139,11 @@ export function ModTagDialog({
 						/>
 					</label>
 					{validationError && (
-						<p className="mutation-dialog-error" role="alert">
+						<p className="text-[0.8rem] font-semibold text-destructive" role="alert">
 							{validationError}
 						</p>
 					)}
-					<div className="mutation-dialog-actions">
+					<div className="dialog-actions">
 						<button
 							type="button"
 							className="quiet-button"
@@ -146,7 +157,7 @@ export function ModTagDialog({
 						</button>
 					</div>
 				</form>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

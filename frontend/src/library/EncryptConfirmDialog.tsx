@@ -1,7 +1,13 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import type { discovery } from "../../wailsjs/go/models";
 import { useConfirmDelay } from "./useConfirmDelay";
-import { useDialogFocusTrap } from "./useDialogFocusTrap";
 
 type EncryptConfirmDialogProps = {
 	encrypt: boolean;
@@ -34,42 +40,40 @@ export function EncryptConfirmDialog({
 		cancelRef.current?.focus();
 	}, []);
 
-	const handleEscape = useCallback(() => {
-		if (!isMutating) onClose();
-	}, [isMutating, onClose]);
-	const dialogRef = useDialogFocusTrap<HTMLElement>(handleEscape);
-
 	async function handleConfirm() {
 		if (await onConfirm()) onClose();
 	}
 
 	return (
-		<div className="mutation-dialog-backdrop">
-			<section
-				ref={dialogRef}
-				className="mutation-dialog"
-				aria-labelledby="encrypt-dialog-title"
-				aria-modal="true"
-				role="dialog"
-			>
-				<div>
+		<Dialog
+			open
+			onOpenChange={(nextOpen, eventDetails) => {
+				if (nextOpen) return;
+				// Escape must not dismiss while the rewrite is running.
+				if (isMutating) eventDetails.cancel();
+				else onClose();
+			}}
+			disablePointerDismissal
+		>
+			<DialogContent>
+				<DialogHeader>
 					<p className="eyebrow">Mod action</p>
-					<h2 id="encrypt-dialog-title">{action} mods</h2>
-					<p className="mutation-dialog-subtitle">
+					<DialogTitle>{action} mods</DialogTitle>
+					<DialogDescription className="wrap-anywhere">
 						{entries.length === 1 ? names[0] : `${entries.length} mods`}
-					</p>
-				</div>
-				<p className="delete-confirm-summary">
+					</DialogDescription>
+				</DialogHeader>
+				<p className="text-[0.85rem] leading-normal text-muted-foreground">
 					{encrypt
 						? `Encrypts ${listed} by rewriting each complete IoStore container in place.`
 						: `Decrypts ${listed} while preserving each container's identity and cooked assets.`}
 				</p>
-				<p className="mutation-dialog-warning" role="status">
+				<p className="text-[0.8rem] leading-snug font-semibold text-warn" role="status">
 					{encrypt
 						? "A failed encryption leaves that mod as it was."
 						: "A failed decryption leaves that mod as it was."}
 				</p>
-				<div className="mutation-dialog-actions">
+				<div className="dialog-actions">
 					<button
 						ref={cancelRef}
 						type="button"
@@ -93,7 +97,7 @@ export function EncryptConfirmDialog({
 								: `${action} (${secondsRemaining})`}
 					</button>
 				</div>
-			</section>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }
