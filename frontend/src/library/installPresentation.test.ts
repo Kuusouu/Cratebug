@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { discovery, install } from "../../wailsjs/go/models";
 import {
 	detectLibraryCollision,

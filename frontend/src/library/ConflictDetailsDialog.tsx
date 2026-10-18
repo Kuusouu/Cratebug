@@ -1,3 +1,6 @@
+import { ChevronRight, Package, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -6,12 +9,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { ChevronRight, Package, X } from "lucide-react";
-import styles from "./ConflictDetailsDialog.module.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+
 import type { conflict, discovery, modtype } from "../../wailsjs/go/models";
 import { canOrganizeMod, characterHeroPortraitUrl } from "./entryPresentation";
 import { maximumPriorityFor } from "./modPriority";
+
+import styles from "./ConflictDetailsDialog.module.css";
 
 type ConflictDetailsDialogProps = {
 	result: conflict.Result;

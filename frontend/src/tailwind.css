@@ -45,6 +45,8 @@
 	--color-ring: var(--accent);
 	--color-good: var(--good);
 	--color-warn: var(--warn);
+	--shadow-toast: var(--toast-shadow);
+	--shadow-dialog: var(--dialog-shadow);
 
 	--radius-sm: calc(var(--radius) * 0.6);
 	--radius-md: calc(var(--radius) * 0.8);

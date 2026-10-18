@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { gamedetect } from "../../wailsjs/go/models";
 import { detectionOutcome } from "./libraryDetection";
 

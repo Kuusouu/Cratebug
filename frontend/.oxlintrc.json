@@ -1,6 +1,7 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
-	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y"],
+	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import"],
+	"jsPlugins": [{ "name": "cratebug", "specifier": "./lint/style-tokens.js" }],
 	"options": { "typeAware": true },
 	"categories": {
 		"correctness": "warn",
@@ -12,6 +13,10 @@
 		"suspicious": "warn"
 	},
 	"rules": {
+		"import/no-cycle": "error",
+		"import/no-duplicates": "error",
+		"import/no-self-import": "error",
+		"import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
 		"no-unused-vars": "error",
 		"no-var": "error",
 		"prefer-const": "error",
@@ -50,6 +55,34 @@
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-useless-spread": "off"
 	},
+	"overrides": [
+		{
+			"files": ["src/**"],
+			"rules": { "cratebug/no-raw-tailwind-colors": "error" }
+		},
+		{
+			"files": ["src/**"],
+			"excludeFiles": ["src/components/ui/**"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": [
+									"@base-ui/react",
+									"@base-ui/react/**",
+									"@radix-ui/**",
+									"radix-ui"
+								],
+								"message": "Compose primitives from @/components/ui; keep vendor imports inside that directory."
+							}
+						]
+					}
+				]
+			}
+		}
+	],
 	"ignorePatterns": [
 		"/node_modules",
 		"/wailsjs",

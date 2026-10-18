@@ -12,6 +12,8 @@
 	--good: #35c7a1;
 	--warn: #e9b568;
 	--bad: #ec5b70;
+	--toast-shadow: 0 0.8rem 2rem rgba(0, 0, 0, 0.24);
+	--dialog-shadow: 0 1.25rem 3.5rem rgba(0, 0, 0, 0.34);
 
 	color-scheme: dark;
 }

@@ -1,9 +1,7 @@
-import { Button } from "@/components/ui/button";
 import { Download, Heart, X } from "lucide-react";
-import styles from "./UpdateDialog.module.css";
 import { useEffect, useRef } from "react";
-import type { update } from "../../wailsjs/go/models";
-import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
+
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -11,6 +9,11 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+
+import type { update } from "../../wailsjs/go/models";
+import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
+
+import styles from "./UpdateDialog.module.css";
 
 export type UpdateDownloadProgress = {
 	downloaded: number;

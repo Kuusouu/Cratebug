@@ -1,6 +1,8 @@
+import { useEffect, useRef } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { useEffect, useRef } from "react";
+
 import type { gamedetect } from "../../wailsjs/go/models";
 import { type LibraryProvider, libraryProviderLabels } from "./libraryTypes";
 import { providerLogos } from "./StoreLogos";

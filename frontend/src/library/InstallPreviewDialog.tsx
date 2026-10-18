@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
 	ChevronDown,
 	ChevronRight,
@@ -9,16 +8,9 @@ import {
 	TriangleAlert,
 	X,
 } from "lucide-react";
-import styles from "./InstallPreviewDialog.module.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-	ApplyInstall,
-	CancelInstall,
-	CancelNexusDownload,
-	PrepareInstall,
-	PrepareNexusInstall,
-} from "../../wailsjs/go/main/App";
-import { type discovery, install } from "../../wailsjs/go/models";
+
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
 	Select,
@@ -27,6 +19,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+
+import {
+	ApplyInstall,
+	CancelInstall,
+	CancelNexusDownload,
+	PrepareInstall,
+	PrepareNexusInstall,
+} from "../../wailsjs/go/main/App";
+import { type discovery, install } from "../../wailsjs/go/models";
 import {
 	categorySlug,
 	entryCategoryLabel,
@@ -46,6 +47,8 @@ import {
 	validateInstallModName,
 } from "./installPresentation";
 import { type InstallProgressView, formatInstallProgress } from "./nexusPresentation";
+
+import styles from "./InstallPreviewDialog.module.css";
 
 export type InstallSource =
 	| { kind: "files"; paths: string[] }

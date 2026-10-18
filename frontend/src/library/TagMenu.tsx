@@ -1,9 +1,12 @@
 import { Check, ChevronDown, Pencil, Plus, Trash2, X } from "lucide-react";
-import styles from "./TagMenu.module.css";
 import { useCallback, useState } from "react";
-import type { metadata } from "../../wailsjs/go/models";
+
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+import type { metadata } from "../../wailsjs/go/models";
+
+import styles from "./TagMenu.module.css";
 
 type TagMenuProps = {
 	catalog: metadata.Tag[];

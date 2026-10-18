@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
 	Download,
 	Grid2X2,
@@ -10,6 +9,16 @@ import {
 	Wrench,
 } from "lucide-react";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+
 import {
 	ApplyUpdate,
 	AssignModTag,
@@ -67,28 +76,20 @@ import {
 	type sigbypass,
 } from "../../wailsjs/go/models";
 import { EventsOn, OnFileDrop, OnFileDropOff } from "../../wailsjs/runtime/runtime";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import { isSupportedAccentChoice, resolveAccent } from "./accentColor";
 import { BatchActionsMenu } from "./BatchActionsMenu";
-import { CompanionPakDialog } from "./CompanionPakDialog";
-import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
-import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import {
 	type CheckClickModifiers,
 	nextCheckedIDs,
 	remapCheckedID,
 	retainCheckedIDs,
 } from "./checkedSelection";
+import { CompanionPakDialog } from "./CompanionPakDialog";
+import { ConflictDetailsDialog } from "./ConflictDetailsDialog";
+import { ContextMenu, type ContextMenuItem, type ContextMenuState } from "./ContextMenu";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { DetectLibraryDialog } from "./DetectLibraryDialog";
 import { EncryptConfirmDialog } from "./EncryptConfirmDialog";
-import { EncryptionRequiredDialog } from "./EncryptionRequiredDialog";
 import { encryptionMenuState } from "./encryptionAction";
 import {
 	type EncryptionFilter,
@@ -96,15 +97,15 @@ import {
 	encryptionFilters,
 	matchesEncryptionFilter,
 } from "./encryptionFilter";
+import { EncryptionRequiredDialog } from "./EncryptionRequiredDialog";
 import { canChangeModState, canDeleteMod, canOrganizeMod, canTagMod } from "./entryPresentation";
-import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
 import { type FilterSection, FilterMenu } from "./FilterMenu";
+import { FolderDeleteConfirmDialog } from "./FolderDeleteConfirmDialog";
 import { FolderMutationDialog } from "./FolderMutationDialog";
 import { FolderNavigation } from "./FolderNavigation";
 import { InstallFromNexusDialog } from "./InstallFromNexusDialog";
-import { InstallPreviewDialog, type InstallSource } from "./InstallPreviewDialog";
 import { formatWailsError as errorMessage } from "./installPresentation";
-import styles from "./LibraryScreen.module.css";
+import { InstallPreviewDialog, type InstallSource } from "./InstallPreviewDialog";
 import { detectionOutcome } from "./libraryDetection";
 import {
 	type DraggedItem,
@@ -137,6 +138,8 @@ import { providerLogos } from "./StoreLogos";
 import { TagMenu } from "./TagMenu";
 import { ToolsDialog } from "./ToolsDialog";
 import { UpdateDialog, type UpdateDownloadProgress } from "./UpdateDialog";
+
+import styles from "./LibraryScreen.module.css";
 
 type LibraryIndex = {
 	folders: string[];

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { discovery, modtype } from "../../wailsjs/go/models";
 import { type EncryptionFilter, matchesEncryptionFilter } from "./encryptionFilter";
 

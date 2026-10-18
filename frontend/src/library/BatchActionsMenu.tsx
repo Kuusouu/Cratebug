@@ -1,12 +1,15 @@
 import { EllipsisVertical } from "lucide-react";
-import styles from "./BatchActionsMenu.module.css";
-import type { EncryptionMenuState } from "./encryptionAction";
+
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+import type { EncryptionMenuState } from "./encryptionAction";
+
+import styles from "./BatchActionsMenu.module.css";
 
 type BatchActionsMenuProps = {
 	encryption: EncryptionMenuState;

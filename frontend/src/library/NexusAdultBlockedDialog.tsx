@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -7,6 +8,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import { nexusAdultContentBlockedMessage, nexusContentBlockingURL } from "./nexusPresentation";
 

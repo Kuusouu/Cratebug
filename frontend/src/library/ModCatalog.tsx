@@ -1,7 +1,8 @@
 import { Lock, Package, ShieldAlert, X } from "lucide-react";
-import styles from "./ModCatalog.module.css";
 import { type DragEvent, memo, type MouseEvent, type ReactNode } from "react";
+
 import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
+import type { CheckClickModifiers } from "./checkedSelection";
 import {
 	canChangeModState,
 	canOrganizeMod,
@@ -11,8 +12,9 @@ import {
 	entryCharacterLabel,
 	entryHeroPortraitUrl,
 } from "./entryPresentation";
-import type { CheckClickModifiers } from "./checkedSelection";
 import type { LibraryState, ViewMode } from "./libraryTypes";
+
+import styles from "./ModCatalog.module.css";
 
 // Caps visible chips so a heavily-tagged mod cannot push a card's other
 // controls out of a reasonable height; the rest collapse into a "+N" chip

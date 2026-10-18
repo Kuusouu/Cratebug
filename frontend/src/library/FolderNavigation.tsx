@@ -1,8 +1,11 @@
 import { ChevronRight, Folder, FolderRoot, LibraryBig } from "lucide-react";
-import styles from "./FolderNavigation.module.css";
 import { memo, type MouseEvent, useCallback, useMemo, useState } from "react";
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { type DraggedItem, isValidDropTarget } from "./libraryTypes";
+
+import styles from "./FolderNavigation.module.css";
 
 type FolderNode = {
 	path: string;

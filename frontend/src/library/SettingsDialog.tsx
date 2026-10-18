@@ -1,7 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Check, Monitor, Moon, RefreshCw, Sun, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import {
 	ClearNexusAPIKey,
 	NexusAccount,
@@ -36,8 +38,9 @@ import {
 	nexusApiKeyPageURL,
 	protocolSwitchDisabledReason,
 } from "./nexusSettingsPresentation";
-import styles from "./SettingsDialog.module.css";
 import { providerLogos } from "./StoreLogos";
+
+import styles from "./SettingsDialog.module.css";
 
 type SettingsDialogProps = {
 	theme: Theme;

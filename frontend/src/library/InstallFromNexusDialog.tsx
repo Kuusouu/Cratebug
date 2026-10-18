@@ -1,11 +1,12 @@
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+
 import { NexusAccount, ResolveNexusModPage } from "../../wailsjs/go/main/App";
 import type { main } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import styles from "./InstallFromNexusDialog.module.css";
 import {
 	defaultNexusFileId,
 	formatNexusFileSize,
@@ -17,6 +18,8 @@ import {
 	nexusModPageURL,
 	parseNexusModPageInput,
 } from "./nexusPresentation";
+
+import styles from "./InstallFromNexusDialog.module.css";
 
 type InstallFromNexusDialogProps = {
 	onReady: (modId: number, fileId: number) => void;

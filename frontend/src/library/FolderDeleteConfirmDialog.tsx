@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -7,6 +8,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+
 import { IsFolderEmpty } from "../../wailsjs/go/main/App";
 import { useConfirmDelay } from "./useConfirmDelay";
 

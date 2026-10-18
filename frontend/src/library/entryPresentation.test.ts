@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { discovery, modtype } from "../../wailsjs/go/models";
 import {
 	canChangeModState,

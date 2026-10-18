@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -14,6 +15,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+
 import type { discovery } from "../../wailsjs/go/models";
 import { maximumPriorityFor } from "./modPriority";
 import { renameValidationError } from "./nameValidation";

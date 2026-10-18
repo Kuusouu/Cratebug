@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -14,6 +15,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+
 import { renameValidationError } from "./nameValidation";
 
 export type FolderMutationMode = "create" | "rename" | "move";

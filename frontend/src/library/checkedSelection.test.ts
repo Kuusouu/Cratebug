@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import { nextCheckedIDs, remapCheckedID, retainCheckedIDs } from "./checkedSelection";
 
 const visible = ["a", "b", "c", "d"];

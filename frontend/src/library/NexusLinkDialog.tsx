@@ -1,5 +1,6 @@
-import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
+
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -7,8 +8,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
+
 import type { main } from "../../wailsjs/go/models";
+import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import { formatNexusFileSize, formatNexusLinkTitle, nexusModPageURL } from "./nexusPresentation";
 
 type NexusLinkDialogProps = {

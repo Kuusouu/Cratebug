@@ -1,7 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, RefreshCw, ShieldAlert, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import {
 	BackupLibrary,
 	CanRetryRestore,
@@ -30,6 +32,7 @@ import {
 	signatureBypassAction,
 	signatureBypassSourceURL,
 } from "./signatureBypassPresentation";
+
 import styles from "./ToolsDialog.module.css";
 
 type ToolsDialogProps = {

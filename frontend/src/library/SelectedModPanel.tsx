@@ -1,5 +1,6 @@
-import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
 import { cn } from "cn";
+
+import type { discovery, metadata, modtype } from "../../wailsjs/go/models";
 import { entryCategoryLabel, entryCharacterLabel, entryStateLabel } from "./entryPresentation";
 
 type SelectedModPanelProps = {

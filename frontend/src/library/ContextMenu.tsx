@@ -1,3 +1,4 @@
+// oxlint-disable-next-line no-restricted-imports -- The pointer-anchored menu needs a virtual anchor and shell portal container that the shared wrapper doesn't expose.
 import { Menu } from "@base-ui/react/menu";
 
 export type ContextMenuItem = {

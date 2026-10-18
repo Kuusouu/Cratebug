@@ -11,6 +11,7 @@
 	"arrowParens": "always",
 	"bracketSameLine": false,
 	"bracketSpacing": true,
+	"sortImports": { "sortSideEffects": false },
 	"sortTailwindcss": {
 		"stylesheet": "./src/tailwind.css",
 		"functions": ["cn", "clsx", "cva"]

@@ -32,5 +32,5 @@
 		},
 		"rootDir": "."
 	},
-	"include": ["src", "vite.config.ts"]
+	"include": ["src", "lint/**/*.ts", "vite.config.ts"]
 }
