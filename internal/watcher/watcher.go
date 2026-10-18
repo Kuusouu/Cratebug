@@ -1,7 +1,6 @@
 package watcher
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -68,7 +67,7 @@ func New(opts Options) (*Watcher, error) {
 		trackedDirs: make(map[string]struct{}),
 	}
 
-	go w.readLoop()
+	go w.readLoop(fsw)
 	return w, nil
 }
 
@@ -208,26 +207,42 @@ func (w *Watcher) Close() error {
 		w.timer.Stop()
 		w.timer = nil
 	}
+	fsw := w.fsWatcher
 	w.mu.Unlock()
 
-	return w.fsWatcher.Close()
+	return fsw.Close()
 }
 
+// Drops every directory watch by replacing the fsnotify watcher instead of
+// removing watches one by one. On Windows, fsnotify v1.10.1 can close a
+// removed watch's directory handle a second time when a change notification
+// for it was already queued, and that second CloseHandle can hit an
+// unrelated handle Windows has since reused, such as a file Cratebug is
+// writing. Closing the whole fsnotify watcher stops its completion loop, so
+// no stale notification is processed.
 func (w *Watcher) clearWatchesLocked() error {
 	w.generation++
-	var failures []error
-	for dir := range w.trackedDirs {
-		if err := w.fsWatcher.Remove(dir); err != nil && !errors.Is(err, fsnotify.ErrNonExistentWatch) {
-			failures = append(failures, fmt.Errorf("remove directory watch %q: %w", dir, err))
-			continue
-		}
-		delete(w.trackedDirs, dir)
-	}
 	if w.timer != nil {
 		w.timer.Stop()
 		w.timer = nil
 	}
-	return errors.Join(failures...)
+	if len(w.trackedDirs) == 0 {
+		return nil
+	}
+
+	fresh, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("create fsnotify watcher: %w", err)
+	}
+	stale := w.fsWatcher
+	w.fsWatcher = fresh
+	clear(w.trackedDirs)
+	go w.readLoop(fresh)
+
+	if err := stale.Close(); err != nil {
+		return fmt.Errorf("close previous fsnotify watcher: %w", err)
+	}
+	return nil
 }
 
 func (w *Watcher) watchSubtreeLocked(root string) error {
@@ -248,7 +263,10 @@ func (w *Watcher) watchSubtreeLocked(root string) error {
 	})
 }
 
-func (w *Watcher) readLoop() {
+// Forwards fsw's events until fsw is closed. A replaced watcher's loop ends
+// on its own; its last events are dropped by handleEvent's root and
+// suspension checks.
+func (w *Watcher) readLoop(fsw *fsnotify.Watcher) {
 	// Windows watch changes can wait for an event or error to reach its consumer.
 	// Drain both channels independently while the event handler holds the mutex.
 	events := make(chan fsnotify.Event)
@@ -267,12 +285,12 @@ func (w *Watcher) readLoop() {
 			next = pending[0]
 		}
 		select {
-		case event, ok := <-w.fsWatcher.Events:
+		case event, ok := <-fsw.Events:
 			if !ok {
 				return
 			}
 			pending = append(pending, event)
-		case _, ok := <-w.fsWatcher.Errors:
+		case _, ok := <-fsw.Errors:
 			if !ok {
 				return
 			}
