@@ -256,7 +256,9 @@ func RewriteCompanionPak(root, pakAbs, utocAbs string, caller companionCaller) e
 	if err != nil {
 		return fmt.Errorf("create companion work directory: %w", err)
 	}
-	defer os.RemoveAll(workDir)
+	defer func() {
+		_ = os.RemoveAll(workDir) // Best-effort removal of disposable staging; preserve the operation result.
+	}()
 
 	nextPak := filepath.Join(workDir, "rewritten.pak")
 	filePaths, err := companionRewriteInputs(caller, pakAbs, listing, workDir)

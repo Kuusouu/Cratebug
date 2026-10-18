@@ -85,7 +85,9 @@ func download(ctx context.Context, link DownloadLink, file FileInfo, httpClient 
 	if err != nil {
 		return "", nil, wrapDownloadError(rawURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", nil, fmt.Errorf("nexus: download %s returned %s", redactURL(rawURL), resp.Status)
@@ -116,7 +118,9 @@ func download(ctx context.Context, link DownloadLink, file FileInfo, httpClient 
 		cleanup()
 		return "", nil, fmt.Errorf("nexus: create downloaded file %q: %w", destPath, err)
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close() // Success checks Close below; this also releases the file on earlier errors.
+	}()
 
 	total := resp.ContentLength
 	if total < 0 {
@@ -155,6 +159,10 @@ func download(ctx context.Context, link DownloadLink, file FileInfo, httpClient 
 		}
 	}
 
+	if err := out.Close(); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("nexus: close downloaded file: %w", err)
+	}
 	return destPath, cleanup, nil
 }
 

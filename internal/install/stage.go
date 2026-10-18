@@ -473,7 +473,9 @@ func copyRegularFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("open source file %q: %w", src, err)
 	}
-	defer srcFile.Close()
+	defer func() {
+		_ = srcFile.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	if err := os.MkdirAll(filepath.Dir(dst), defaultStagingDirPermissions); err != nil {
 		return fmt.Errorf("create destination directory for %q: %w", dst, err)
@@ -485,7 +487,7 @@ func copyRegularFile(src, dst string) error {
 	}
 
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		dstFile.Close()
+		_ = dstFile.Close()
 		return fmt.Errorf("copy data from %q to %q: %w", src, dst, err)
 	}
 

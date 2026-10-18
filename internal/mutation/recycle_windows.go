@@ -3,6 +3,7 @@
 package mutation
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"unicode/utf16"
@@ -51,7 +52,7 @@ func recycleFiles(paths []string) error {
 	result, _, callErr := shellFileOperationProc.Call(uintptr(unsafe.Pointer(&operation)))
 	runtime.KeepAlive(from)
 	if result != 0 {
-		if callErr != nil && callErr != windows.ERROR_SUCCESS {
+		if callErr != nil && !errors.Is(callErr, windows.ERROR_SUCCESS) {
 			return fmt.Errorf("Windows shell deletion failed with code %d: %w", result, callErr)
 		}
 		return fmt.Errorf("Windows shell deletion failed with code %d", result)

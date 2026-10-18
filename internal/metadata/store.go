@@ -239,14 +239,16 @@ func writeFileAtomically(dir, destination string, data []byte) error {
 		return fmt.Errorf("create temporary file: %w", err)
 	}
 	tempPath := temp.Name()
-	defer os.Remove(tempPath)
+	defer func() {
+		_ = os.Remove(tempPath) // Best-effort removal of disposable staging; preserve the operation result.
+	}()
 
 	if _, err := temp.Write(data); err != nil {
-		temp.Close()
+		_ = temp.Close()
 		return fmt.Errorf("write temporary file: %w", err)
 	}
 	if err := temp.Sync(); err != nil {
-		temp.Close()
+		_ = temp.Close()
 		return fmt.Errorf("sync temporary file: %w", err)
 	}
 	if err := temp.Close(); err != nil {

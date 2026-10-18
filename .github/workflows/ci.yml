@@ -48,6 +48,12 @@ jobs:
               working-directory: frontend
               run: bun install --frozen-lockfile
 
+            - name: Install pinned Go linter
+              uses: golangci/golangci-lint-action@v9
+              with:
+                  version-file: .golangci-lint-version
+                  install-only: true
+
             - name: Run canonical checks
               shell: pwsh
               run: .\check.ps1
@@ -120,6 +126,12 @@ jobs:
             - name: Install frontend dependencies
               working-directory: frontend
               run: bun install --frozen-lockfile
+
+            - name: Install pinned Go linter
+              uses: golangci/golangci-lint-action@v9
+              with:
+                  version-file: .golangci-lint-version
+                  install-only: true
 
             - name: Run canonical checks
               run: bash ./check.sh

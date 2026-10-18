@@ -2,6 +2,7 @@ package backup
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +22,11 @@ func TestApplyRollbackFailurePreservesRecoveryAndBlocksRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	stagingDir := manager.sessions[preview.Token].stagingDir
-	defer os.RemoveAll(stagingDir)
+	defer func() {
+		if err := os.RemoveAll(stagingDir); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	root := filepath.Join(t.TempDir(), "library")
 	writeFile(t, filepath.Join(root, "A_P.pak"), []byte("original A"))
 	writeFile(t, filepath.Join(root, "Keep_P.pak"), []byte("original Keep"))
@@ -55,6 +60,9 @@ func TestApplyRollbackFailurePreservesRecoveryAndBlocksRetry(t *testing.T) {
 	// Assert
 	if applyErr == nil || !strings.Contains(applyErr.Error(), "rollback also failed") || result.Cancelled {
 		t.Fatalf("rollback failure = %+v, error = %v", result, applyErr)
+	}
+	if errors.Is(applyErr, context.Canceled) {
+		t.Fatal("rollback failure must not be classified as a safe cancellation")
 	}
 	if retryErr == nil || manager.CanRetry(preview.Token) {
 		t.Fatal("an incomplete staged backup remained eligible for retry")

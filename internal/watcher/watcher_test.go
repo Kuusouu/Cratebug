@@ -17,7 +17,11 @@ func TestWatcherDrainsErrorsWhileEventHandlerWaits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	w.mu.Lock()
 	locked := true
 	defer func() {
@@ -51,7 +55,11 @@ func TestWatcherRepeatedSuspensionWithFileActivity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	if err := w.SetRoot(root); err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +111,11 @@ func TestWatcherSetRootAndClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	setErr := w.SetRoot(dir)
@@ -148,7 +160,11 @@ func TestWatcherSuspensionReleasesHandlesAndResumes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	if err := w.SetRoot(root); err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +223,11 @@ func TestWatcherRootChangeStaysSuspended(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	if err := w.SetRoot(t.TempDir()); err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +289,11 @@ func TestWatcherDebouncesFileChanges(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)
@@ -316,7 +340,11 @@ func TestWatcherTracksDynamicSubdirectories(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)
@@ -357,7 +385,11 @@ func TestWatcherIgnoresNoiseFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)
@@ -391,7 +423,11 @@ func TestWatcherSuppress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)
@@ -423,7 +459,11 @@ func TestWatcherTracksDirectoryWhilePaused(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)
@@ -478,7 +518,11 @@ func TestWatcherUntracksRemovedDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)
@@ -524,7 +568,11 @@ func TestWatcherIgnoresEventsOutsideRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := w.SetRoot(dir1); err != nil {
 		t.Fatalf("SetRoot() error = %v", err)

@@ -562,7 +562,11 @@ func TestDetectConflictsFindsSamePriorityGroupAndReusesCache(t *testing.T) {
 
 	worker := &fakeConflictWorker{response: `{"files":[{"path":"Marvel/Content/Characters/1044/SK_Blade.uasset"}]}`}
 	classifier := modtype.NewSessionClassifier(func() (modtype.PoolWorker, error) { return worker, nil })
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	table := modtype.CharacterTable{}
 	app := newApp(staticGameRunningChecker{}, testMetadataStore(t), classifier, &table, nil, testSecretStore(t))
@@ -841,7 +845,11 @@ func TestAppWatcherIntegration(t *testing.T) {
 	if app.watcher == nil {
 		t.Fatal("initWatcher() did not create watcher")
 	}
-	defer app.watcher.Close()
+	defer func() {
+		if err := app.watcher.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	dir := t.TempDir()
 
@@ -887,7 +895,11 @@ func TestAppWatcherSuppressionAndTracking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("watcher.New() error = %v", err)
 	}
-	defer w.Close()
+	defer func() {
+		if err := w.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	app.watcher = w
 
 	dir := t.TempDir()
@@ -928,7 +940,11 @@ func TestAppWatcherScanLibraryNormalizesPaths(t *testing.T) {
 	if app.watcher == nil {
 		t.Fatal("initWatcher() did not create watcher")
 	}
-	defer app.watcher.Close()
+	defer func() {
+		if err := app.watcher.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	dir := t.TempDir()
 	if _, err := app.ScanLibrary(dir); err != nil {

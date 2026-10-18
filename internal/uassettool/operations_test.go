@@ -567,7 +567,11 @@ func TestOperationsAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	dir := t.TempDir()
 

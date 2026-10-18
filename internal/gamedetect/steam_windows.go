@@ -32,7 +32,9 @@ func defaultSteamPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open the Steam registry key: %w", err)
 	}
-	defer key.Close()
+	defer func() {
+		_ = key.Close() // Release the handle after reading; preserve the operation result.
+	}()
 
 	value, _, err := key.GetStringValue(steamRegistryValue)
 	if err != nil {

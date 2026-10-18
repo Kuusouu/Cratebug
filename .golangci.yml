@@ -1,0 +1,37 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - staticcheck
+    - unused
+    - ineffassign
+    - errcheck
+    - errorlint
+    - nolintlint
+    - depguard
+  settings:
+    errorlint:
+      # Keep the primary error identity; secondary rollback details may be text.
+      errorf-multi: false
+    staticcheck:
+      # Correctness checks; gofmt owns formatting and UI error copy is reviewed.
+      checks: ["SA*"]
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+    depguard:
+      rules:
+        domain:
+          files: ["**/internal/**/*.go"]
+          deny:
+            - pkg: github.com/wailsapp/wails
+              desc: Keep domain and filesystem packages independent of Wails.
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

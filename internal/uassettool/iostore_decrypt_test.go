@@ -88,7 +88,11 @@ func TestDecryptIoStoreDirectWithWorker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	path := buildIoStoreFixture(t, worker, t.TempDir())
 	plainTOC, err := os.ReadFile(path)
 	if err != nil {

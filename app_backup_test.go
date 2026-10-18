@@ -34,7 +34,11 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	if app.watcher == nil {
 		t.Fatal("library watcher is unavailable")
 	}
-	defer app.watcher.Close()
+	defer func() {
+		if err := app.watcher.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	if _, err := app.ScanLibrary(root); err != nil {
 		t.Fatal(err)
 	}

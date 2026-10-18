@@ -416,7 +416,9 @@ func copyFileVerified(source, target, wantSHA256 string) error {
 	if err != nil {
 		return fmt.Errorf("open payload file %s: %w", source, err)
 	}
-	defer in.Close()
+	defer func() {
+		_ = in.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	tmp, err := os.CreateTemp(filepath.Dir(target), ".cratebug-sigbypass-*")
 	if err != nil {
@@ -453,7 +455,9 @@ func fileSHA256(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {

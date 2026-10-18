@@ -89,7 +89,7 @@ func TestParseDownloadURL(t *testing.T) {
 				if tt.wantErrSub != "" && !strings.Contains(err.Error(), tt.wantErrSub) {
 					t.Fatalf("error = %q, want it to contain %q", err, tt.wantErrSub)
 				}
-				if tt.wantErr == ErrWrongGame && !strings.Contains(err.Error(), "skyrim") {
+				if errors.Is(tt.wantErr, ErrWrongGame) && !strings.Contains(err.Error(), "skyrim") {
 					t.Fatalf("ErrWrongGame text = %q, want it to name the domain", err)
 				}
 				return

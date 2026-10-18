@@ -16,7 +16,9 @@ func readZipFile(file *zip.File) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	defer func() {
+		_ = reader.Close() // Reading the ZIP entry already reports corrupt input.
+	}()
 	return io.ReadAll(reader)
 }
 
@@ -60,7 +62,11 @@ func TestCreateStoresEntriesUncompressed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Assert.
 	for _, file := range reader.File {
@@ -79,7 +85,11 @@ func readZipEntries(t *testing.T, zipPath string) map[string]string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 	entries := make(map[string]string)
 	for _, file := range reader.File {
 		if file.FileInfo().IsDir() {

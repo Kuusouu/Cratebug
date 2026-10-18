@@ -309,7 +309,11 @@ func TestDetermineAgainstSupervisedWorkerAndFixtureArchives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	root := t.TempDir()
 

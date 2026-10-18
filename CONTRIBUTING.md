@@ -10,6 +10,7 @@ Development targets 64-bit Windows 10 version 1909 or newer and Windows 11. Inst
 - Microsoft WebView2 Runtime (Windows 11 already includes it)
 - Go `1.26.5` ([go.dev/dl](https://go.dev/dl/) or `winget install -e --id GoLang.Go --version 1.26.5`)
 - Bun `1.3.14` ([bun.sh](https://bun.sh/) or `winget install -e --id Oven-sh.Bun --version 1.3.14`)
+- golangci-lint `2.15.0` (version recorded in `.golangci-lint-version`)
 - Node `24.20.0` or newer, only if you drive the app with the Playwright CLI below
 - NSIS 3, only if you want to build the installer
 - ImageMagick 7, only if you refresh hero portraits with `fetch-hero-portraits.ps1` (`winget install -e --id ImageMagick.ImageMagick --version 7.1.2.31`)
@@ -19,6 +20,17 @@ winget install NSIS.NSIS --silent
 ```
 
 Restart the terminal after installing system tools so their updated paths are available.
+
+Install golangci-lint from the [pinned release](https://github.com/golangci/golangci-lint/releases/tag/v2.15.0).
+On Windows, extract `golangci-lint-2.15.0-windows-amd64.zip` and put the executable
+on PATH. On Linux, use the pinned installer command:
+
+```bash
+curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b "$HOME/.local/bin" v2.15.0
+```
+
+Both check scripts reject a missing or different linter version. CI installs the
+version from `.golangci-lint-version` before running those same scripts.
 
 ### Pinned versions
 
@@ -77,7 +89,7 @@ Run every required check before submitting anything:
 .\check.ps1
 ```
 
-That runs `gofmt`, oxfmt formatting and oxlint linting, the frontend tests, the TypeScript typecheck, the Vite build, `go vet`, and the full Go test suite. Linux uses `./check.sh` for the same checks. Both CI jobs invoke these scripts. Frontend scripts (run from `frontend`):
+That runs `gofmt`, oxfmt formatting and oxlint linting, the frontend tests, the TypeScript typecheck, the Vite build, `go vet`, golangci-lint, and the full Go test suite. Linux uses `./check.sh` for the same checks. Both CI jobs invoke these scripts. Frontend scripts (run from `frontend`):
 
 | Command | Purpose |
 | --- | --- |
@@ -95,6 +107,7 @@ Canonical Go commands (repository root):
 ```powershell
 go fmt ./...
 go vet ./...
+golangci-lint run ./...
 go test ./...
 ```
 

@@ -349,7 +349,9 @@ func rewriteBundleEncryption(root string, entry discovery.Entry, encrypt bool, c
 	if err != nil {
 		return fmt.Errorf("create encryption work directory: %w", err)
 	}
-	defer os.RemoveAll(workDir)
+	defer func() {
+		_ = os.RemoveAll(workDir) // Best-effort removal of disposable staging; preserve the operation result.
+	}()
 
 	// Stage under a plain .pak name so the worker finds the sibling .utoc
 	// next to it even when the live primary is disabled (.pak_crateoff).
@@ -451,7 +453,9 @@ func copyRegularFile(source, destination string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() {
+		_ = in.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	out, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {

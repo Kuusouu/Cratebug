@@ -237,7 +237,7 @@ applyLoop:
 
 		for i := len(createdDirs) - 1; i >= 0; i-- {
 			// Best-effort: silently ignore errors (directory may be non-empty or already gone)
-			os.Remove(createdDirs[i])
+			_ = os.Remove(createdDirs[i])
 		}
 
 		// Reconcile and report

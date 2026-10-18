@@ -186,7 +186,9 @@ func writeApplyScript(exePath, installerPath string, pid int) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("update: create apply helper script: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Success checks Close below; this also releases the file on earlier errors.
+	}()
 
 	data := applyScriptData{
 		TargetPID:           pid,
@@ -203,6 +205,9 @@ func writeApplyScript(exePath, installerPath string, pid int) (string, error) {
 	script := strings.ReplaceAll(rendered.String(), "\n", "\r\n")
 	if _, err := file.WriteString(script); err != nil {
 		return "", fmt.Errorf("update: write apply helper script: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("update: close apply helper script: %w", err)
 	}
 	return scriptPath, nil
 }

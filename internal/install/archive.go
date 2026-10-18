@@ -85,7 +85,9 @@ func ExtractArchive(ctx context.Context, archivePath, destDir string) error {
 	if err != nil {
 		return fmt.Errorf("open archive %q: %w", archivePath, err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	format, reader, err := archives.Identify(ctx, archivePath, file)
 	if err != nil {
@@ -143,7 +145,9 @@ func ExtractArchive(ctx context.Context, archivePath, destDir string) error {
 		if err != nil {
 			return fmt.Errorf("open archive entry %q: %w", nameInArchive, err)
 		}
-		defer srcFile.Close()
+		defer func() {
+			_ = srcFile.Close() // Only the read result matters; closing this input cannot change it.
+		}()
 
 		dstFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, defaultArchiveFilePermissions)
 		if err != nil {
@@ -151,7 +155,7 @@ func ExtractArchive(ctx context.Context, archivePath, destDir string) error {
 		}
 
 		if _, err := io.Copy(dstFile, srcFile); err != nil {
-			dstFile.Close()
+			_ = dstFile.Close()
 			return fmt.Errorf("write extracted file %q: %w", cleanedRel, err)
 		}
 

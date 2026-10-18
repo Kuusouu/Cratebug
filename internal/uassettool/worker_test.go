@@ -137,7 +137,11 @@ func TestWorkerCallRoundTripsThroughSupervisedProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	var result struct {
@@ -188,7 +192,11 @@ func TestWorkerCallReturnsCrashedAndLeavesNoOrphan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	callErr := worker.Call("list_pak", nil, nil)
@@ -213,7 +221,11 @@ func TestWorkerCallReturnsTimeoutAndKillsHungProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	callErr := worker.Call("list_pak", nil, nil)
@@ -238,7 +250,11 @@ func TestWorkerCallReturnsMalformedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	callErr := worker.Call("list_pak", nil, nil)
@@ -359,7 +375,11 @@ func TestNewPinnedWorkerLaunchesWithPinnedRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewWorker() error = %v", err)
 	}
-	defer worker.Close()
+	defer func() {
+		if err := worker.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Assert
 	if !worker.Alive() {

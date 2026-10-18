@@ -3,6 +3,7 @@
 package urlscheme
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -25,12 +26,14 @@ type userHive struct{}
 func (userHive) read(scheme string) (Snapshot, bool, error) {
 	key, err := registry.OpenKey(registry.CURRENT_USER, classesPath(scheme), registry.QUERY_VALUE|registry.ENUMERATE_SUB_KEYS)
 	if err != nil {
-		if err == registry.ErrNotExist {
+		if errors.Is(err, registry.ErrNotExist) {
 			return Snapshot{}, false, nil
 		}
 		return Snapshot{}, false, fmt.Errorf("open protocol key: %w", err)
 	}
-	defer key.Close()
+	defer func() {
+		_ = key.Close() // Release the handle after reading; preserve the operation result.
+	}()
 
 	var values []Value
 	if err := collectRegistryValues(key, "", &values); err != nil {
@@ -50,10 +53,12 @@ func (userHive) write(scheme string, snapshot Snapshot) error {
 			return fmt.Errorf("create protocol key: %w", err)
 		}
 		if err := key.SetStringValue(value.Name, value.Data); err != nil {
-			key.Close()
+			_ = key.Close()
 			return fmt.Errorf("write protocol value: %w", err)
 		}
-		key.Close()
+		if err := key.Close(); err != nil {
+			return fmt.Errorf("close protocol key: %w", err)
+		}
 	}
 	return nil
 }
@@ -102,12 +107,12 @@ func classesPath(scheme string) string {
 func keyExists(root registry.Key, path string) (bool, error) {
 	key, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
 	if err != nil {
-		if err == registry.ErrNotExist {
+		if errors.Is(err, registry.ErrNotExist) {
 			return false, nil
 		}
 		return false, err
 	}
-	key.Close()
+	_ = key.Close()
 	return true, nil
 }
 
@@ -143,7 +148,7 @@ func collectRegistryValues(key registry.Key, subKey string, into *[]Value) error
 			next = subKey + `\` + name
 		}
 		err = collectRegistryValues(child, next, into)
-		child.Close()
+		_ = child.Close()
 		if err != nil {
 			return err
 		}
@@ -156,13 +161,13 @@ func deleteRegistryTree(root registry.Key, path string) error {
 		func(keyPath string) ([]string, error) {
 			key, err := registry.OpenKey(root, keyPath, registry.ENUMERATE_SUB_KEYS)
 			if err != nil {
-				if err == registry.ErrNotExist {
+				if errors.Is(err, registry.ErrNotExist) {
 					return nil, nil
 				}
 				return nil, err
 			}
 			names, err := key.ReadSubKeyNames(-1)
-			key.Close()
+			_ = key.Close()
 			return names, err
 		},
 		func(keyPath string) error {
@@ -171,16 +176,18 @@ func deleteRegistryTree(root registry.Key, path string) error {
 			if parent != "" {
 				opened, err := registry.OpenKey(root, parent, registry.WRITE)
 				if err != nil {
-					if err == registry.ErrNotExist {
+					if errors.Is(err, registry.ErrNotExist) {
 						return nil
 					}
 					return err
 				}
-				defer opened.Close()
+				defer func() {
+					_ = opened.Close() // The deletion result is returned below; this releases its parent handle.
+				}()
 				parentKey = opened
 			}
 			err := registry.DeleteKey(parentKey, name)
-			if err == registry.ErrNotExist {
+			if errors.Is(err, registry.ErrNotExist) {
 				return nil
 			}
 			return err

@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,10 +67,18 @@ func createTarArchive(t *testing.T, targetPath string, entries []tarEntry) {
 	if err != nil {
 		t.Fatalf("create tar file: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	tw := tar.NewWriter(f)
-	defer tw.Close()
+	defer func() {
+		if err := tw.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	for _, e := range entries {
 		hdr := &tar.Header{
@@ -198,7 +207,11 @@ func TestStageFiles_MixedArchivesAndDirectFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create staging session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	err = session.StageFiles(context.Background(), nil)
@@ -260,7 +273,11 @@ func TestStageFiles_AutoDiscoversCompanionSidecars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act: User selects ONLY the .pak file for staging
 	err = session.StageFiles(context.Background(), nil)
@@ -309,7 +326,11 @@ func TestStageFiles_CompanionDiscovery_CaseInsensitiveMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	err = session.StageFiles(context.Background(), nil)
@@ -357,7 +378,11 @@ func TestStageFiles_CompanionDiscovery_ExcludesDifferentStem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act: User selects ONLY Foo_P.pak
 	err = session.StageFiles(context.Background(), nil)
@@ -395,7 +420,11 @@ func TestStageFiles_CompanionDiscovery_PicksUpDisabledSuffixVariant(t *testing.T
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	err = session.StageFiles(context.Background(), nil)
@@ -445,7 +474,11 @@ func TestStageFiles_CompanionCopyFailure_SurfacesIssueInsteadOfSilentClassic(t *
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Obstruct both sidecar destinations with directories so copyRegularFile fails for
 	// each companion, simulating a locked-file/permission-denied failure portably.
@@ -514,7 +547,11 @@ func TestBuildPreview_CollisionDetection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := session.StageFiles(context.Background(), nil); err != nil {
 		t.Fatalf("stage files: %v", err)
@@ -562,7 +599,11 @@ func TestApply_TransactionalSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := session.StageFiles(context.Background(), nil); err != nil {
 		t.Fatalf("stage files: %v", err)
@@ -616,7 +657,11 @@ func TestApply_GameRunningBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := session.StageFiles(context.Background(), nil); err != nil {
 		t.Fatalf("stage files: %v", err)
@@ -637,7 +682,7 @@ func TestApply_GameRunningBlock(t *testing.T) {
 	_, err = Apply(context.Background(), modRoot, session, items, checker)
 
 	// Assert
-	if err != mutation.ErrGameRunning {
+	if !errors.Is(err, mutation.ErrGameRunning) {
 		t.Fatalf("expected ErrGameRunning, got: %v", err)
 	}
 
@@ -669,7 +714,11 @@ func TestApply_OverwriteRollbackOnFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := session.StageFiles(context.Background(), nil); err != nil {
 		t.Fatalf("stage files: %v", err)
@@ -754,7 +803,11 @@ func TestBuildPreview_EscapingDestinationFolder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	if err := session.StageFiles(context.Background(), nil); err != nil {
 		t.Fatalf("stage files: %v", err)
@@ -842,7 +895,11 @@ func TestStageFiles_IncompleteMultiVolumeRarFailsCleanly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	err = session.StageFiles(context.Background(), nil)
@@ -873,7 +930,11 @@ func TestStageFiles_GenuinelyEmptyRarRejectedCleanly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	defer session.Cleanup()
+	defer func() {
+		if err := session.Cleanup(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Act
 	err = session.StageFiles(context.Background(), nil)

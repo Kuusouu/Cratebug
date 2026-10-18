@@ -201,7 +201,9 @@ func (c *Client) downloadOnce(ctx context.Context, assetURL, tempPath string, id
 	if err != nil {
 		return fmt.Errorf("update: downloading %s: %w", assetURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return &httpStatusError{statusCode: resp.StatusCode, status: resp.Status}
@@ -220,7 +222,9 @@ func (c *Client) downloadOnce(ctx context.Context, assetURL, tempPath string, id
 	if err != nil {
 		return fmt.Errorf("update: creating temp download file %s: %w", tempPath, err)
 	}
-	defer out.Close()
+	defer func() {
+		_ = out.Close() // Success checks Close below; this also releases the file on earlier errors.
+	}()
 
 	// resp.ContentLength is -1, not 0, when the server didn't send a length
 	// (e.g. a chunked response); normalize so callers can rely on "0 means
@@ -252,6 +256,9 @@ func (c *Client) downloadOnce(ctx context.Context, assetURL, tempPath string, id
 			}
 			return fmt.Errorf("update: reading download stream: %w", readErr)
 		}
+	}
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("update: close downloaded file: %w", err)
 	}
 	return nil
 }

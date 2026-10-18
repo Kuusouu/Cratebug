@@ -104,7 +104,9 @@ func (c *Client) fetch(ctx context.Context, url string) (Release, error) {
 	if err != nil {
 		return Release{}, fmt.Errorf("update: fetching %s: %w", url, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return Release{}, ErrNoRelease

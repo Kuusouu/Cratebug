@@ -119,7 +119,9 @@ func fetchCharacterTable(ctx context.Context) (CharacterTable, error) {
 	if err != nil {
 		return CharacterTable{}, fmt.Errorf("fetch character table: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return CharacterTable{}, fmt.Errorf("fetch character table: unexpected status %s", resp.Status)

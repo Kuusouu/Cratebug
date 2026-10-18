@@ -342,7 +342,9 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	if err != nil {
 		return wrapFetchError(c.APIKey, req.URL.String(), err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	c.captureRateLimit(resp.Header)
 

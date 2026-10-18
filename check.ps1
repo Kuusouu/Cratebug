@@ -7,6 +7,15 @@ Set-StrictMode -Version Latest
 $repositoryRoot = $PSScriptRoot
 $frontendRoot = Join-Path $repositoryRoot "frontend"
 
+$expectedLintVersion = (Get-Content (Join-Path $repositoryRoot ".golangci-lint-version") -Raw).Trim()
+if (-not (Get-Command golangci-lint -ErrorAction SilentlyContinue)) {
+    throw "Install golangci-lint $expectedLintVersion on PATH (see CONTRIBUTING.md)."
+}
+$lintVersion = & golangci-lint version --short
+if ($LASTEXITCODE -ne 0 -or $lintVersion -ne $expectedLintVersion) {
+    throw "Expected golangci-lint $expectedLintVersion; found $lintVersion. See CONTRIBUTING.md."
+}
+
 function Invoke-Step {
     param(
         [Parameter(Mandatory)]
@@ -64,6 +73,7 @@ if ($unformattedFiles.Count -gt 0) {
 
 Invoke-Step -Label "Frontend checks" -Script { bun run check } -WorkingDirectory $frontendRoot
 Invoke-Step -Label "Go vet" -Script { go vet ./... } -WorkingDirectory $repositoryRoot
+Invoke-Step -Label "Go lint" -Script { golangci-lint run ./... } -WorkingDirectory $repositoryRoot
 Invoke-Step -Label "Go tests" -Script { go test ./... } -WorkingDirectory $repositoryRoot
 
 Write-Host "All checks passed."

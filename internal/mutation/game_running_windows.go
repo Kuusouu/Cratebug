@@ -19,7 +19,9 @@ func (WindowsGameRunningChecker) IsGameRunning() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("create process snapshot: %w", err)
 	}
-	defer windows.CloseHandle(snapshot)
+	defer func() {
+		_ = windows.CloseHandle(snapshot) // Release the handle after reading; preserve the operation result.
+	}()
 
 	var process windows.ProcessEntry32
 	process.Size = uint32(unsafe.Sizeof(process))

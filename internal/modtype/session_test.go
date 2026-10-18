@@ -74,7 +74,11 @@ func TestSessionClassifierCachesResultsOnRepeatedScans(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entries := []discovery.Entry{
 		{
@@ -153,7 +157,11 @@ func TestSessionClassifierReclassifiesOnlyModifiedEntry(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entries := []discovery.Entry{
 		{
@@ -210,7 +218,11 @@ func TestSessionClassifierDegradesToUnknownOnLauncherFailure(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entries := []discovery.Entry{
 		{
@@ -258,7 +270,11 @@ func TestSessionClassifierDoesNotCacheFailedOutcomes(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entries := []discovery.Entry{
 		{
@@ -344,7 +360,11 @@ func TestSessionClassifierReplacesDeadWorker(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entries := []discovery.Entry{
 		{
@@ -414,7 +434,11 @@ func TestSessionClassifierUsesUpdatedCharacterTableOnWarmPool(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entry1 := discovery.Entry{
 		ID:           "mod-1",
@@ -463,7 +487,11 @@ func TestSessionClassifierSkipsNonModEntries(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	entries := []discovery.Entry{
 		{
@@ -507,7 +535,11 @@ func TestSessionClassifierResizesPoolAcrossTiers(t *testing.T) {
 	}
 
 	classifier := NewSessionClassifier(launcher)
-	defer classifier.Close()
+	defer func() {
+		if err := classifier.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	// Initial small classify -> small tier pool
 	entry := discovery.Entry{

@@ -74,7 +74,7 @@ Use the install button, drag and drop files onto the window, or the download ico
 
 ### Windows
 
-You need 64-bit Windows 10 (1909+) or 11, Git with [Git LFS](https://git-lfs.com/), Go `1.26.5`, Bun `1.3.14`, and the Microsoft WebView2 Runtime:
+You need 64-bit Windows 10 (1909+) or 11, Git with [Git LFS](https://git-lfs.com/), Go `1.26.5`, Bun `1.3.14`, and the Microsoft WebView2 Runtime. Checks also require golangci-lint `2.15.0` on PATH; see [tool installation](CONTRIBUTING.md#requirements).
 
 ```powershell
 git lfs install
@@ -90,7 +90,7 @@ wails dev                       # run the app
 
 ### Linux
 
-You need a 64-bit Linux distribution (Ubuntu 22.04+ recommended), Git with Git LFS, Go `1.26.5`, Bun `1.3.14`, and development libraries for GTK 3 and WebKit2GTK 4.1:
+You need a 64-bit Linux distribution (Ubuntu 22.04+ recommended), Git with Git LFS, Go `1.26.5`, Bun `1.3.14`, and development libraries for GTK 3 and WebKit2GTK 4.1. Checks also require golangci-lint `2.15.0` on PATH; see [tool installation](CONTRIBUTING.md#requirements).
 
 ```bash
 # Ubuntu / Debian prerequisites

@@ -27,8 +27,15 @@ Pin the following runtime and application-tool versions:
 | oxfmt | `0.73.0` |
 | oxlint | `1.88.0` |
 | oxlint-tsgolint | `7.0.2004` |
+| golangci-lint | `2.15.0` |
 | `@types/react` | `19.2.17` |
 | `@types/react-dom` | `19.2.3` |
+
+The 2026-10-17 consistency follow-up adds `oxlint-tsgolint` for type-aware rules
+and golangci-lint for Go checks. `.golangci-lint-version` pins the Go linter for
+both local check scripts and CI. Existing runtime and compiler pins are unchanged.
+The local Tailwind color rule uses Oxlint's JS plugin API, which upstream labels
+alpha; the pinned Oxlint version and a CLI integration test bound that dependency.
 
 Go is pinned by `go.mod`, Bun by `frontend/package.json` (`packageManager`), and the Wails CLI by the `v2.13.0` install/build commands. Node was added on 2026-08-30 because the agentic-development workflow (see `AGENTS.md`) installs the Playwright CLI globally through npm (Node 24+); Cratebug's own frontend tooling remains Bun-only. ImageMagick is not part of the build toolchain: only `fetch-hero-portraits.ps1` needs it, installed on Windows via `winget install -e --id ImageMagick.ImageMagick --version 7.1.2.31`.
 

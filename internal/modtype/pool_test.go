@@ -26,7 +26,11 @@ func TestWorkerPoolSurvivesFailedLauncher(t *testing.T) {
 	}
 
 	pool := NewWorkerPool(1, launcher)
-	defer pool.Close()
+	defer func() {
+		if err := pool.Close(); err != nil {
+			t.Errorf("test cleanup: %v", err)
+		}
+	}()
 
 	results := make(chan classifyOutcome, 1)
 	pool.Submit(classifyJob{

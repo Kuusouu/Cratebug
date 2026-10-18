@@ -535,7 +535,9 @@ func (a *App) StripCompanionPaks(modRoot string, entryIDs []string) (mutation.Co
 		if err != nil {
 			return mutation.CompanionCleanupResult{}, err
 		}
-		defer worker.Close()
+		defer func() {
+			_ = worker.Close() // Worker.Close waits for shutdown and always returns nil.
+		}()
 
 		a.companionMu.Lock()
 		a.companionCancel = make(chan struct{})
@@ -940,7 +942,9 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 		if err != nil {
 			return install.ApplyResult{}, err
 		}
-		defer worker.Close()
+		defer func() {
+			_ = worker.Close() // Worker.Close waits for shutdown and always returns nil.
+		}()
 		onProgress := func(p install.Progress) {
 			if a.ctx != nil {
 				wailsRuntime.EventsEmit(a.ctx, "install:progress", p)

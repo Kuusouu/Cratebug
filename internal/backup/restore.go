@@ -220,6 +220,7 @@ func (m *SessionManager) Apply(ctx context.Context, modRoot, metadataPath, token
 	rollback := func(cause error, parked, placed []string) (RestoreResult, error) {
 		if err := rollbackPark(root, parkDir, treeDir, parked, placed); err != nil {
 			retryable = false
+			//nolint:errorlint // A failed rollback must not unwrap to cancellation and be reported as a safe cancel.
 			return RestoreResult{}, fmt.Errorf("restore failed: %v; rollback also failed: %v; recovery files remain in %q and %q", cause, err, parkDir, session.stagingDir)
 		}
 		if err := os.Remove(parkDir); err != nil {
