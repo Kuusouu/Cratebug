@@ -6,10 +6,6 @@ export function ApplyInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['ApplyInstall'](arg1, arg2, arg3);
 }
 
-export function ApplyUpdate(arg1) {
-  return window['go']['main']['App']['ApplyUpdate'](arg1);
-}
-
 export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
@@ -48,14 +44,6 @@ export function CancelNexusDownload() {
 
 export function CancelRestore() {
   return window['go']['main']['App']['CancelRestore']();
-}
-
-export function CheckForUpdate() {
-  return window['go']['main']['App']['CheckForUpdate']();
-}
-
-export function CheckWhatsNew() {
-  return window['go']['main']['App']['CheckWhatsNew']();
 }
 
 export function ClassificationType() {
@@ -118,10 +106,6 @@ export function DiscardRestorePreview(arg1) {
   return window['go']['main']['App']['DiscardRestorePreview'](arg1);
 }
 
-export function DownloadUpdate(arg1) {
-  return window['go']['main']['App']['DownloadUpdate'](arg1);
-}
-
 export function EncryptionType() {
   return window['go']['main']['App']['EncryptionType']();
 }
@@ -132,10 +116,6 @@ export function FindModsNeedingEncryption(arg1) {
 
 export function FindUnsupportedCompanionPaks(arg1) {
   return window['go']['main']['App']['FindUnsupportedCompanionPaks'](arg1);
-}
-
-export function GetAppVersion() {
-  return window['go']['main']['App']['GetAppVersion']();
 }
 
 export function InstallSignatureBypass() {
@@ -308,8 +288,4 @@ export function UnassignModTag(arg1, arg2) {
 
 export function UnregisterNexusProtocol() {
   return window['go']['main']['App']['UnregisterNexusProtocol']();
-}
-
-export function UpdateType() {
-  return window['go']['main']['App']['UpdateType']();
 }

@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,22 +19,9 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/Kuusouu/Cratebug/internal/secret"
 	"github.com/Kuusouu/Cratebug/internal/uassettool"
-	"github.com/Kuusouu/Cratebug/internal/update"
 	"github.com/Kuusouu/Cratebug/internal/urlscheme"
 	"github.com/Kuusouu/Cratebug/internal/watcher"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
-)
-
-// The GitHub repository release.yml publishes to and CheckForUpdate reads from.
-const (
-	updateRepoOwner = "Kuusouu"
-	updateRepoName  = "Cratebug"
-
-	// Deliberately distinct from internal/update's own applyStagingDirName:
-	// writeApplyScript clears its staging directory with os.RemoveAll before
-	// writing the helper script, which would delete the downloaded installer
-	// if the two shared a directory.
-	updateDownloadDirName = "cratebug-update-download"
 )
 
 // Exposes the small backend surface used by the frontend.
@@ -52,6 +37,7 @@ type App struct {
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
 	sigbypassTool         sigbypassToolkit
+	updates               *UpdateService
 
 	secretStore secret.Store
 
@@ -107,14 +93,16 @@ func newApp(
 	if installSessionManager == nil {
 		installSessionManager = install.NewSessionManager()
 	}
+	c := &core{
+		runtime:  &runtimeHost{},
+		game:     gameRunningChecker,
+		meta:     newMetadataGate(metadataStore),
+		catalog:  newCatalog(classifier, characterTable),
+		detector: gamedetect.NewDefaultRegistry(),
+	}
 	return &App{
-		core: &core{
-			runtime:  &runtimeHost{},
-			game:     gameRunningChecker,
-			meta:     newMetadataGate(metadataStore),
-			catalog:  newCatalog(classifier, characterTable),
-			detector: gamedetect.NewDefaultRegistry(),
-		},
+		core:                  c,
+		updates:               newUpdateService(c),
 		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
 		installSessionManager: installSessionManager,
 		restoreSessions:       backup.NewSessionManager(),
@@ -148,12 +136,6 @@ func (a *App) SetLibraryWatcherSuspended(suspended bool) error {
 // Confirms that the frontend can reach the Go application.
 func (a *App) RuntimeStatus() string {
 	return "Go backend connected"
-}
-
-// GetAppVersion returns the running build's CalVer release tag, or "dev" for
-// a local or CI build, for display in Settings.
-func (a *App) GetAppVersion() string {
-	return AppVersion
 }
 
 // ClassificationType anchors modtype.Identity so Wails emits its TypeScript model into models.ts.
@@ -210,147 +192,6 @@ func (a *App) DetectConflicts(modRoot string, entries []discovery.Entry) (confli
 	}
 
 	return conflict.Detect(entries, paths), nil
-}
-
-// UpdateType anchors update.Release so Wails emits its TypeScript model into models.ts.
-func (a *App) UpdateType() update.Release {
-	return update.Release{}
-}
-
-// Reports whether a newer Cratebug release is published, and its details when it is.
-type UpdateCheckResult struct {
-	Available bool           `json:"available"`
-	Release   update.Release `json:"release,omitempty"`
-}
-
-// Reports download progress for an in-progress update download, emitted on
-// the "update:downloadProgress" event as it downloads (matching
-// PrepareInstall's "install:progress" event for the same purpose).
-type UpdateDownloadProgress struct {
-	Downloaded int64 `json:"downloaded"`
-	Total      int64 `json:"total"`
-}
-
-// CheckForUpdate compares the running build against the latest published
-// GitHub release. A local or CI build (AppVersion is "dev", not a real
-// release tag) never reports one available, since there is nothing valid to
-// compare against.
-func (a *App) CheckForUpdate() (UpdateCheckResult, error) {
-	current, err := update.ParseVersion(AppVersion)
-	if err != nil {
-		return UpdateCheckResult{}, nil
-	}
-
-	release, err := a.updateClient().Latest(a.runtime.context())
-	if err != nil {
-		if errors.Is(err, update.ErrNoRelease) {
-			return UpdateCheckResult{}, nil
-		}
-		return UpdateCheckResult{}, err
-	}
-
-	if !release.Version.IsNewer(current) {
-		return UpdateCheckResult{}, nil
-	}
-	return UpdateCheckResult{Available: true, Release: release}, nil
-}
-
-// CheckWhatsNew reports the changelog for the running build's own release,
-// once, the first time it runs after that build changed -- the "what's new"
-// notice shown right after an update relaunches Cratebug, not a check for a
-// further update. Persists the running version as seen immediately so a
-// crash before the frontend renders the notice can only lose it, never
-// repeat it on every subsequent launch.
-func (a *App) CheckWhatsNew() (UpdateCheckResult, error) {
-	current, err := update.ParseVersion(AppVersion)
-	if err != nil {
-		return UpdateCheckResult{}, nil
-	}
-
-	if a.meta.read().Settings.LastSeenVersion == current.Tag {
-		return UpdateCheckResult{}, nil
-	}
-
-	markSeen := func(doc *metadata.Document) error {
-		doc.SetLastSeenVersion(current.Tag)
-		return nil
-	}
-
-	// The release lookup runs outside the metadata lock so a slow network
-	// call cannot hold up other settings writes.
-	release, err := a.updateClient().Tag(a.runtime.context(), current.Tag)
-	if err != nil {
-		// Best-effort: a missing or unreachable release for the running tag
-		// (offline, or a build that was never actually published) should not
-		// block startup or repeat every launch, so it's still marked seen.
-		_ = a.meta.update(markSeen)
-		return UpdateCheckResult{}, nil
-	}
-
-	if saveErr := a.meta.update(markSeen); saveErr != nil {
-		return UpdateCheckResult{}, fmt.Errorf("record the shown changelog version: %w", saveErr)
-	}
-	return UpdateCheckResult{Available: true, Release: release}, nil
-}
-
-// DownloadUpdate downloads release's installer, reporting progress through
-// the "update:downloadProgress" event. Returns the downloaded installer's
-// local path for a subsequent ApplyUpdate call.
-func (a *App) DownloadUpdate(release update.Release) (string, error) {
-	destDir := filepath.Join(os.TempDir(), updateDownloadDirName)
-	onProgress := func(downloaded, total int64) {
-		a.runtime.emit("update:downloadProgress", UpdateDownloadProgress{
-			Downloaded: downloaded,
-			Total:      total,
-		})
-	}
-	return a.updateClient().Download(a.runtime.context(), release.Asset, destDir, onProgress)
-}
-
-// ApplyUpdate launches the detached helper that installs the update
-// downloaded to installerPath and relaunches Cratebug, then quits the
-// running instance so the helper can replace it. A nil error means Cratebug
-// is about to exit, not that the update finished applying -- that happens in
-// the detached helper after this process is gone.
-func (a *App) ApplyUpdate(installerPath string) error {
-	// Wails exposes every bound method to the frontend with no lower trust
-	// boundary, so this can't rely on the frontend only ever passing back
-	// exactly what DownloadUpdate gave it. Unlike the mutation methods
-	// (RenameMod, DeleteMod, ...), which are inherently constrained to paths
-	// already inside the user's mod library, a bare installerPath string has
-	// no such constraint -- confirm it actually points at something
-	// DownloadUpdate could have produced before spawning it as a process.
-	expectedDir := filepath.Join(os.TempDir(), updateDownloadDirName)
-	if !strings.EqualFold(filepath.Ext(installerPath), ".exe") || !pathWithinDir(expectedDir, installerPath) {
-		return fmt.Errorf("refusing to apply update from an unexpected path: %q", installerPath)
-	}
-
-	// Checked here rather than in the helper so the failure surfaces while
-	// the app can still report it: after this call succeeds the app quits,
-	// and a helper whose installer vanished (antivirus quarantine, a temp
-	// cleaner) would otherwise close Cratebug silently without relaunching.
-	if _, err := os.Stat(installerPath); err != nil {
-		return fmt.Errorf("downloaded installer %q is not available: %w", installerPath, err)
-	}
-
-	if err := update.ApplyUpdate(installerPath); err != nil {
-		return err
-	}
-	if ctx := a.runtime.current(); ctx != nil {
-		wailsRuntime.Quit(ctx)
-	}
-	return nil
-}
-
-// Reports whether path resolves to a location inside dir, rejecting any
-// ".." traversal component.
-func pathWithinDir(dir, path string) bool {
-	relative, err := filepath.Rel(dir, path)
-	return err == nil && filepath.IsLocal(relative)
-}
-
-func (a *App) updateClient() *update.Client {
-	return &update.Client{Owner: updateRepoOwner, Repo: updateRepoName}
 }
 
 // Changes one current scanner entry to the requested enabled state.

@@ -20,12 +20,9 @@ import {
 } from "@/components/ui/dialog";
 
 import {
-	ApplyUpdate,
 	AssignModTag,
 	CancelCompanionCleanup,
 	CancelEncryption,
-	CheckForUpdate,
-	CheckWhatsNew,
 	ClassifyLibrary,
 	CreateFolder,
 	CreateLibrary,
@@ -36,10 +33,8 @@ import {
 	DetectConflicts,
 	DetectLibrary,
 	DiscardNexusLink,
-	DownloadUpdate,
 	FindModsNeedingEncryption,
 	FindUnsupportedCompanionPaks,
-	GetAppVersion,
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
@@ -65,6 +60,13 @@ import {
 	TakePendingNexusLink,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
+import {
+	ApplyUpdate,
+	CheckForUpdate,
+	CheckWhatsNew,
+	DownloadUpdate,
+	GetAppVersion,
+} from "../../wailsjs/go/main/UpdateService";
 import {
 	conflict,
 	discovery,
@@ -872,7 +874,7 @@ export function LibraryScreen() {
 			setIsDownloadingUpdate(false);
 		}
 	}, [updateCheckResult, showMutationFeedback]);
-	// A successful call quits Cratebug from the Go side (see App.ApplyUpdate),
+	// A successful call quits Cratebug from the Go side (see UpdateService.ApplyUpdate),
 	// so there is deliberately no further state update on success here: the
 	// detached helper takes over from this point, not the running frontend.
 	const applyUpdate = useCallback(async () => {

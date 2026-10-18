@@ -65,6 +65,7 @@ func main() {
 		},
 		Bind: []interface{}{
 			app,
+			app.updates,
 		},
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,
