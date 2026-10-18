@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import {
 	Dialog,
@@ -85,33 +86,35 @@ export function NexusLinkDialog({
 						That Nexus link is missing a file.
 					</p>
 				) : null}
-				<div className="dialog-actions">
-					<button type="button" className="quiet-button" onClick={onCancel}>
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button size="action" type="button" variant="secondary" onClick={onCancel}>
 						Cancel
-					</button>
+					</Button>
 					{needsAccount ? (
-						<button type="button" onClick={onOpenSettings}>
+						<Button size="action" type="button" onClick={onOpenSettings}>
 							Open Settings
-						</button>
+						</Button>
 					) : null}
 					{link.needsWebsite && link.modId ? (
-						<button
+						<Button
+							size="action"
 							type="button"
 							onClick={() =>
 								BrowserOpenURL(nexusModPageURL(link.modId ?? 0, link.fileId))
 							}
 						>
 							Open Nexus page
-						</button>
+						</Button>
 					) : null}
-					<button
+					<Button
+						size="action"
 						ref={confirmRef}
 						type="button"
 						disabled={!canInstall}
 						onClick={onConfirm}
 					>
 						Download &amp; install
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

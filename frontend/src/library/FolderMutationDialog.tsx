@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
 	Dialog,
@@ -193,16 +194,17 @@ export function FolderMutationDialog({
 							{validationError}
 						</p>
 					)}
-					<div className="dialog-actions">
-						<button
+					<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+						<Button
+							size="action"
 							type="button"
-							className="quiet-button"
+							variant="secondary"
 							disabled={isMutating}
 							onClick={onClose}
 						>
 							Cancel
-						</button>
-						<button type="submit" disabled={isMutating}>
+						</Button>
+						<Button size="action" type="submit" disabled={isMutating}>
 							{isMutating
 								? "Saving..."
 								: createMode
@@ -210,7 +212,7 @@ export function FolderMutationDialog({
 									: renameMode
 										? "Rename"
 										: "Move"}
-						</button>
+						</Button>
 					</div>
 				</form>
 			</DialogContent>

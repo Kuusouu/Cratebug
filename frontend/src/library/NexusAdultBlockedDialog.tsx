@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import {
 	Dialog,
@@ -36,13 +37,23 @@ export function NexusAdultBlockedDialog({ onClose }: NexusAdultBlockedDialogProp
 				<DialogDescription className="wrap-anywhere" role="alert">
 					{nexusAdultContentBlockedMessage}
 				</DialogDescription>
-				<div className="dialog-actions">
-					<button ref={closeRef} type="button" className="quiet-button" onClick={onClose}>
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button
+						size="action"
+						ref={closeRef}
+						type="button"
+						variant="secondary"
+						onClick={onClose}
+					>
 						Close
-					</button>
-					<button type="button" onClick={() => BrowserOpenURL(nexusContentBlockingURL)}>
+					</Button>
+					<Button
+						size="action"
+						type="button"
+						onClick={() => BrowserOpenURL(nexusContentBlockingURL)}
+					>
 						Open Content Blocking
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

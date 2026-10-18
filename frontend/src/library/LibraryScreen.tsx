@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {
 	Download,
 	Grid2X2,
@@ -2647,29 +2648,29 @@ export function LibraryScreen() {
 					</div>
 				</div>
 				<div className={styles["header-controls"]}>
-					<button
-						type="button"
-						className="icon-button"
+					<Button
+						variant="secondary"
+						size="icon"
 						onClick={() => void startInstallFiles()}
 						disabled={!libraryRoot || libraryState === "loading"}
 						aria-label="Install mod"
 						title="Install mod from archive or pak file"
 					>
 						<PackagePlus aria-hidden="true" />
-					</button>
-					<button
-						type="button"
-						className="icon-button"
+					</Button>
+					<Button
+						variant="secondary"
+						size="icon"
 						onClick={() => setInstallFromNexusOpen(true)}
 						disabled={!libraryRoot || libraryState === "loading"}
 						aria-label="Install from Nexus Mods"
 						title="Install a mod from Nexus Mods"
 					>
 						<Download aria-hidden="true" />
-					</button>
-					<button
-						type="button"
-						className="icon-button"
+					</Button>
+					<Button
+						variant="secondary"
+						size="icon"
 						onClick={() => {
 							if ((conflictResult?.groups?.length ?? 0) > 0) {
 								setConflictDetailsOpen(true);
@@ -2690,20 +2691,23 @@ export function LibraryScreen() {
 						}
 					>
 						<ShieldAlert aria-hidden="true" />
-					</button>
-					<button
-						type="button"
-						className="icon-button"
+					</Button>
+					<Button
+						variant="secondary"
+						size="icon"
 						onClick={() => void openTools()}
 						aria-label="Tools"
 						title="Tools"
 					>
 						<Wrench aria-hidden="true" />
-					</button>
-					<button
-						type="button"
+					</Button>
+					<Button
+						variant="secondary"
+						size="icon"
 						className={
-							updateCheckResult?.available ? "icon-button has-update" : "icon-button"
+							updateCheckResult?.available
+								? "border-primary/60 bg-primary/18 text-primary"
+								: undefined
 						}
 						onClick={() => setSettingsOpen(true)}
 						aria-label={
@@ -2718,7 +2722,7 @@ export function LibraryScreen() {
 						}
 					>
 						<SettingsIcon aria-hidden="true" />
-					</button>
+					</Button>
 				</div>
 			</header>
 
@@ -2739,31 +2743,32 @@ export function LibraryScreen() {
 						placeholder="Paste the Marvel Rivals mod folder path"
 						autoComplete="off"
 					/>
-					<button type="submit" disabled={libraryState === "loading" || isMutationLocked}>
+					<Button type="submit" disabled={libraryState === "loading" || isMutationLocked}>
 						{libraryState === "loading" ? "Scanning..." : "Scan library"}
-					</button>
+					</Button>
 				</form>
-				<button
+				<Button
 					type="button"
-					className="quiet-button detect-button"
+					variant="secondary"
+					className="gap-[0.45rem] max-[760px]:w-full"
 					onClick={() => void detectLibrary()}
 					disabled={isDetectingLibrary || isMutationLocked}
 					title={`Automatically detect the Marvel Rivals mod library in your ${libraryProviderLabels[libraryProvider]} installation`}
 				>
-					<ActiveProviderLogo className="detect-button-logo" />
+					<ActiveProviderLogo className="size-[1.05rem] shrink-0" />
 					{isDetectingLibrary
 						? "Detecting..."
 						: `Detect ${libraryProviderLabels[libraryProvider]} library`}
-				</button>
+				</Button>
 				{library && (
-					<button
+					<Button
 						type="button"
-						className="quiet-button"
+						variant="secondary"
 						onClick={() => scan()}
 						disabled={libraryState === "loading" || isMutationLocked}
 					>
 						Refresh
-					</button>
+					</Button>
 				)}
 			</section>
 
@@ -2784,12 +2789,10 @@ export function LibraryScreen() {
 						<span>Folders</span>
 						{library && (
 							<div className={styles["sidebar-heading-actions"]}>
-								<button
+								<Button
 									type="button"
-									className={[
-										"quiet-button",
-										styles["sidebar-heading-action"],
-									].join(" ")}
+									variant="secondary"
+									className={styles["sidebar-heading-action"]}
 									disabled={isMutationLocked}
 									onClick={() => {
 										setFolderDialogTarget(
@@ -2799,7 +2802,7 @@ export function LibraryScreen() {
 									}}
 								>
 									New folder
-								</button>
+								</Button>
 							</div>
 						)}
 					</div>
@@ -2845,22 +2848,22 @@ export function LibraryScreen() {
 								<span className={styles["batch-count"]}>
 									{checkedEntryIDs.size} selected
 								</span>
-								<button
+								<Button
 									type="button"
-									className="quiet-button"
+									variant="secondary"
 									disabled={displayedEntries.length === 0 || isMutationLocked}
 									onClick={selectAllVisible}
 								>
 									Select all
-								</button>
-								<button
+								</Button>
+								<Button
 									type="button"
-									className="quiet-button"
+									variant="secondary"
 									disabled={checkedEntryIDs.size === 0 || isMutationLocked}
 									onClick={clearChecked}
 								>
 									Clear
-								</button>
+								</Button>
 								<BatchActionsMenu
 									selectedCount={checkedEntryIDs.size}
 									encryption={encryptMenu}
@@ -2907,18 +2910,19 @@ export function LibraryScreen() {
 						scanError={scanError}
 						hasLibrary={library !== null}
 						initialStateAction={
-							<button
+							<Button
 								type="button"
-								className="quiet-button detect-button"
+								variant="secondary"
+								className="mt-[0.6rem] gap-[0.45rem] justify-self-center max-[760px]:w-full"
 								onClick={() => void detectLibrary()}
 								disabled={isDetectingLibrary || isMutationLocked}
 								title={`Automatically detect the Marvel Rivals mod library in your ${libraryProviderLabels[libraryProvider]} installation`}
 							>
-								<ActiveProviderLogo className="detect-button-logo" />
+								<ActiveProviderLogo className="size-[1.05rem] shrink-0" />
 								{isDetectingLibrary
 									? "Detecting..."
 									: `Detect ${libraryProviderLabels[libraryProvider]} library`}
-							</button>
+							</Button>
 						}
 						mutatingEntryIDs={mutatingEntryIDs}
 						isMutationLocked={isMutationLocked}
@@ -3056,14 +3060,15 @@ export function LibraryScreen() {
 						<p className="text-[0.85rem] leading-normal text-muted-foreground">
 							{companionProgress.current} of {companionProgress.total}
 						</p>
-						<div className="dialog-actions">
-							<button
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
 								type="button"
-								className="quiet-button"
+								variant="secondary"
+								size="action"
 								onClick={() => void CancelCompanionCleanup()}
 							>
 								Cancel
-							</button>
+							</Button>
 						</div>
 					</DialogContent>
 				</Dialog>
@@ -3083,14 +3088,15 @@ export function LibraryScreen() {
 						<p className="text-[0.85rem] leading-normal text-muted-foreground">
 							{encryptProgress.current} of {encryptProgress.total}
 						</p>
-						<div className="dialog-actions">
-							<button
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
 								type="button"
-								className="quiet-button"
+								variant="secondary"
+								size="action"
 								onClick={() => void CancelEncryption()}
 							>
 								Cancel
-							</button>
+							</Button>
 						</div>
 					</DialogContent>
 				</Dialog>

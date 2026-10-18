@@ -538,8 +538,3 @@
 		justify-content: space-between;
 	}
 }
-
-.catalog-state :global(.detect-button) {
-	justify-self: center;
-	margin-top: 0.6rem;
-}

@@ -106,52 +106,22 @@
 	text-transform: uppercase;
 }
 
-h1,
-h2,
-h3,
-p {
-	margin-top: 0;
-}
-
 h1 {
 	margin-bottom: 0;
 	font-size: 1.35rem;
 	letter-spacing: -0.03em;
 }
 
-.icon-button {
-	display: grid;
-	width: 2.4rem;
-	height: 2.4rem;
-	place-items: center;
-	padding: 0;
-	border: 1px solid var(--line);
-	border-radius: 0.6rem;
-	background: var(--panel-raised);
-	color: var(--muted);
-}
-
-.icon-button:hover:not(:disabled) {
-	border-color: color-mix(in srgb, var(--accent), transparent 52%);
-	background: color-mix(in srgb, var(--accent), transparent 88%);
-	color: var(--text);
-	filter: none;
-}
-
-.icon-button svg {
-	width: 1.15rem;
-	height: 1.15rem;
-}
-
-.icon-button.has-update {
-	border-color: color-mix(in srgb, var(--accent), transparent 40%);
-	background: color-mix(in srgb, var(--accent), transparent 82%);
-	color: var(--accent);
-}
-
 /* Element defaults live in the base layer so Tailwind utilities can style new
    components; unlayered class rules in this file keep their priority. */
 @layer base {
+	h1,
+	h2,
+	h3,
+	p {
+		margin-top: 0;
+	}
+
 	select,
 	input,
 	button {
@@ -243,55 +213,6 @@ input:focus-visible,
 select:focus-visible {
 	outline: 3px solid color-mix(in srgb, var(--accent), transparent 55%);
 	outline-offset: 2px;
-}
-
-.quiet-button {
-	padding: 0.65rem 0.9rem;
-	background: var(--panel-raised);
-	color: var(--text);
-	border: 1px solid var(--line);
-}
-
-.detect-button {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 0.45rem;
-}
-
-.detect-button-logo {
-	width: 1.05rem;
-	height: 1.05rem;
-	flex: 0 0 auto;
-}
-
-.destructive-button {
-	padding: 0.65rem 0.9rem;
-	background: var(--bad);
-	color: var(--page);
-}
-
-/* Action-row metrics carried over from the retired .mutation-dialog-actions rule.
-   Buttons keep the legacy styling system until they join the Tailwind migration. */
-.dialog-actions {
-	display: flex;
-	justify-content: end;
-	gap: 0.65rem;
-	margin-top: 0.35rem;
-}
-
-.dialog-actions button {
-	min-height: 2.7rem;
-	padding: 0.6rem 0.85rem;
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-}
-
-.dialog-actions button svg {
-	width: 1rem;
-	height: 1rem;
-	flex-shrink: 0;
 }
 
 .library-layout {
@@ -490,10 +411,6 @@ select:focus-visible {
 	.library-toolbar {
 		align-items: stretch;
 		flex-direction: column;
-	}
-
-	.detect-button {
-		width: 100%;
 	}
 
 	.library-layout {

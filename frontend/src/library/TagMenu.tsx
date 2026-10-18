@@ -2,6 +2,7 @@ import { Check, ChevronDown, Pencil, Plus, Trash2, X } from "lucide-react";
 import styles from "./TagMenu.module.css";
 import { useCallback, useState } from "react";
 import type { metadata } from "../../wailsjs/go/models";
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type TagMenuProps = {
@@ -19,9 +20,7 @@ type EditingState = { tagID: string; name: string } | null;
 // docs/decisions/0002-organize-action-pattern.md it earns its own toolbar
 // control instead of living behind a per-mod context menu. The panel mixes
 // toggle rows, inline rename, and a create form, so it is a popover rather
-// than a plain menu of actions. Its rows keep their module classes: the
-// unlayered button rules in App.css outrank Tailwind utilities, so styling
-// them with utilities here would render the global accent treatment instead.
+// than a plain menu of actions.
 export function TagMenu({
 	catalog,
 	filterIDs,
@@ -224,14 +223,16 @@ export function TagMenu({
 							setValidationError("");
 						}}
 					/>
-					<button
+					<Button
 						type="submit"
-						className="icon-button"
+						variant="secondary"
+						size="icon"
+						className="size-[2.15rem]"
 						disabled={isBusy}
 						aria-label="Add tag"
 					>
 						<Plus aria-hidden="true" />
-					</button>
+					</Button>
 				</form>
 				{validationError && (
 					<p className={styles["tag-menu-error"]} role="alert">

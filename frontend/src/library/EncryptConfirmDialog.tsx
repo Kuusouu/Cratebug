@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import {
 	Dialog,
@@ -73,17 +74,19 @@ export function EncryptConfirmDialog({
 						? "A failed encryption leaves that mod as it was."
 						: "A failed decryption leaves that mod as it was."}
 				</p>
-				<div className="dialog-actions">
-					<button
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button
+						size="action"
 						ref={cancelRef}
 						type="button"
-						className="quiet-button"
+						variant="secondary"
 						disabled={isMutating}
 						onClick={onClose}
 					>
 						Cancel
-					</button>
-					<button
+					</Button>
+					<Button
+						size="action"
 						type="button"
 						disabled={!ready || isMutating}
 						onClick={() => void handleConfirm()}
@@ -95,7 +98,7 @@ export function EncryptConfirmDialog({
 							: ready
 								? action
 								: `${action} (${secondsRemaining})`}
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

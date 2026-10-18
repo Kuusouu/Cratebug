@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Check, Monitor, Moon, RefreshCw, Sun, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -219,15 +220,16 @@ export function SettingsDialog({
 						<p className="eyebrow">Cratebug</p>
 						<DialogTitle>Settings</DialogTitle>
 					</DialogHeader>
-					<button
+					<Button
 						ref={closeButtonRef}
 						type="button"
-						className="icon-button shrink-0"
 						onClick={onClose}
 						aria-label="Close"
+						variant="secondary"
+						size="icon"
 					>
 						<X aria-hidden="true" />
-					</button>
+					</Button>
 				</div>
 				{/* The negative margin pushes the scrollbar into the dialog's own
 					padding so the content width stays the same while it scrolls. */}
@@ -418,14 +420,14 @@ export function SettingsDialog({
 										{formatNexusRateLimit(account)}
 									</p>
 								) : null}
-								<button
+								<Button
 									type="button"
-									className="quiet-button"
 									disabled={nexusBusy}
+									variant="secondary"
 									onClick={() => void disconnectNexus()}
 								>
 									Disconnect
-								</button>
+								</Button>
 							</div>
 						) : (
 							<div className={styles["nexus-key-row"]}>
@@ -509,13 +511,13 @@ export function SettingsDialog({
 									Cratebug can restore it if you turn this off later.
 								</p>
 								<div className={styles["nexus-takeover-actions"]}>
-									<button
+									<Button
 										type="button"
-										className="quiet-button"
+										variant="secondary"
 										onClick={() => setTakeOverOwner(null)}
 									>
 										Cancel
-									</button>
+									</Button>
 									<button
 										type="button"
 										onClick={() => {
@@ -543,18 +545,18 @@ export function SettingsDialog({
 							<span className={styles["update-settings-version"]}>
 								Version {appVersion}
 							</span>
-							<button
+							<Button
 								type="button"
-								className="quiet-button"
 								onClick={onCheckForUpdate}
 								disabled={isCheckingForUpdate}
+								variant="secondary"
 							>
 								<RefreshCw
 									className={isCheckingForUpdate ? "spinning-loader" : undefined}
 									aria-hidden="true"
 								/>
 								{isCheckingForUpdate ? "Checking..." : "Check for updates"}
-							</button>
+							</Button>
 						</div>
 					</div>
 				</div>

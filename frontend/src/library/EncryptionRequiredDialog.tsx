@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import {
 	Dialog,
@@ -70,17 +71,19 @@ export function EncryptionRequiredDialog({
 					This rebuilds each complete IoStore bundle. Close Marvel Rivals first. A failed
 					rebuild leaves that mod as it was.
 				</p>
-				<div className="dialog-actions">
-					<button
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button
+						size="action"
 						ref={cancelRef}
 						type="button"
-						className="quiet-button"
+						variant="secondary"
 						disabled={isMutating}
 						onClick={onClose}
 					>
 						Not now
-					</button>
-					<button
+					</Button>
+					<Button
+						size="action"
 						type="button"
 						disabled={!ready || isMutating}
 						onClick={() => void handleConfirm()}
@@ -90,7 +93,7 @@ export function EncryptionRequiredDialog({
 							: ready
 								? "Encrypt"
 								: `Encrypt (${secondsRemaining})`}
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

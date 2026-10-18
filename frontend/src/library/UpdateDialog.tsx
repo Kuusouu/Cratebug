@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Download, Heart, X } from "lucide-react";
 import styles from "./UpdateDialog.module.css";
 import { useEffect, useRef } from "react";
@@ -167,15 +168,16 @@ export function UpdateDialog({
 						</DialogDescription>
 					</DialogHeader>
 					{!isDownloading && (
-						<button
+						<Button
 							ref={closeButtonRef}
 							type="button"
-							className="icon-button shrink-0"
 							onClick={onClose}
 							aria-label="Close"
+							variant="secondary"
+							size="icon"
 						>
 							<X aria-hidden="true" />
-						</button>
+						</Button>
 					)}
 				</div>
 
@@ -208,27 +210,33 @@ export function UpdateDialog({
 				</div>
 
 				{mode === "available" && (
-					<div className="dialog-actions">
+					<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
 						{!isReady && (
-							<button
+							<Button
+								size="action"
 								type="button"
-								className="quiet-button"
+								variant="secondary"
 								onClick={() => BrowserOpenURL(release.htmlURL)}
 								disabled={isDownloading}
 							>
 								View release
-							</button>
+							</Button>
 						)}
 						{!isReady && (
-							<button type="button" onClick={onDownload} disabled={isDownloading}>
+							<Button
+								size="action"
+								type="button"
+								onClick={onDownload}
+								disabled={isDownloading}
+							>
 								<Download aria-hidden="true" />
 								{isDownloading ? "Downloading..." : "Download update"}
-							</button>
+							</Button>
 						)}
 						{isReady && (
-							<button type="button" onClick={onApply}>
+							<Button size="action" type="button" onClick={onApply}>
 								Install &amp; restart
-							</button>
+							</Button>
 						)}
 					</div>
 				)}

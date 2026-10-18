@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -153,15 +154,16 @@ export function ConflictDetailsDialog({
 							)}
 						</DialogDescription>
 					</DialogHeader>
-					<button
+					<Button
 						ref={closeButtonRef}
 						type="button"
-						className="icon-button shrink-0"
 						onClick={onClose}
 						aria-label="Close conflict details"
+						variant="secondary"
+						size="icon"
 					>
 						<X aria-hidden="true" />
-					</button>
+					</Button>
 				</div>
 
 				{unavailable.length > 0 && (
@@ -195,10 +197,10 @@ export function ConflictDetailsDialog({
 					))}
 				</div>
 
-				<div className="dialog-actions">
-					<button type="button" className="quiet-button" onClick={onClose}>
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button size="action" type="button" variant="secondary" onClick={onClose}>
 						Close
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

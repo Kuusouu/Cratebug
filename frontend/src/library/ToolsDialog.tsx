@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, RefreshCw, ShieldAlert, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -224,16 +225,17 @@ export function ToolsDialog({
 						<p className="eyebrow">Cratebug</p>
 						<DialogTitle>Tools</DialogTitle>
 					</DialogHeader>
-					<button
+					<Button
 						ref={closeButtonRef}
 						type="button"
-						className="icon-button shrink-0"
+						variant="secondary"
+						size="icon"
 						onClick={() => void close()}
 						disabled={busy}
 						aria-label="Close"
 					>
 						<X aria-hidden="true" />
-					</button>
+					</Button>
 				</div>
 				{/* The negative margin pushes the scrollbar into the dialog's own
 					padding so the content width stays the same while it scrolls. */}
@@ -254,44 +256,44 @@ export function ToolsDialog({
 							<div className={styles["tool-card-actions"]}>
 								{backupRestore.phase === "preview" ? (
 									<>
-										<button
+										<Button
 											type="button"
-											className="quiet-button"
+											variant="secondary"
 											onClick={() => void confirmRestore()}
 										>
 											<Upload aria-hidden="true" />
 											Restore
-										</button>
-										<button
+										</Button>
+										<Button
 											type="button"
-											className="quiet-button"
+											variant="secondary"
 											onClick={() => void cancelPreview()}
 										>
 											Cancel
-										</button>
+										</Button>
 									</>
 								) : backupRestore.phase === "error" && backupRestore.retry ? (
 									<>
-										<button
+										<Button
 											type="button"
-											className="quiet-button"
+											variant="secondary"
 											onClick={() => void confirmRestore()}
 										>
 											<Upload aria-hidden="true" />
 											Try again
-										</button>
-										<button
+										</Button>
+										<Button
 											type="button"
-											className="quiet-button"
+											variant="secondary"
 											onClick={() => void cancelPreview()}
 										>
 											Start over
-										</button>
+										</Button>
 									</>
 								) : busy ? (
-									<button
+									<Button
 										type="button"
-										className="quiet-button"
+										variant="secondary"
 										onClick={() =>
 											backupRestore.phase === "backing-up"
 												? cancelBackup()
@@ -299,37 +301,37 @@ export function ToolsDialog({
 										}
 									>
 										Cancel
-									</button>
+									</Button>
 								) : (
 									<>
-										<button
+										<Button
 											type="button"
-											className="quiet-button"
 											disabled={!libraryRoot}
 											title={
 												libraryRoot
 													? "Back up the library"
 													: "Set a mod library first"
 											}
+											variant="secondary"
 											onClick={() => void startBackup()}
 										>
 											<Download aria-hidden="true" />
 											Backup
-										</button>
-										<button
+										</Button>
+										<Button
 											type="button"
-											className="quiet-button"
 											disabled={!libraryRoot}
 											title={
 												libraryRoot
 													? "Restore from a backup"
 													: "Set a mod library first"
 											}
+											variant="secondary"
 											onClick={() => void startRestorePreview()}
 										>
 											<Upload aria-hidden="true" />
 											Restore
-										</button>
+										</Button>
 									</>
 								)}
 							</div>
@@ -402,13 +404,13 @@ function SignatureBypassCard({ initial }: { initial: sigbypass.Status | null }) 
 			<div className={styles["tool-card-text"]}>
 				<p className={styles["tool-card-title"]}>Signature bypass</p>
 				<p className={styles["tool-card-description"]}>Required for mods to load.</p>
-				<button
+				<Button
 					type="button"
-					className="quiet-button"
+					variant="secondary"
 					onClick={() => BrowserOpenURL(signatureBypassSourceURL)}
 				>
 					Source and license
-				</button>
+				</Button>
 				{card.phase === "error" ? (
 					<p
 						className="text-[0.8rem] leading-snug font-semibold text-destructive"
@@ -424,16 +426,16 @@ function SignatureBypassCard({ initial }: { initial: sigbypass.Status | null }) 
 			</div>
 			<div className={styles["tool-card-actions"]}>
 				{card.phase === "error" ? (
-					<button type="button" className="quiet-button" onClick={() => void reload()}>
+					<Button type="button" variant="secondary" onClick={() => void reload()}>
 						<RefreshCw aria-hidden="true" />
 						Try again
-					</button>
+					</Button>
 				) : (
 					active && (
-						<button
+						<Button
 							type="button"
-							className="quiet-button"
 							disabled={card.phase !== "ready"}
+							variant="secondary"
 							onClick={() => void run(action)}
 						>
 							<ShieldAlert aria-hidden="true" />
@@ -444,7 +446,7 @@ function SignatureBypassCard({ initial }: { initial: sigbypass.Status | null }) 
 								: card.phase === "busy"
 									? "Removing…"
 									: "Remove"}
-						</button>
+						</Button>
 					)
 				)}
 			</div>

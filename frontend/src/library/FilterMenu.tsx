@@ -1,5 +1,5 @@
 import { ChevronDown, ListFilter } from "lucide-react";
-import styles from "./FilterMenu.module.css";
+import { cn } from "cn";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -50,12 +50,10 @@ export function FilterMenu({ sections }: FilterMenuProps) {
 				render={
 					<button
 						type="button"
-						className={[
-							styles["filter-menu-trigger"],
-							activeCount > 0 ? styles.active : "",
-						]
-							.filter(Boolean)
-							.join(" ")}
+						className={cn(
+							"flex items-center gap-[0.4rem] rounded-[0.55rem] border border-border bg-popover px-[0.8rem] py-[0.65rem] font-bold text-foreground hover:border-primary/48 hover:filter-none [&_svg]:size-4",
+							activeCount > 0 && "border-primary/60 bg-primary/12 text-primary",
+						)}
 						aria-label="Filter catalog"
 						title="Filter catalog"
 					/>

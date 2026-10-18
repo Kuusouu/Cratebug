@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {
 	ChevronDown,
 	ChevronRight,
@@ -298,16 +299,17 @@ export function InstallPreviewDialog({
 						</DialogTitle>
 					</div>
 					{phase !== "applying" && (
-						<button
+						<Button
 							ref={closeButtonRef}
 							type="button"
-							className="icon-button"
+							variant="secondary"
+							size="icon"
 							onClick={() => void handleCancel()}
 							aria-label="Close"
 							title="Cancel installation"
 						>
 							<X aria-hidden="true" />
-						</button>
+						</Button>
 					)}
 				</div>
 
@@ -351,14 +353,15 @@ export function InstallPreviewDialog({
 					>
 						<CircleAlert aria-hidden="true" />
 						<p>{errorMessage || "An error occurred during installation."}</p>
-						<div className="dialog-actions">
-							<button
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
+								size="action"
 								type="button"
-								className="quiet-button"
+								variant="secondary"
 								onClick={() => void handleCancel()}
 							>
 								Close
-							</button>
+							</Button>
 						</div>
 					</div>
 				)}
@@ -367,14 +370,15 @@ export function InstallPreviewDialog({
 					<div className={styles["install-preview-status-state"]}>
 						<Package aria-hidden="true" />
 						<p>No installable mod files were found in the selected files.</p>
-						<div className="dialog-actions">
-							<button
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
+								size="action"
 								type="button"
-								className="quiet-button"
+								variant="secondary"
 								onClick={() => void handleCancel()}
 							>
 								Close
-							</button>
+							</Button>
 						</div>
 					</div>
 				)}
@@ -786,16 +790,18 @@ export function InstallPreviewDialog({
 									Select at least 1 mod to install.
 								</p>
 							)}
-							<div className="dialog-actions">
-								<button
+							<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+								<Button
+									size="action"
 									type="button"
-									className="quiet-button"
+									variant="secondary"
 									disabled={phase === "applying"}
 									onClick={() => void handleCancel()}
 								>
 									Cancel
-								</button>
-								<button
+								</Button>
+								<Button
+									size="action"
 									type="button"
 									disabled={!canInstall}
 									onClick={() => void handleApply()}
@@ -814,7 +820,7 @@ export function InstallPreviewDialog({
 											<span>{buttonLabel}</span>
 										</>
 									)}
-								</button>
+								</Button>
 							</div>
 						</div>
 					</>

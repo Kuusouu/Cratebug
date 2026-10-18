@@ -117,7 +117,7 @@
 	gap: 0.5rem;
 }
 
-:global(.quiet-button).sidebar-heading-action {
+.sidebar-heading-action {
 	padding: 0.3rem 0.55rem;
 	font-size: 0.7rem;
 	letter-spacing: 0.04em;

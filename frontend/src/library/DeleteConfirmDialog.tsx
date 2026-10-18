@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useRef } from "react";
 import {
 	Dialog,
@@ -88,19 +89,21 @@ export function DeleteConfirmDialog({
 						missing a recognized file. Only the files listed above will be removed.
 					</p>
 				)}
-				<div className="dialog-actions">
-					<button
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button
+						size="action"
 						ref={cancelRef}
 						type="button"
-						className="quiet-button"
+						variant="secondary"
 						disabled={isMutating}
 						onClick={onClose}
 					>
 						Cancel
-					</button>
-					<button
+					</Button>
+					<Button
+						size="action"
 						type="button"
-						className="destructive-button"
+						variant="destructiveSolid"
 						disabled={!ready || isMutating}
 						onClick={() => void handleConfirm()}
 					>
@@ -109,7 +112,7 @@ export function DeleteConfirmDialog({
 							: ready
 								? "Delete"
 								: `Delete (${secondsRemaining})`}
-					</button>
+					</Button>
 				</div>
 			</DialogContent>
 		</Dialog>

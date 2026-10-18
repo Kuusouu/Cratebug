@@ -147,12 +147,6 @@
 	font-size: 0.85rem;
 }
 
-.tag-menu-create-form :global(.icon-button) {
-	flex-shrink: 0;
-	width: 2.15rem;
-	height: 2.15rem;
-}
-
 .tag-menu-error {
 	margin: 0;
 	color: var(--bad);

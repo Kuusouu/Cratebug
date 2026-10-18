@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { NexusAccount, ResolveNexusModPage } from "../../wailsjs/go/main/App";
@@ -266,24 +267,27 @@ export function InstallFromNexusDialog({
 							</p>
 						) : null}
 
-						<div className="dialog-actions">
-							<button
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
+								size="action"
 								type="button"
-								className="quiet-button"
+								variant="secondary"
 								onClick={onCancel}
 								disabled={busy}
 							>
 								Cancel
-							</button>
+							</Button>
 							{adultBlocked ? (
-								<button
+								<Button
+									size="action"
 									type="button"
 									onClick={() => BrowserOpenURL(nexusContentBlockingURL)}
 								>
 									Open Content Blocking
-								</button>
+								</Button>
 							) : null}
-							<button
+							<Button
+								size="action"
 								type="submit"
 								disabled={busy || (step === "pick-file" && selectedFileId === null)}
 							>
@@ -297,7 +301,7 @@ export function InstallFromNexusDialog({
 								) : (
 									"Look up mod"
 								)}
-							</button>
+							</Button>
 						</div>
 					</form>
 				) : null}
@@ -326,10 +330,15 @@ export function InstallFromNexusDialog({
 								{errorMessage}
 							</p>
 						) : null}
-						<div className="dialog-actions">
-							<button type="button" className="quiet-button" onClick={onCancel}>
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
+								size="action"
+								type="button"
+								variant="secondary"
+								onClick={onCancel}
+							>
 								Cancel
-							</button>
+							</Button>
 						</div>
 					</div>
 				) : null}
@@ -344,13 +353,18 @@ export function InstallFromNexusDialog({
 								{errorMessage}
 							</p>
 						) : null}
-						<div className="dialog-actions">
-							<button type="button" className="quiet-button" onClick={onCancel}>
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
+								size="action"
+								type="button"
+								variant="secondary"
+								onClick={onCancel}
+							>
 								Close
-							</button>
-							<button type="button" onClick={onOpenSettings}>
+							</Button>
+							<Button size="action" type="button" onClick={onOpenSettings}>
 								Open Settings
-							</button>
+							</Button>
 						</div>
 					</>
 				) : null}
@@ -369,10 +383,15 @@ export function InstallFromNexusDialog({
 								This mod has no installable MAIN or OPTIONAL files.
 							</p>
 						)}
-						<div className="dialog-actions">
-							<button type="button" className="quiet-button" onClick={onCancel}>
+						<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+							<Button
+								size="action"
+								type="button"
+								variant="secondary"
+								onClick={onCancel}
+							>
 								Close
-							</button>
+							</Button>
 						</div>
 					</>
 				) : null}

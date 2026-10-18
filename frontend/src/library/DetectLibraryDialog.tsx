@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useEffect, useRef } from "react";
 import type { gamedetect } from "../../wailsjs/go/models";
@@ -93,34 +94,37 @@ export function DetectLibraryDialog({
 						</>
 					)}
 				</div>
-				<div className="dialog-actions">
-					<button
+				<div className="mt-[0.35rem] flex justify-end gap-[0.65rem]">
+					<Button
+						size="action"
 						ref={cancelButtonRef}
 						type="button"
-						className="quiet-button"
+						variant="secondary"
 						onClick={onClose}
 						disabled={isWorking}
 					>
 						Cancel
-					</button>
+					</Button>
 					{mode === "apply" ? (
-						<button
+						<Button
+							size="action"
 							ref={primaryButtonRef}
 							type="button"
 							onClick={onApply}
 							disabled={isWorking}
 						>
 							Use this library
-						</button>
+						</Button>
 					) : (
-						<button
+						<Button
+							size="action"
 							ref={primaryButtonRef}
 							type="button"
 							onClick={onCreate}
 							disabled={isWorking}
 						>
 							{isWorking ? "Creating..." : "Create library"}
-						</button>
+						</Button>
 					)}
 				</div>
 			</DialogContent>
