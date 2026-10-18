@@ -3,12 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/gamedetect"
 	"github.com/Kuusouu/Cratebug/internal/install"
@@ -33,6 +30,7 @@ type App struct {
 	backups               *BackupService
 	pakRepair             *PakRepairService
 	organize              *OrganizeService
+	library               *LibraryService
 
 	secretStore secret.Store
 
@@ -102,6 +100,7 @@ func newApp(
 		backups:               newBackupService(c),
 		pakRepair:             newPakRepairService(c),
 		organize:              newOrganizeService(c),
+		library:               newLibraryService(c),
 		installSessionManager: installSessionManager,
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
@@ -120,73 +119,9 @@ func (a *App) initWatcher() {
 	}
 }
 
-// Releases library directory handles while the Tools menu is open.
-func (a *App) SetLibraryWatcherSuspended(suspended bool) error {
-	if a.watcher == nil {
-		return nil
-	}
-	return a.watcher.SetSuspended(suspended)
-}
-
 // Confirms that the frontend can reach the Go application.
 func (a *App) RuntimeStatus() string {
 	return "Go backend connected"
-}
-
-// ClassificationType anchors modtype.Identity so Wails emits its TypeScript model into models.ts.
-func (a *App) ClassificationType() modtype.Identity {
-	return modtype.Identity{}
-}
-
-// Returns the read-only catalog discovered beneath modRoot.
-func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
-	if a.watcher != nil {
-		currentRoot := a.watcher.Root()
-		targetRoot := strings.TrimSpace(modRoot)
-		if targetRoot != "" {
-			if abs, err := filepath.Abs(targetRoot); err == nil {
-				targetRoot = abs
-			}
-		}
-		if filepath.Clean(currentRoot) != filepath.Clean(targetRoot) {
-			_ = a.watcher.SetRoot(modRoot)
-		}
-	}
-	return discovery.Scan(modRoot)
-}
-
-// ClassifyLibrary determines the category and hero/skin identity for discovered entries.
-func (a *App) ClassifyLibrary(modRoot string, entries []discovery.Entry) (map[string]modtype.Identity, error) {
-	return a.catalog.classify(modRoot, entries)
-}
-
-// ConflictType anchors conflict.Result so Wails emits its TypeScript model into models.ts.
-func (a *App) ConflictType() conflict.Result {
-	return conflict.Result{}
-}
-
-// DetectConflicts scans entries for enabled mods that share internal Unreal
-// asset paths. It classifies entries first (a no-op for anything already
-// classified this session, since internal/modtype's SessionClassifier keyed
-// on Classify's own mtime-based cache also skips the corresponding
-// UAssetToolRivals call), then reuses each enabled mod's retained path
-// listing from that same cache rather than resolving it a second time.
-func (a *App) DetectConflicts(modRoot string, entries []discovery.Entry) (conflict.Result, error) {
-	if _, err := a.catalog.classify(modRoot, entries); err != nil {
-		return conflict.Result{}, err
-	}
-
-	paths := make(map[string][]string, len(entries))
-	for _, entry := range entries {
-		if entry.State != discovery.StateEnabled {
-			continue
-		}
-		if resolved, ok := a.catalog.pathsFor(modRoot, entry); ok {
-			paths[entry.ID] = resolved
-		}
-	}
-
-	return conflict.Detect(entries, paths), nil
 }
 
 // MetadataState is the persisted document plus whether it had to be
@@ -206,33 +141,6 @@ func (a *App) LoadMetadata() MetadataState {
 		state.RecoveryReason = recovery.Cause.Error()
 	}
 	return state
-}
-
-// Persists the selected mod root so the library does not need to be
-// reselected the next time Cratebug launches.
-func (a *App) SetModRoot(modRoot string) error {
-	if a.watcher != nil {
-		_ = a.watcher.SetRoot(modRoot)
-	}
-	return a.meta.update(func(doc *metadata.Document) error {
-		doc.Settings.ModRoot = modRoot
-		return nil
-	})
-}
-
-// DetectLibrary locates the named store provider's Marvel Rivals
-// installation and mod library. Read-only: nothing is written for any
-// detection outcome.
-func (a *App) DetectLibrary(provider string) (gamedetect.Detection, error) {
-	return a.detector.Detect(provider)
-}
-
-// CreateLibrary re-detects the named store provider's installation and
-// creates its missing mod-library folder, the one write Cratebug performs
-// outside a configured mod root. The frontend calls it only after the user
-// confirmed the creation in a dialog.
-func (a *App) CreateLibrary(provider string) (string, error) {
-	return a.detector.CreateLibrary(provider)
 }
 
 // Persists which store provider library auto-detection targets.

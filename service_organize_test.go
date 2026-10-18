@@ -19,7 +19,7 @@ func TestSetModEnabledBlocksRunningGame(t *testing.T) {
 	}
 
 	app := testApp(t, true)
-	library, err := app.ScanLibrary(root)
+	library, err := app.library.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestSetModEnabled(t *testing.T) {
 	}
 
 	app := testApp(t, false)
-	library, err := app.ScanLibrary(root)
+	library, err := app.library.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestOrganizationOperationsBlockRunningGame(t *testing.T) {
 				t.Fatal(err)
 			}
 			app := testApp(t, true)
-			library, err := app.ScanLibrary(root)
+			library, err := app.library.ScanLibrary(root)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -161,7 +161,7 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := testApp(t, false)
-	library, err := app.ScanLibrary(root)
+	library, err := app.library.ScanLibrary(root)
 	if err != nil {
 		t.Fatal(err)
 	}

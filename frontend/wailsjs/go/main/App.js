@@ -18,24 +18,8 @@ export function CancelNexusDownload() {
   return window['go']['main']['App']['CancelNexusDownload']();
 }
 
-export function ClassificationType() {
-  return window['go']['main']['App']['ClassificationType']();
-}
-
-export function ClassifyLibrary(arg1, arg2) {
-  return window['go']['main']['App']['ClassifyLibrary'](arg1, arg2);
-}
-
 export function ClearNexusAPIKey() {
   return window['go']['main']['App']['ClearNexusAPIKey']();
-}
-
-export function ConflictType() {
-  return window['go']['main']['App']['ConflictType']();
-}
-
-export function CreateLibrary(arg1) {
-  return window['go']['main']['App']['CreateLibrary'](arg1);
 }
 
 export function CreateTag(arg1) {
@@ -44,14 +28,6 @@ export function CreateTag(arg1) {
 
 export function DeleteTag(arg1) {
   return window['go']['main']['App']['DeleteTag'](arg1);
-}
-
-export function DetectConflicts(arg1, arg2) {
-  return window['go']['main']['App']['DetectConflicts'](arg1, arg2);
-}
-
-export function DetectLibrary(arg1) {
-  return window['go']['main']['App']['DetectLibrary'](arg1);
 }
 
 export function DiscardNexusLink(arg1, arg2) {
@@ -78,14 +54,6 @@ export function NexusProtocolStatus() {
   return window['go']['main']['App']['NexusProtocolStatus']();
 }
 
-export function OpenFolderInExplorer(arg1, arg2) {
-  return window['go']['main']['App']['OpenFolderInExplorer'](arg1, arg2);
-}
-
-export function OpenModInExplorer(arg1, arg2) {
-  return window['go']['main']['App']['OpenModInExplorer'](arg1, arg2);
-}
-
 export function PrepareInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['PrepareInstall'](arg1, arg2, arg3);
 }
@@ -110,10 +78,6 @@ export function RuntimeStatus() {
   return window['go']['main']['App']['RuntimeStatus']();
 }
 
-export function ScanLibrary(arg1) {
-  return window['go']['main']['App']['ScanLibrary'](arg1);
-}
-
 export function SelectFilesForInstall() {
   return window['go']['main']['App']['SelectFilesForInstall']();
 }
@@ -128,14 +92,6 @@ export function SetDefaultViewMode(arg1) {
 
 export function SetLibraryProvider(arg1) {
   return window['go']['main']['App']['SetLibraryProvider'](arg1);
-}
-
-export function SetLibraryWatcherSuspended(arg1) {
-  return window['go']['main']['App']['SetLibraryWatcherSuspended'](arg1);
-}
-
-export function SetModRoot(arg1) {
-  return window['go']['main']['App']['SetModRoot'](arg1);
 }
 
 export function SetNexusAPIKey(arg1) {

@@ -39,7 +39,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 			t.Errorf("test cleanup: %v", err)
 		}
 	}()
-	if _, err := app.ScanLibrary(root); err != nil {
+	if _, err := app.library.ScanLibrary(root); err != nil {
 		t.Fatal(err)
 	}
 	preview, err := app.backups.restoreSessions.Preview(context.Background(), zipPath)
@@ -49,7 +49,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	defer app.backups.restoreSessions.DiscardSession(preview.Token)
 
 	// Act
-	if err := app.SetLibraryWatcherSuspended(true); err != nil {
+	if err := app.library.SetLibraryWatcherSuspended(true); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -73,7 +73,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("restore with the Tools menu open: %v", err)
 	}
-	if _, err := app.ScanLibrary(root); err != nil {
+	if _, err := app.library.ScanLibrary(root); err != nil {
 		t.Fatal(err)
 	}
 
@@ -95,7 +95,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	}
 
 	// Act
-	if err := app.SetLibraryWatcherSuspended(false); err != nil {
+	if err := app.library.SetLibraryWatcherSuspended(false); err != nil {
 		t.Fatal(err)
 	}
 
