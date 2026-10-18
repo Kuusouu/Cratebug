@@ -28,6 +28,7 @@ These guidelines define the shared readability and maintainability standards for
 
 - Use lowercase primitive types: `string`, `number`, and `boolean`.
 - Prefer `type` for object shapes, aliases, and unions. Use `interface` only for class shapes, declaration merging, or module augmentation.
+- Mark imports used only as types with `import type` or an inline `type` specifier.
 - Do not use `any`. Use `unknown` when a value is genuinely unknown, then narrow it before use.
 - Use `const` by default. Use `let` only when reassignment is necessary. Never use `var`.
 - Prefer `async` and `await` to promise chains.
@@ -35,6 +36,9 @@ These guidelines define the shared readability and maintainability standards for
 - Use `camelCase` for variables, functions, and non-component filenames. Use `PascalCase` for React components, their filenames, and types. Use `UPPER_SNAKE_CASE` for environment variables and regular-expression patterns.
 - Keep React components focused on rendering and interaction. Filesystem policy and mutations belong in Go.
 - Use oxfmt for formatting and oxlint for linting; do not manually fight their output.
+- Oxlint enforces primitive types, type aliases, type-only imports, no explicit `any`, and `const`/`let` usage. For an allowed `interface` exception, suppress only `typescript/consistent-type-definitions` at the declaration and explain why it is needed.
+- Do not use `@ts-ignore` or `@ts-nocheck`. If an error suppression is necessary, use `@ts-expect-error` with an explanation. Remove unused lint suppressions; `bun run lint` rejects them.
+- TypeScript checks return paths, rejects unreachable code and unused labels, and preserves value imports with `verbatimModuleSyntax`.
 - One exported React component per file. Unexported helpers may stay in that file.
 - Prefer Tailwind utilities over CSS modules for new components. Where a module already exists, keep it colocated as `Component.module.css` next to `Component.tsx`; skip the module file when utilities cover the component.
 

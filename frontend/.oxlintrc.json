@@ -11,7 +11,22 @@
 	},
 	"rules": {
 		"no-unused-vars": "error",
+		"no-var": "error",
+		"prefer-const": "error",
 		"no-console": "off",
+		"typescript/ban-ts-comment": [
+			"error",
+			{
+				"ts-expect-error": "allow-with-description",
+				"ts-ignore": true,
+				"ts-nocheck": true,
+				"ts-check": false
+			}
+		],
+		"typescript/consistent-type-definitions": ["error", "type"],
+		"typescript/consistent-type-imports": "error",
+		"typescript/no-explicit-any": "error",
+		"typescript/no-wrapper-object-types": "error",
 		"unicorn/consistent-function-scoping": "off",
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-useless-spread": "off"
