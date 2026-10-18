@@ -14,8 +14,6 @@ export function NexusAccount():Promise<main.NexusAccountState>;
 
 export function NexusDownloadRequestType():Promise<nexus.DownloadRequest>;
 
-export function NexusKeyState():Promise<main.NexusKeyState>;
-
 export function NexusProtocolStatus():Promise<main.NexusProtocolState>;
 
 export function PrepareNexusInstall(arg1:string,arg2:number,arg3:number,arg4:string):Promise<install.PreviewResult>;

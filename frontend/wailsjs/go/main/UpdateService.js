@@ -21,7 +21,3 @@ export function DownloadUpdate(arg1) {
 export function GetAppVersion() {
   return window['go']['main']['UpdateService']['GetAppVersion']();
 }
-
-export function UpdateType() {
-  return window['go']['main']['UpdateService']['UpdateType']();
-}

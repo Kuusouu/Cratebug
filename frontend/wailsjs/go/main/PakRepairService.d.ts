@@ -6,10 +6,6 @@ export function CancelCompanionCleanup():Promise<void>;
 
 export function CancelEncryption():Promise<void>;
 
-export function CompanionCleanupType():Promise<mutation.CompanionCleanupResult>;
-
-export function EncryptionType():Promise<mutation.EncryptionBatchResult>;
-
 export function FindModsNeedingEncryption(arg1:string):Promise<Array<string>>;
 
 export function FindUnsupportedCompanionPaks(arg1:string):Promise<Array<string>>;

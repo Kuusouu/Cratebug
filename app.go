@@ -15,7 +15,8 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/watcher"
 )
 
-// Exposes the small backend surface used by the frontend.
+// Builds the shared core and the bound services, and handles the Wails
+// lifecycle hooks. It is not bound itself; main.go binds the services.
 type App struct {
 	*core
 
@@ -30,7 +31,7 @@ type App struct {
 	nexusMods       *NexusService
 }
 
-// Creates the application binding.
+// Creates the application and its services.
 func NewApp() (*App, error) {
 	path, err := metadata.DefaultPath()
 	if err != nil {
@@ -99,11 +100,6 @@ func (a *App) initWatcher() {
 	if err == nil {
 		a.watcher = w
 	}
-}
-
-// Confirms that the frontend can reach the Go application.
-func (a *App) RuntimeStatus() string {
-	return "Go backend connected"
 }
 
 // startup is called by Wails when the application is launched, saving the runtime context.

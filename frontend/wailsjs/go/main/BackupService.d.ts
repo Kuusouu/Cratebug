@@ -4,8 +4,6 @@ import {backup} from '../models';
 
 export function BackupLibrary(arg1:string):Promise<backup.Result>;
 
-export function BackupType():Promise<backup.Result>;
-
 export function CanRetryRestore(arg1:string):Promise<boolean>;
 
 export function CancelBackup():Promise<void>;
@@ -17,7 +15,3 @@ export function DiscardRestorePreview(arg1:string):Promise<void>;
 export function RestoreApply(arg1:string,arg2:string):Promise<backup.RestoreResult>;
 
 export function RestorePreview():Promise<backup.Preview>;
-
-export function RestorePreviewType():Promise<backup.Preview>;
-
-export function RestoreResultType():Promise<backup.RestoreResult>;

@@ -53,20 +53,6 @@ func failingMetadataStore(t *testing.T) metadata.Store {
 	return metadata.NewStore(filepath.Join(parent, "metadata.json"))
 }
 
-func TestRuntimeStatus(t *testing.T) {
-	// Arrange
-	app := testApp(t, false)
-
-	// Act
-	got := app.RuntimeStatus()
-
-	// Assert
-	const want = "Go backend connected"
-	if got != want {
-		t.Fatalf("RuntimeStatus() = %q, want %q", got, want)
-	}
-}
-
 func TestAppShutdown(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)

@@ -12,5 +12,3 @@ export function CheckWhatsNew():Promise<main.UpdateCheckResult>;
 export function DownloadUpdate(arg1:update.Release):Promise<string>;
 
 export function GetAppVersion():Promise<string>;
-
-export function UpdateType():Promise<update.Release>;

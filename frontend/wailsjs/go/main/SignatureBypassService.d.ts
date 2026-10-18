@@ -7,5 +7,3 @@ export function InstallSignatureBypass():Promise<sigbypass.Status>;
 export function RemoveSignatureBypass():Promise<sigbypass.Status>;
 
 export function SignatureBypassStatus():Promise<sigbypass.Status>;
-
-export function SignatureBypassStatusType():Promise<sigbypass.Status>;

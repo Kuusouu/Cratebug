@@ -13,7 +13,3 @@ export function RemoveSignatureBypass() {
 export function SignatureBypassStatus() {
   return window['go']['main']['SignatureBypassService']['SignatureBypassStatus']();
 }
-
-export function SignatureBypassStatusType() {
-  return window['go']['main']['SignatureBypassService']['SignatureBypassStatusType']();
-}

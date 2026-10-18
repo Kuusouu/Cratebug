@@ -6,10 +6,6 @@ export function BackupLibrary(arg1) {
   return window['go']['main']['BackupService']['BackupLibrary'](arg1);
 }
 
-export function BackupType() {
-  return window['go']['main']['BackupService']['BackupType']();
-}
-
 export function CanRetryRestore(arg1) {
   return window['go']['main']['BackupService']['CanRetryRestore'](arg1);
 }
@@ -32,12 +28,4 @@ export function RestoreApply(arg1, arg2) {
 
 export function RestorePreview() {
   return window['go']['main']['BackupService']['RestorePreview']();
-}
-
-export function RestorePreviewType() {
-  return window['go']['main']['BackupService']['RestorePreviewType']();
-}
-
-export function RestoreResultType() {
-  return window['go']['main']['BackupService']['RestoreResultType']();
 }

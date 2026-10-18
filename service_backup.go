@@ -34,11 +34,6 @@ func newBackupService(c *core) *BackupService {
 	return &BackupService{core: c, restoreSessions: backup.NewSessionManager()}
 }
 
-// BackupType anchors backup.Result so Wails emits its TypeScript model.
-func (s *BackupService) BackupType() backup.Result {
-	return backup.Result{}
-}
-
 // Backs up the mod-root tree and Cratebug metadata to a user-chosen zip
 // file. Read-only against the library, so no game-running check and no
 // watcher suppression. Emits backup:progress events. A cancelled save dialog
@@ -101,16 +96,6 @@ func (s *BackupService) CancelBackup() {
 		s.backupCancel()
 		s.backupCancel = nil
 	}
-}
-
-// RestorePreviewType anchors backup.Preview so Wails emits its TypeScript model.
-func (s *BackupService) RestorePreviewType() backup.Preview {
-	return backup.Preview{}
-}
-
-// RestoreResultType anchors backup.RestoreResult so Wails emits its TypeScript model.
-func (s *BackupService) RestoreResultType() backup.RestoreResult {
-	return backup.RestoreResult{}
 }
 
 // Stages a user-chosen backup zip for a later RestoreApply. Read-only:

@@ -122,7 +122,7 @@ func (s *NexusService) NexusDownloadRequestType() nexus.DownloadRequest {
 }
 
 // Reports whether a Nexus API key file is present, without decrypting it.
-func (s *NexusService) NexusKeyState() NexusKeyState {
+func (s *NexusService) keyState() NexusKeyState {
 	return NexusKeyState{Configured: s.secretStore.Configured()}
 }
 
@@ -130,15 +130,15 @@ func (s *NexusService) NexusKeyState() NexusKeyState {
 // is confirmed. An unverified key is rejected and not written.
 func (s *NexusService) SetNexusAPIKey(key string) (NexusKeyState, error) {
 	if err := nexus.CheckAPIKey(key); err != nil {
-		return s.NexusKeyState(), err
+		return s.keyState(), err
 	}
 
 	client := s.newNexusClient(key)
 	if _, err := client.Validate(s.runtime.context()); err != nil {
-		return s.NexusKeyState(), err
+		return s.keyState(), err
 	}
 	if err := s.secretStore.Set(key); err != nil {
-		return s.NexusKeyState(), err
+		return s.keyState(), err
 	}
 
 	s.nexusMu.Lock()
@@ -150,7 +150,7 @@ func (s *NexusService) SetNexusAPIKey(key string) (NexusKeyState, error) {
 // Removes the stored API key and drops the cached client.
 func (s *NexusService) ClearNexusAPIKey() (NexusKeyState, error) {
 	if err := s.secretStore.Clear(); err != nil {
-		return s.NexusKeyState(), err
+		return s.keyState(), err
 	}
 	s.nexusMu.Lock()
 	s.nexusClient = nil

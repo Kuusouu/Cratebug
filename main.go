@@ -64,7 +64,6 @@ func main() {
 			OnSecondInstanceLaunch: app.nexusMods.onSecondInstanceLaunch,
 		},
 		Bind: []interface{}{
-			app,
 			app.updates,
 			app.signatureBypass,
 			app.backups,

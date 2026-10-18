@@ -22,10 +22,6 @@ export function NexusDownloadRequestType() {
   return window['go']['main']['NexusService']['NexusDownloadRequestType']();
 }
 
-export function NexusKeyState() {
-  return window['go']['main']['NexusService']['NexusKeyState']();
-}
-
 export function NexusProtocolStatus() {
   return window['go']['main']['NexusService']['NexusProtocolStatus']();
 }

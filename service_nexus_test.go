@@ -76,8 +76,8 @@ func TestSetNexusAPIKeyRejectsInvalidKeys(t *testing.T) {
 			if state.Configured {
 				t.Fatal("Configured = true after a rejected key, want false")
 			}
-			if app.nexusMods.NexusKeyState().Configured {
-				t.Fatal("NexusKeyState().Configured = true after a rejected key, want false")
+			if app.nexusMods.keyState().Configured {
+				t.Fatal("keyState().Configured = true after a rejected key, want false")
 			}
 		})
 	}
@@ -89,8 +89,8 @@ func TestNexusKeyStateTracksConfiguration(t *testing.T) {
 	app := testApp(t, false)
 	app.nexusMods.nexusBaseURL = server.URL
 
-	if app.nexusMods.NexusKeyState().Configured {
-		t.Fatal("NexusKeyState().Configured = true on a fresh store, want false")
+	if app.nexusMods.keyState().Configured {
+		t.Fatal("keyState().Configured = true on a fresh store, want false")
 	}
 
 	// Act
@@ -99,8 +99,8 @@ func TestNexusKeyStateTracksConfiguration(t *testing.T) {
 	}
 
 	// Assert
-	if !app.nexusMods.NexusKeyState().Configured {
-		t.Fatal("NexusKeyState().Configured = false after Set, want true")
+	if !app.nexusMods.keyState().Configured {
+		t.Fatal("keyState().Configured = false after Set, want true")
 	}
 
 	// Act
@@ -109,8 +109,8 @@ func TestNexusKeyStateTracksConfiguration(t *testing.T) {
 	}
 
 	// Assert
-	if app.nexusMods.NexusKeyState().Configured {
-		t.Fatal("NexusKeyState().Configured = true after Clear, want false")
+	if app.nexusMods.keyState().Configured {
+		t.Fatal("keyState().Configured = true after Clear, want false")
 	}
 }
 

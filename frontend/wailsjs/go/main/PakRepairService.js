@@ -10,14 +10,6 @@ export function CancelEncryption() {
   return window['go']['main']['PakRepairService']['CancelEncryption']();
 }
 
-export function CompanionCleanupType() {
-  return window['go']['main']['PakRepairService']['CompanionCleanupType']();
-}
-
-export function EncryptionType() {
-  return window['go']['main']['PakRepairService']['EncryptionType']();
-}
-
 export function FindModsNeedingEncryption(arg1) {
   return window['go']['main']['PakRepairService']['FindModsNeedingEncryption'](arg1);
 }

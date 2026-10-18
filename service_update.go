@@ -53,11 +53,6 @@ func (s *UpdateService) GetAppVersion() string {
 	return AppVersion
 }
 
-// UpdateType anchors update.Release so Wails emits its TypeScript model into models.ts.
-func (s *UpdateService) UpdateType() update.Release {
-	return update.Release{}
-}
-
 // CheckForUpdate compares the running build against the latest published
 // GitHub release. A local or CI build (AppVersion is "dev", not a real
 // release tag) never reports one available, since there is nothing valid to

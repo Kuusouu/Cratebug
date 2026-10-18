@@ -30,11 +30,6 @@ func defaultSigbypassToolkit() sigbypassToolkit {
 	}
 }
 
-// Exists only so Wails emits the sigbypass.Status TypeScript model.
-func (s *SignatureBypassService) SignatureBypassStatusType() sigbypass.Status {
-	return sigbypass.Status{}
-}
-
 // Reports the signature bypass state of the detected game installation, plus
 // whether this build carries a verified payload to install. Read-only.
 func (s *SignatureBypassService) SignatureBypassStatus() (sigbypass.Status, error) {

@@ -55,11 +55,6 @@ func (l *lazyWorkerCaller) Close() {
 	}
 }
 
-// EncryptionType anchors mutation.EncryptionBatchResult so Wails emits its TypeScript model into models.ts.
-func (s *PakRepairService) EncryptionType() mutation.EncryptionBatchResult {
-	return mutation.EncryptionBatchResult{}
-}
-
 // Encrypts or decrypts each complete IoStore bundle without a legacy asset conversion.
 // The Marvel Rivals AES key stays in Go. The frontend receives only the
 // encrypted flag after the next classify. Emits encrypt:progress events.
@@ -101,11 +96,6 @@ func (s *PakRepairService) CancelEncryption() {
 		close(s.encryptCancel)
 		s.encryptCancel = nil
 	}
-}
-
-// CompanionCleanupType anchors mutation.CompanionCleanupResult so Wails emits its TypeScript model.
-func (s *PakRepairService) CompanionCleanupType() mutation.CompanionCleanupResult {
-	return mutation.CompanionCleanupResult{}
 }
 
 // Lists complete unencrypted IoStore IDs whose classify listing leaves Characters.

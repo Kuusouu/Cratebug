@@ -30,11 +30,6 @@ func (s *LibraryService) SetLibraryWatcherSuspended(suspended bool) error {
 	return s.watcher.SetSuspended(suspended)
 }
 
-// ClassificationType anchors modtype.Identity so Wails emits its TypeScript model into models.ts.
-func (s *LibraryService) ClassificationType() modtype.Identity {
-	return modtype.Identity{}
-}
-
 // Returns the read-only catalog discovered beneath modRoot.
 func (s *LibraryService) ScanLibrary(modRoot string) (discovery.Library, error) {
 	if s.watcher != nil {
@@ -55,11 +50,6 @@ func (s *LibraryService) ScanLibrary(modRoot string) (discovery.Library, error) 
 // ClassifyLibrary determines the category and hero/skin identity for discovered entries.
 func (s *LibraryService) ClassifyLibrary(modRoot string, entries []discovery.Entry) (map[string]modtype.Identity, error) {
 	return s.catalog.classify(modRoot, entries)
-}
-
-// ConflictType anchors conflict.Result so Wails emits its TypeScript model into models.ts.
-func (s *LibraryService) ConflictType() conflict.Result {
-	return conflict.Result{}
 }
 
 // DetectConflicts scans entries for enabled mods that share internal Unreal
