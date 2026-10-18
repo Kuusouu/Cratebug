@@ -153,18 +153,24 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() {
+		_ = in.Close() // Only the read result matters; closing this input cannot change it.
+	}()
 
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm())
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
 	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close() // The copy already failed; report that error, not the cleanup.
 		return err
 	}
-	return out.Sync()
+	if err := out.Sync(); err != nil {
+		_ = out.Close() // The sync already failed; report that error, not the cleanup.
+		return err
+	}
+	return out.Close()
 }
 
 func copyDir(src, dst string) error {
