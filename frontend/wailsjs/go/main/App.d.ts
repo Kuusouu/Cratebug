@@ -5,7 +5,6 @@ import {modtype} from '../models';
 import {discovery} from '../models';
 import {main} from '../models';
 import {conflict} from '../models';
-import {mutation} from '../models';
 import {metadata} from '../models';
 import {gamedetect} from '../models';
 import {nexus} from '../models';
@@ -26,15 +25,9 @@ export function ClearNexusAPIKey():Promise<main.NexusKeyState>;
 
 export function ConflictType():Promise<conflict.Result>;
 
-export function CreateFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
-
 export function CreateLibrary(arg1:string):Promise<string>;
 
 export function CreateTag(arg1:string):Promise<metadata.Tag>;
-
-export function DeleteFolder(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
-
-export function DeleteMod(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
 
 export function DeleteTag(arg1:string):Promise<void>;
 
@@ -44,13 +37,7 @@ export function DetectLibrary(arg1:string):Promise<gamedetect.Detection>;
 
 export function DiscardNexusLink(arg1:number,arg2:number):Promise<void>;
 
-export function IsFolderEmpty(arg1:string,arg2:string):Promise<boolean>;
-
 export function LoadMetadata():Promise<main.MetadataState>;
-
-export function MoveFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
-
-export function MoveMod(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
 export function NexusAccount():Promise<main.NexusAccountState>;
 
@@ -70,10 +57,6 @@ export function PrepareNexusInstall(arg1:string,arg2:number,arg3:number,arg4:str
 
 export function RegisterNexusProtocol(arg1:boolean):Promise<main.NexusProtocolState>;
 
-export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
-
-export function RenameMod(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
-
 export function RenameTag(arg1:string,arg2:string):Promise<void>;
 
 export function ResolveNexusModPage(arg1:string):Promise<main.NexusLink>;
@@ -91,10 +74,6 @@ export function SetDefaultViewMode(arg1:string):Promise<void>;
 export function SetLibraryProvider(arg1:string):Promise<void>;
 
 export function SetLibraryWatcherSuspended(arg1:boolean):Promise<void>;
-
-export function SetModEnabled(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
-
-export function SetModPriority(arg1:string,arg2:string,arg3:number):Promise<mutation.Result>;
 
 export function SetModRoot(arg1:string):Promise<void>;
 

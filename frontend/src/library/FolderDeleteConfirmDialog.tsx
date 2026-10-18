@@ -9,7 +9,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 
-import { IsFolderEmpty } from "../../wailsjs/go/main/App";
+import { IsFolderEmpty } from "../../wailsjs/go/main/OrganizeService";
 import { useConfirmDelay } from "./useConfirmDelay";
 
 type FolderDeleteConfirmDialogProps = {

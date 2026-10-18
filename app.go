@@ -27,12 +27,12 @@ import (
 type App struct {
 	*core
 
-	mutationExecutor      mutation.Executor
 	installSessionManager *install.SessionManager
 	updates               *UpdateService
 	signatureBypass       *SignatureBypassService
 	backups               *BackupService
 	pakRepair             *PakRepairService
+	organize              *OrganizeService
 
 	secretStore secret.Store
 
@@ -101,7 +101,7 @@ func newApp(
 		signatureBypass:       newSignatureBypassService(c, defaultSigbypassToolkit()),
 		backups:               newBackupService(c),
 		pakRepair:             newPakRepairService(c),
-		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
+		organize:              newOrganizeService(c),
 		installSessionManager: installSessionManager,
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
@@ -187,109 +187,6 @@ func (a *App) DetectConflicts(modRoot string, entries []discovery.Entry) (confli
 	}
 
 	return conflict.Detect(entries, paths), nil
-}
-
-// Changes one current scanner entry to the requested enabled state.
-// The entry ID is scanner-issued, never an arbitrary filesystem path.
-func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
-		return a.mutationExecutor.Execute(operation)
-	})
-}
-
-// Renames one current scanner entry without exposing arbitrary filesystem paths.
-func (a *App) RenameMod(modRoot, entryID, name string) (mutation.Result, error) {
-	operation := mutation.NewRenameModOperation(modRoot, entryID, name)
-	return a.executeAndReconcile(operation)
-}
-
-// Changes one current scanner entry's filename-based priority.
-func (a *App) SetModPriority(modRoot, entryID string, priority int) (mutation.Result, error) {
-	operation := mutation.NewSetPriorityOperation(modRoot, entryID, priority)
-	return a.executeAndReconcile(operation)
-}
-
-// Moves one current scanner entry to an existing scanner-known folder.
-func (a *App) MoveMod(modRoot, entryID, destinationFolder string) (mutation.Result, error) {
-	operation := mutation.NewMoveModOperation(modRoot, entryID, destinationFolder)
-	return a.executeAndReconcile(operation)
-}
-
-// Creates one folder beneath the root or an existing scanner-known folder.
-func (a *App) CreateFolder(modRoot, parentFolder, name string) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		operation := mutation.NewCreateFolderOperation(modRoot, parentFolder, name)
-		return a.mutationExecutor.Execute(operation)
-	})
-}
-
-// Renames one scanner-known physical folder.
-func (a *App) RenameFolder(modRoot, folder, name string) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		operation := mutation.NewRenameFolderOperation(modRoot, folder, name)
-		return a.mutationExecutor.Execute(operation)
-	})
-}
-
-// Moves one scanner-known physical folder beneath the root or another scanner-known folder.
-func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
-		return a.mutationExecutor.Execute(operation)
-	})
-}
-
-// Deletes one current scanner entry through the Windows Recycle Bin.
-func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		operation := mutation.NewDeleteModOperation(modRoot, entryID, confirmed)
-		return a.mutationExecutor.Execute(operation)
-	})
-}
-
-// Deletes one scanner-known physical folder and its contents through the Windows Recycle Bin.
-func (a *App) DeleteFolder(modRoot, folder string, confirmed bool) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		operation := mutation.NewDeleteFolderOperation(modRoot, folder, confirmed)
-		return a.mutationExecutor.Execute(operation)
-	})
-}
-
-// Reports whether one scanner-known physical folder holds no entries at all.
-func (a *App) IsFolderEmpty(modRoot, folder string) (bool, error) {
-	return mutation.FolderIsEmpty(modRoot, folder)
-}
-
-// Executes operation, then re-points any persisted metadata (currently tag
-// assignments) from its previous scanner ID to its new one so a rename,
-// priority change, or move does not orphan a mod's metadata.
-//
-// A folder rename or move changes the scanner ID of every mod it contains,
-// but its Result reports only the folder's own old and new paths, not a
-// per-mod ID pair, so those operations call the executor directly instead of
-// this helper. These operations do not reconcile metadata for mods in the folder.
-func (a *App) executeAndReconcile(operation mutation.Operation) (mutation.Result, error) {
-	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
-		result, err := a.mutationExecutor.Execute(operation)
-		if err != nil {
-			return result, err
-		}
-		if result.PreviousID == "" || result.PreviousID == result.ID {
-			return result, nil
-		}
-
-		err = a.meta.update(func(doc *metadata.Document) error {
-			if !doc.ReconcileMod(result.PreviousID, result.ID) {
-				return errMetadataUnchanged
-			}
-			return nil
-		})
-		if err != nil {
-			return result, fmt.Errorf("reconcile mod metadata: %w", err)
-		}
-		return result, nil
-	})
 }
 
 // MetadataState is the persisted document plus whether it had to be

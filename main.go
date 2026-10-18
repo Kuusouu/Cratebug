@@ -69,6 +69,7 @@ func main() {
 			app.signatureBypass,
 			app.backups,
 			app.pakRepair,
+			app.organize,
 		},
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,

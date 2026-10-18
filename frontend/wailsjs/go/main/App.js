@@ -34,24 +34,12 @@ export function ConflictType() {
   return window['go']['main']['App']['ConflictType']();
 }
 
-export function CreateFolder(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateFolder'](arg1, arg2, arg3);
-}
-
 export function CreateLibrary(arg1) {
   return window['go']['main']['App']['CreateLibrary'](arg1);
 }
 
 export function CreateTag(arg1) {
   return window['go']['main']['App']['CreateTag'](arg1);
-}
-
-export function DeleteFolder(arg1, arg2, arg3) {
-  return window['go']['main']['App']['DeleteFolder'](arg1, arg2, arg3);
-}
-
-export function DeleteMod(arg1, arg2, arg3) {
-  return window['go']['main']['App']['DeleteMod'](arg1, arg2, arg3);
 }
 
 export function DeleteTag(arg1) {
@@ -70,20 +58,8 @@ export function DiscardNexusLink(arg1, arg2) {
   return window['go']['main']['App']['DiscardNexusLink'](arg1, arg2);
 }
 
-export function IsFolderEmpty(arg1, arg2) {
-  return window['go']['main']['App']['IsFolderEmpty'](arg1, arg2);
-}
-
 export function LoadMetadata() {
   return window['go']['main']['App']['LoadMetadata']();
-}
-
-export function MoveFolder(arg1, arg2, arg3) {
-  return window['go']['main']['App']['MoveFolder'](arg1, arg2, arg3);
-}
-
-export function MoveMod(arg1, arg2, arg3) {
-  return window['go']['main']['App']['MoveMod'](arg1, arg2, arg3);
 }
 
 export function NexusAccount() {
@@ -122,14 +98,6 @@ export function RegisterNexusProtocol(arg1) {
   return window['go']['main']['App']['RegisterNexusProtocol'](arg1);
 }
 
-export function RenameFolder(arg1, arg2, arg3) {
-  return window['go']['main']['App']['RenameFolder'](arg1, arg2, arg3);
-}
-
-export function RenameMod(arg1, arg2, arg3) {
-  return window['go']['main']['App']['RenameMod'](arg1, arg2, arg3);
-}
-
 export function RenameTag(arg1, arg2) {
   return window['go']['main']['App']['RenameTag'](arg1, arg2);
 }
@@ -164,14 +132,6 @@ export function SetLibraryProvider(arg1) {
 
 export function SetLibraryWatcherSuspended(arg1) {
   return window['go']['main']['App']['SetLibraryWatcherSuspended'](arg1);
-}
-
-export function SetModEnabled(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SetModEnabled'](arg1, arg2, arg3);
-}
-
-export function SetModPriority(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SetModPriority'](arg1, arg2, arg3);
 }
 
 export function SetModRoot(arg1) {
