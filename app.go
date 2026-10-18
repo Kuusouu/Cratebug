@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Kuusouu/Cratebug/internal/backup"
 	"github.com/Kuusouu/Cratebug/internal/conflict"
 	"github.com/Kuusouu/Cratebug/internal/discovery"
 	"github.com/Kuusouu/Cratebug/internal/gamedetect"
@@ -32,12 +31,12 @@ type App struct {
 	installSessionManager *install.SessionManager
 	encryptMu             sync.Mutex
 	encryptCancel         chan struct{}
-	restoreSessions       *backup.SessionManager
 	companionMu           sync.Mutex
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
 	updates               *UpdateService
 	signatureBypass       *SignatureBypassService
+	backups               *BackupService
 
 	secretStore secret.Store
 
@@ -104,9 +103,9 @@ func newApp(
 		core:                  c,
 		updates:               newUpdateService(c),
 		signatureBypass:       newSignatureBypassService(c, defaultSigbypassToolkit()),
+		backups:               newBackupService(c),
 		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
 		installSessionManager: installSessionManager,
-		restoreSessions:       backup.NewSessionManager(),
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 		companionCache:        mutation.NewCompanionCache(),

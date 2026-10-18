@@ -12,7 +12,7 @@ import {
 	DiscardRestorePreview,
 	RestoreApply,
 	RestorePreview,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/main/BackupService";
 import {
 	InstallSignatureBypass,
 	RemoveSignatureBypass,

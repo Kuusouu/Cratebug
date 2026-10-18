@@ -17,18 +17,25 @@ import (
 // do not overwrite each other without asking.
 const backupFilenameTimestampLayout = "2006-01-02-150405"
 
-// Guards in-flight backup and restore cancellation. Stored on App so the
-// CancelBackup and CancelRestore bindings can reach them; see the
-// encrypt/companion pattern.
-var (
+// Backup creation and restore, bound to the frontend.
+type BackupService struct {
+	*core
+	restoreSessions *backup.SessionManager
+
+	// Guard in-flight backup and restore cancellation so the CancelBackup and
+	// CancelRestore bindings can reach the running operation.
 	backupMu      sync.Mutex
 	backupCancel  context.CancelFunc
 	restoreMu     sync.Mutex
 	restoreCancel context.CancelFunc
-)
+}
+
+func newBackupService(c *core) *BackupService {
+	return &BackupService{core: c, restoreSessions: backup.NewSessionManager()}
+}
 
 // BackupType anchors backup.Result so Wails emits its TypeScript model.
-func (a *App) BackupType() backup.Result {
+func (s *BackupService) BackupType() backup.Result {
 	return backup.Result{}
 }
 
@@ -36,8 +43,8 @@ func (a *App) BackupType() backup.Result {
 // file. Read-only against the library, so no game-running check and no
 // watcher suppression. Emits backup:progress events. A cancelled save dialog
 // returns a cancelled result, not an error, so the frontend stays silent.
-func (a *App) BackupLibrary(modRoot string) (backup.Result, error) {
-	runtimeCtx := a.runtime.current()
+func (s *BackupService) BackupLibrary(modRoot string) (backup.Result, error) {
+	runtimeCtx := s.runtime.current()
 	if runtimeCtx == nil {
 		return backup.Result{}, fmt.Errorf("application runtime context is not available")
 	}
@@ -68,17 +75,17 @@ func (a *App) BackupLibrary(modRoot string) (backup.Result, error) {
 	}
 
 	ctx, stop := context.WithCancel(runtimeCtx)
-	backupMu.Lock()
-	backupCancel = stop
-	backupMu.Unlock()
+	s.backupMu.Lock()
+	s.backupCancel = stop
+	s.backupMu.Unlock()
 	defer func() {
-		backupMu.Lock()
-		backupCancel = nil
-		backupMu.Unlock()
+		s.backupMu.Lock()
+		s.backupCancel = nil
+		s.backupMu.Unlock()
 	}()
 
 	result, err := backup.Create(ctx, modRoot, metadataPath, destPath, func(progress backup.Progress) {
-		a.runtime.emit("backup:progress", progress)
+		s.runtime.emit("backup:progress", progress)
 	})
 	if err != nil {
 		return backup.Result{}, err
@@ -87,22 +94,22 @@ func (a *App) BackupLibrary(modRoot string) (backup.Result, error) {
 }
 
 // Stops an in-progress BackupLibrary; the partial destination is removed.
-func (a *App) CancelBackup() {
-	backupMu.Lock()
-	defer backupMu.Unlock()
-	if backupCancel != nil {
-		backupCancel()
-		backupCancel = nil
+func (s *BackupService) CancelBackup() {
+	s.backupMu.Lock()
+	defer s.backupMu.Unlock()
+	if s.backupCancel != nil {
+		s.backupCancel()
+		s.backupCancel = nil
 	}
 }
 
 // RestorePreviewType anchors backup.Preview so Wails emits its TypeScript model.
-func (a *App) RestorePreviewType() backup.Preview {
+func (s *BackupService) RestorePreviewType() backup.Preview {
 	return backup.Preview{}
 }
 
 // RestoreResultType anchors backup.RestoreResult so Wails emits its TypeScript model.
-func (a *App) RestoreResultType() backup.RestoreResult {
+func (s *BackupService) RestoreResultType() backup.RestoreResult {
 	return backup.RestoreResult{}
 }
 
@@ -110,8 +117,8 @@ func (a *App) RestoreResultType() backup.RestoreResult {
 // nothing is validated against the game-running lock at this point. A
 // dismissed open dialog returns a cancelled preview, not an error, so the
 // frontend stays silent.
-func (a *App) RestorePreview() (backup.Preview, error) {
-	runtimeCtx := a.runtime.current()
+func (s *BackupService) RestorePreview() (backup.Preview, error) {
+	runtimeCtx := s.runtime.current()
 	if runtimeCtx == nil {
 		return backup.Preview{}, fmt.Errorf("application runtime context is not available")
 	}
@@ -132,15 +139,15 @@ func (a *App) RestorePreview() (backup.Preview, error) {
 		return backup.Preview{Cancelled: true}, nil
 	}
 
-	return a.restoreSessions.Preview(runtimeCtx, zipPath)
+	return s.restoreSessions.Preview(runtimeCtx, zipPath)
 }
 
 // Replaces the mod-root tree with a staged preview's contents and restores
 // its metadata. Blocked while Marvel Rivals runs. Emits restore:progress
 // events as entries move into place.
-func (a *App) RestoreApply(modRoot, token string) (backup.RestoreResult, error) {
-	return suppressWatcherResult(a.core, func() (backup.RestoreResult, error) {
-		if err := a.requireGameNotRunning(); err != nil {
+func (s *BackupService) RestoreApply(modRoot, token string) (backup.RestoreResult, error) {
+	return suppressWatcherResult(s.core, func() (backup.RestoreResult, error) {
+		if err := s.requireGameNotRunning(); err != nil {
 			return backup.RestoreResult{}, err
 		}
 
@@ -149,43 +156,43 @@ func (a *App) RestoreApply(modRoot, token string) (backup.RestoreResult, error) 
 			return backup.RestoreResult{}, fmt.Errorf("resolve metadata location: %w", err)
 		}
 
-		ctx, stop := context.WithCancel(a.runtime.context())
-		restoreMu.Lock()
-		if restoreCancel != nil {
-			restoreMu.Unlock()
+		ctx, stop := context.WithCancel(s.runtime.context())
+		s.restoreMu.Lock()
+		if s.restoreCancel != nil {
+			s.restoreMu.Unlock()
 			stop()
 			return backup.RestoreResult{}, fmt.Errorf("a restore is already active")
 		}
-		restoreCancel = stop
-		restoreMu.Unlock()
+		s.restoreCancel = stop
+		s.restoreMu.Unlock()
 		defer func() {
 			stop()
-			restoreMu.Lock()
-			restoreCancel = nil
-			restoreMu.Unlock()
+			s.restoreMu.Lock()
+			s.restoreCancel = nil
+			s.restoreMu.Unlock()
 		}()
 
-		return a.restoreSessions.Apply(ctx, modRoot, metadataPath, token, func(progress backup.Progress) {
-			a.runtime.emit("restore:progress", progress)
+		return s.restoreSessions.Apply(ctx, modRoot, metadataPath, token, func(progress backup.Progress) {
+			s.runtime.emit("restore:progress", progress)
 		})
 	})
 }
 
 // Drops a staged preview without touching the library.
-func (a *App) DiscardRestorePreview(token string) {
-	a.restoreSessions.DiscardSession(token)
+func (s *BackupService) DiscardRestorePreview(token string) {
+	s.restoreSessions.DiscardSession(token)
 }
 
 // Keeps retry controls tied to a complete, idle staged backup.
-func (a *App) CanRetryRestore(token string) bool {
-	return a.restoreSessions.CanRetry(token)
+func (s *BackupService) CanRetryRestore(token string) bool {
+	return s.restoreSessions.CanRetry(token)
 }
 
 // Stops an in-progress RestoreApply; the previous library is put back.
-func (a *App) CancelRestore() {
-	restoreMu.Lock()
-	defer restoreMu.Unlock()
-	if restoreCancel != nil {
-		restoreCancel()
+func (s *BackupService) CancelRestore() {
+	s.restoreMu.Lock()
+	defer s.restoreMu.Unlock()
+	if s.restoreCancel != nil {
+		s.restoreCancel()
 	}
 }

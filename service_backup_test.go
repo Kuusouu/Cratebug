@@ -42,11 +42,11 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	if _, err := app.ScanLibrary(root); err != nil {
 		t.Fatal(err)
 	}
-	preview, err := app.restoreSessions.Preview(context.Background(), zipPath)
+	preview, err := app.backups.restoreSessions.Preview(context.Background(), zipPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer app.restoreSessions.DiscardSession(preview.Token)
+	defer app.backups.restoreSessions.DiscardSession(preview.Token)
 
 	// Act
 	if err := app.SetLibraryWatcherSuspended(true); err != nil {
@@ -55,7 +55,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cancelled, err := suppressWatcherResult(app.core, func() (backup.RestoreResult, error) {
-		return app.restoreSessions.Apply(ctx, root, "", preview.Token, func(backup.Progress) {
+		return app.backups.restoreSessions.Apply(ctx, root, "", preview.Token, func(backup.Progress) {
 			cancel()
 		})
 	})
@@ -69,7 +69,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	}
 
 	// Act
-	result, err := app.RestoreApply(root, preview.Token)
+	result, err := app.backups.RestoreApply(root, preview.Token)
 	if err != nil {
 		t.Fatalf("restore with the Tools menu open: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestRestoreApplyBlocksRunningGame(t *testing.T) {
 	app := testApp(t, true)
 
 	// Act
-	_, err := app.RestoreApply(root, "missing-token")
+	_, err := app.backups.RestoreApply(root, "missing-token")
 
 	// Assert
 	if !errors.Is(err, mutation.ErrGameRunning) {
@@ -131,7 +131,7 @@ func TestRestorePreviewRequiresRuntimeContext(t *testing.T) {
 	app := testApp(t, false)
 
 	// Act
-	_, err := app.RestorePreview()
+	_, err := app.backups.RestorePreview()
 
 	// Assert
 	if err == nil {
@@ -144,7 +144,7 @@ func TestBackupLibraryRequiresRuntimeContext(t *testing.T) {
 	app := testApp(t, false)
 
 	// Act
-	_, err := app.BackupLibrary(t.TempDir())
+	_, err := app.backups.BackupLibrary(t.TempDir())
 
 	// Assert
 	if err == nil {
