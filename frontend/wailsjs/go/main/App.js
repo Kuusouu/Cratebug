@@ -6,10 +6,6 @@ export function ApplyInstall(arg1, arg2, arg3) {
   return window['go']['main']['App']['ApplyInstall'](arg1, arg2, arg3);
 }
 
-export function AssignModTag(arg1, arg2) {
-  return window['go']['main']['App']['AssignModTag'](arg1, arg2);
-}
-
 export function CancelInstall(arg1) {
   return window['go']['main']['App']['CancelInstall'](arg1);
 }
@@ -22,20 +18,8 @@ export function ClearNexusAPIKey() {
   return window['go']['main']['App']['ClearNexusAPIKey']();
 }
 
-export function CreateTag(arg1) {
-  return window['go']['main']['App']['CreateTag'](arg1);
-}
-
-export function DeleteTag(arg1) {
-  return window['go']['main']['App']['DeleteTag'](arg1);
-}
-
 export function DiscardNexusLink(arg1, arg2) {
   return window['go']['main']['App']['DiscardNexusLink'](arg1, arg2);
-}
-
-export function LoadMetadata() {
-  return window['go']['main']['App']['LoadMetadata']();
 }
 
 export function NexusAccount() {
@@ -66,10 +50,6 @@ export function RegisterNexusProtocol(arg1) {
   return window['go']['main']['App']['RegisterNexusProtocol'](arg1);
 }
 
-export function RenameTag(arg1, arg2) {
-  return window['go']['main']['App']['RenameTag'](arg1, arg2);
-}
-
 export function ResolveNexusModPage(arg1) {
   return window['go']['main']['App']['ResolveNexusModPage'](arg1);
 }
@@ -82,36 +62,12 @@ export function SelectFilesForInstall() {
   return window['go']['main']['App']['SelectFilesForInstall']();
 }
 
-export function SetAccentColor(arg1) {
-  return window['go']['main']['App']['SetAccentColor'](arg1);
-}
-
-export function SetDefaultViewMode(arg1) {
-  return window['go']['main']['App']['SetDefaultViewMode'](arg1);
-}
-
-export function SetLibraryProvider(arg1) {
-  return window['go']['main']['App']['SetLibraryProvider'](arg1);
-}
-
 export function SetNexusAPIKey(arg1) {
   return window['go']['main']['App']['SetNexusAPIKey'](arg1);
 }
 
-export function SetSkipDestructiveDelay(arg1) {
-  return window['go']['main']['App']['SetSkipDestructiveDelay'](arg1);
-}
-
-export function SetTheme(arg1) {
-  return window['go']['main']['App']['SetTheme'](arg1);
-}
-
 export function TakePendingNexusLink() {
   return window['go']['main']['App']['TakePendingNexusLink']();
-}
-
-export function UnassignModTag(arg1, arg2) {
-  return window['go']['main']['App']['UnassignModTag'](arg1, arg2);
 }
 
 export function UnregisterNexusProtocol() {

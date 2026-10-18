@@ -20,20 +20,9 @@ import {
 } from "@/components/ui/dialog";
 
 import {
-	AssignModTag,
-	CreateTag,
-	DeleteTag,
 	DiscardNexusLink,
-	LoadMetadata,
-	RenameTag,
 	SelectFilesForInstall,
-	SetAccentColor,
-	SetDefaultViewMode,
-	SetLibraryProvider,
-	SetSkipDestructiveDelay,
-	SetTheme,
 	TakePendingNexusLink,
-	UnassignModTag,
 } from "../../wailsjs/go/main/App";
 import {
 	ClassifyLibrary,
@@ -65,6 +54,19 @@ import {
 	SetModEncryption,
 	StripCompanionPaks,
 } from "../../wailsjs/go/main/PakRepairService";
+import {
+	AssignModTag,
+	CreateTag,
+	DeleteTag,
+	LoadMetadata,
+	RenameTag,
+	SetAccentColor,
+	SetDefaultViewMode,
+	SetLibraryProvider,
+	SetSkipDestructiveDelay,
+	SetTheme,
+	UnassignModTag,
+} from "../../wailsjs/go/main/SettingsService";
 import { SignatureBypassStatus } from "../../wailsjs/go/main/SignatureBypassService";
 import {
 	ApplyUpdate,

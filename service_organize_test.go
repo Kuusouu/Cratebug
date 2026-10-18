@@ -167,14 +167,14 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 	}
 	entryID := library.Entries[0].ID
 
-	tag, err := app.CreateTag("Combat")
+	tag, err := app.settings.CreateTag("Combat")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := app.AssignModTag(entryID, tag.ID); err != nil {
+	if err := app.settings.AssignModTag(entryID, tag.ID); err != nil {
 		t.Fatal(err)
 	}
-	before := app.LoadMetadata().Document
+	before := app.settings.LoadMetadata().Document
 	modID, ok := before.FindModByScannerID(entryID)
 	if !ok {
 		t.Fatal("assigned mod is not tracked in persisted metadata")
@@ -187,7 +187,7 @@ func TestRenameModReconcilesPersistedTagAssignment(t *testing.T) {
 	}
 
 	// Assert
-	after := app.LoadMetadata().Document
+	after := app.settings.LoadMetadata().Document
 	if got := after.Mods[modID].Tags; len(got) != 1 || got[0] != tag.ID {
 		t.Errorf("Tags after rename = %#v, want [%q]", got, tag.ID)
 	}

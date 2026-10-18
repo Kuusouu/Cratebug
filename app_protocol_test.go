@@ -55,7 +55,7 @@ func TestRegisterNexusProtocolPersistsADisplacedOwner(t *testing.T) {
 	if !state.Enabled {
 		t.Fatal("Enabled = false after register, want true")
 	}
-	doc := app.LoadMetadata().Document
+	doc := app.settings.LoadMetadata().Document
 	if doc.Settings.NexusProtocol.Command != foreign.Command {
 		t.Errorf("persisted command = %q, want the displaced Vortex command", doc.Settings.NexusProtocol.Command)
 	}
@@ -74,7 +74,7 @@ func TestPersistProtocolSnapshotPreservesDesktopFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := app.LoadMetadata().Document.Settings.NexusProtocol
+	got := app.settings.LoadMetadata().Document.Settings.NexusProtocol
 	if got.Command != want.Command || got.DesktopFile != want.DesktopFile {
 		t.Errorf("persisted snapshot = %+v, want command and desktop file", got)
 	}
@@ -161,7 +161,7 @@ func TestUnregisterNexusProtocolRestoresThePersistedOwner(t *testing.T) {
 	if filepath.Base(state.OwnerPath) != "Vortex.exe" {
 		t.Errorf("OwnerName path = %q, want Vortex.exe", state.OwnerPath)
 	}
-	if !app.LoadMetadata().Document.Settings.NexusProtocolOptOut {
+	if !app.settings.LoadMetadata().Document.Settings.NexusProtocolOptOut {
 		t.Fatal("NexusProtocolOptOut = false after unregister, want true")
 	}
 }

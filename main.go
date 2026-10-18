@@ -71,6 +71,7 @@ func main() {
 			app.pakRepair,
 			app.organize,
 			app.library,
+			app.settings,
 		},
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,

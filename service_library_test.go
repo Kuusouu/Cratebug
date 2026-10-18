@@ -83,7 +83,7 @@ func TestSetModRootPersistsAcrossLoads(t *testing.T) {
 	if err := app.library.SetModRoot(`C:\Mods`); err != nil {
 		t.Fatal(err)
 	}
-	state := app.LoadMetadata()
+	state := app.settings.LoadMetadata()
 
 	// Assert
 	if state.Document.Settings.ModRoot != `C:\Mods` {
