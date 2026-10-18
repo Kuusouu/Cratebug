@@ -4,8 +4,8 @@ import {install} from '../models';
 import {modtype} from '../models';
 import {discovery} from '../models';
 import {main} from '../models';
-import {mutation} from '../models';
 import {conflict} from '../models';
+import {mutation} from '../models';
 import {metadata} from '../models';
 import {gamedetect} from '../models';
 import {nexus} from '../models';
@@ -13,10 +13,6 @@ import {nexus} from '../models';
 export function ApplyInstall(arg1:string,arg2:string,arg3:Array<install.ApplyItem>):Promise<install.ApplyResult>;
 
 export function AssignModTag(arg1:string,arg2:string):Promise<void>;
-
-export function CancelCompanionCleanup():Promise<void>;
-
-export function CancelEncryption():Promise<void>;
 
 export function CancelInstall(arg1:string):Promise<void>;
 
@@ -27,8 +23,6 @@ export function ClassificationType():Promise<modtype.Identity>;
 export function ClassifyLibrary(arg1:string,arg2:Array<discovery.Entry>):Promise<Record<string, modtype.Identity>>;
 
 export function ClearNexusAPIKey():Promise<main.NexusKeyState>;
-
-export function CompanionCleanupType():Promise<mutation.CompanionCleanupResult>;
 
 export function ConflictType():Promise<conflict.Result>;
 
@@ -49,12 +43,6 @@ export function DetectConflicts(arg1:string,arg2:Array<discovery.Entry>):Promise
 export function DetectLibrary(arg1:string):Promise<gamedetect.Detection>;
 
 export function DiscardNexusLink(arg1:number,arg2:number):Promise<void>;
-
-export function EncryptionType():Promise<mutation.EncryptionBatchResult>;
-
-export function FindModsNeedingEncryption(arg1:string):Promise<Array<string>>;
-
-export function FindUnsupportedCompanionPaks(arg1:string):Promise<Array<string>>;
 
 export function IsFolderEmpty(arg1:string,arg2:string):Promise<boolean>;
 
@@ -106,8 +94,6 @@ export function SetLibraryWatcherSuspended(arg1:boolean):Promise<void>;
 
 export function SetModEnabled(arg1:string,arg2:string,arg3:boolean):Promise<mutation.Result>;
 
-export function SetModEncryption(arg1:string,arg2:Array<string>,arg3:boolean):Promise<mutation.EncryptionBatchResult>;
-
 export function SetModPriority(arg1:string,arg2:string,arg3:number):Promise<mutation.Result>;
 
 export function SetModRoot(arg1:string):Promise<void>;
@@ -117,8 +103,6 @@ export function SetNexusAPIKey(arg1:string):Promise<main.NexusKeyState>;
 export function SetSkipDestructiveDelay(arg1:boolean):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
-
-export function StripCompanionPaks(arg1:string,arg2:Array<string>):Promise<mutation.CompanionCleanupResult>;
 
 export function TakePendingNexusLink():Promise<main.NexusLink>;
 

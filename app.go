@@ -29,14 +29,10 @@ type App struct {
 
 	mutationExecutor      mutation.Executor
 	installSessionManager *install.SessionManager
-	encryptMu             sync.Mutex
-	encryptCancel         chan struct{}
-	companionMu           sync.Mutex
-	companionCancel       chan struct{}
-	companionCache        *mutation.CompanionCache
 	updates               *UpdateService
 	signatureBypass       *SignatureBypassService
 	backups               *BackupService
+	pakRepair             *PakRepairService
 
 	secretStore secret.Store
 
@@ -104,11 +100,11 @@ func newApp(
 		updates:               newUpdateService(c),
 		signatureBypass:       newSignatureBypassService(c, defaultSigbypassToolkit()),
 		backups:               newBackupService(c),
+		pakRepair:             newPakRepairService(c),
 		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
 		installSessionManager: installSessionManager,
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
-		companionCache:        mutation.NewCompanionCache(),
 	}
 }
 
@@ -200,153 +196,6 @@ func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Res
 		operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
 		return a.mutationExecutor.Execute(operation)
 	})
-}
-
-// EncryptionType anchors mutation.EncryptionBatchResult so Wails emits its TypeScript model into models.ts.
-func (a *App) EncryptionType() mutation.EncryptionBatchResult {
-	return mutation.EncryptionBatchResult{}
-}
-
-// Encrypts or decrypts each complete IoStore bundle without a legacy asset conversion.
-// The Marvel Rivals AES key stays in Go. The frontend receives only the
-// encrypted flag after the next classify. Emits encrypt:progress events.
-func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) (mutation.EncryptionBatchResult, error) {
-	return suppressWatcherResult(a.core, func() (mutation.EncryptionBatchResult, error) {
-		if err := a.requireGameNotRunning(); err != nil {
-			return mutation.EncryptionBatchResult{}, err
-		}
-
-		a.encryptMu.Lock()
-		a.encryptCancel = make(chan struct{})
-		cancel := a.encryptCancel
-		a.encryptMu.Unlock()
-		defer func() {
-			a.encryptMu.Lock()
-			a.encryptCancel = nil
-			a.encryptMu.Unlock()
-		}()
-
-		launch := func() (mutation.ArchiveCaller, func(), error) {
-			worker, err := uassettool.NewWriteWorker(nil)
-			if err != nil {
-				return nil, nil, err
-			}
-			return worker, func() { _ = worker.Close() }, nil
-		}
-
-		return mutation.SetModEncryptionPooled(modRoot, entryIDs, encrypt, launch, func(progress mutation.EncryptionProgress) {
-			a.runtime.emit("encrypt:progress", progress)
-		}, cancel)
-	})
-}
-
-// Stops an in-progress SetModEncryption after in-flight pool jobs finish.
-func (a *App) CancelEncryption() {
-	a.encryptMu.Lock()
-	defer a.encryptMu.Unlock()
-	if a.encryptCancel != nil {
-		close(a.encryptCancel)
-		a.encryptCancel = nil
-	}
-}
-
-// CompanionCleanupType anchors mutation.CompanionCleanupResult so Wails emits its TypeScript model.
-func (a *App) CompanionCleanupType() mutation.CompanionCleanupResult {
-	return mutation.CompanionCleanupResult{}
-}
-
-// Lists complete unencrypted IoStore IDs whose classify listing leaves Characters.
-func (a *App) FindModsNeedingEncryption(modRoot string) ([]string, error) {
-	library, err := discovery.Scan(modRoot)
-	if err != nil {
-		return nil, fmt.Errorf("scan mod library before required-encryption check: %w", err)
-	}
-	identities, err := a.catalog.classify(modRoot, library.Entries)
-	if err != nil {
-		return nil, fmt.Errorf("classify library before required-encryption check: %w", err)
-	}
-	paths := make(map[string][]string, len(library.Entries))
-	for _, entry := range library.Entries {
-		if listing, ok := a.catalog.pathsFor(modRoot, entry); ok {
-			paths[entry.ID] = listing
-		}
-	}
-	return mutation.FindModsNeedingEncryption(library.Entries, identities, paths), nil
-}
-
-type lazyWorkerCaller struct {
-	mu     sync.Mutex
-	worker *uassettool.Worker
-}
-
-func (l *lazyWorkerCaller) Call(action string, params map[string]any, result any) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.worker == nil {
-		w, err := uassettool.NewWriteWorker(nil)
-		if err != nil {
-			return err
-		}
-		l.worker = w
-	}
-	return l.worker.Call(action, params, result)
-}
-
-func (l *lazyWorkerCaller) Close() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.worker != nil {
-		_ = l.worker.Close()
-		l.worker = nil
-	}
-}
-
-// Lists scanner IDs whose companion PAK still contains chunknames or patched_files.
-func (a *App) FindUnsupportedCompanionPaks(modRoot string) ([]string, error) {
-	lazy := &lazyWorkerCaller{}
-	defer lazy.Close()
-	return mutation.FindUnsupportedCompanionPaksWithCache(modRoot, lazy, a.companionCache)
-}
-
-// Rewrites each dirty companion PAK one at a time. Emits companion:progress.
-func (a *App) StripCompanionPaks(modRoot string, entryIDs []string) (mutation.CompanionCleanupResult, error) {
-	return suppressWatcherResult(a.core, func() (mutation.CompanionCleanupResult, error) {
-		if err := a.requireGameNotRunning(); err != nil {
-			return mutation.CompanionCleanupResult{}, err
-		}
-
-		worker, err := uassettool.NewWriteWorker(nil)
-		if err != nil {
-			return mutation.CompanionCleanupResult{}, err
-		}
-		defer func() {
-			_ = worker.Close() // Worker.Close waits for shutdown and always returns nil.
-		}()
-
-		a.companionMu.Lock()
-		a.companionCancel = make(chan struct{})
-		cancel := a.companionCancel
-		a.companionMu.Unlock()
-		defer func() {
-			a.companionMu.Lock()
-			a.companionCancel = nil
-			a.companionMu.Unlock()
-		}()
-
-		return mutation.StripCompanionPaks(modRoot, entryIDs, worker, func(progress mutation.CompanionCleanupProgress) {
-			a.runtime.emit("companion:progress", progress)
-		}, cancel)
-	})
-}
-
-// Stops an in-progress StripCompanionPaks after the current bundle finishes.
-func (a *App) CancelCompanionCleanup() {
-	a.companionMu.Lock()
-	defer a.companionMu.Unlock()
-	if a.companionCancel != nil {
-		close(a.companionCancel)
-		a.companionCancel = nil
-	}
 }
 
 // Renames one current scanner entry without exposing arbitrary filesystem paths.

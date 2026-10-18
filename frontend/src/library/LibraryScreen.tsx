@@ -21,8 +21,6 @@ import {
 
 import {
 	AssignModTag,
-	CancelCompanionCleanup,
-	CancelEncryption,
 	ClassifyLibrary,
 	CreateFolder,
 	CreateLibrary,
@@ -33,8 +31,6 @@ import {
 	DetectConflicts,
 	DetectLibrary,
 	DiscardNexusLink,
-	FindModsNeedingEncryption,
-	FindUnsupportedCompanionPaks,
 	LoadMetadata,
 	MoveFolder,
 	MoveMod,
@@ -50,15 +46,21 @@ import {
 	SetLibraryProvider,
 	SetLibraryWatcherSuspended,
 	SetModEnabled,
-	SetModEncryption,
 	SetModPriority,
 	SetModRoot,
 	SetSkipDestructiveDelay,
 	SetTheme,
-	StripCompanionPaks,
 	TakePendingNexusLink,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
+import {
+	CancelCompanionCleanup,
+	CancelEncryption,
+	FindModsNeedingEncryption,
+	FindUnsupportedCompanionPaks,
+	SetModEncryption,
+	StripCompanionPaks,
+} from "../../wailsjs/go/main/PakRepairService";
 import { SignatureBypassStatus } from "../../wailsjs/go/main/SignatureBypassService";
 import {
 	ApplyUpdate,

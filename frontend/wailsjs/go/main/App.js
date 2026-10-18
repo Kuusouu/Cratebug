@@ -10,14 +10,6 @@ export function AssignModTag(arg1, arg2) {
   return window['go']['main']['App']['AssignModTag'](arg1, arg2);
 }
 
-export function CancelCompanionCleanup() {
-  return window['go']['main']['App']['CancelCompanionCleanup']();
-}
-
-export function CancelEncryption() {
-  return window['go']['main']['App']['CancelEncryption']();
-}
-
 export function CancelInstall(arg1) {
   return window['go']['main']['App']['CancelInstall'](arg1);
 }
@@ -36,10 +28,6 @@ export function ClassifyLibrary(arg1, arg2) {
 
 export function ClearNexusAPIKey() {
   return window['go']['main']['App']['ClearNexusAPIKey']();
-}
-
-export function CompanionCleanupType() {
-  return window['go']['main']['App']['CompanionCleanupType']();
 }
 
 export function ConflictType() {
@@ -80,18 +68,6 @@ export function DetectLibrary(arg1) {
 
 export function DiscardNexusLink(arg1, arg2) {
   return window['go']['main']['App']['DiscardNexusLink'](arg1, arg2);
-}
-
-export function EncryptionType() {
-  return window['go']['main']['App']['EncryptionType']();
-}
-
-export function FindModsNeedingEncryption(arg1) {
-  return window['go']['main']['App']['FindModsNeedingEncryption'](arg1);
-}
-
-export function FindUnsupportedCompanionPaks(arg1) {
-  return window['go']['main']['App']['FindUnsupportedCompanionPaks'](arg1);
 }
 
 export function IsFolderEmpty(arg1, arg2) {
@@ -194,10 +170,6 @@ export function SetModEnabled(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetModEnabled'](arg1, arg2, arg3);
 }
 
-export function SetModEncryption(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SetModEncryption'](arg1, arg2, arg3);
-}
-
 export function SetModPriority(arg1, arg2, arg3) {
   return window['go']['main']['App']['SetModPriority'](arg1, arg2, arg3);
 }
@@ -216,10 +188,6 @@ export function SetSkipDestructiveDelay(arg1) {
 
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
-}
-
-export function StripCompanionPaks(arg1, arg2) {
-  return window['go']['main']['App']['StripCompanionPaks'](arg1, arg2);
 }
 
 export function TakePendingNexusLink() {
