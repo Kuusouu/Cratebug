@@ -1,82 +1,56 @@
 # Cratebug Agent Instructions
 
-## Scope
+Cratebug is an open-source Marvel Rivals mod manager built with Go, Wails, React, and TypeScript.
 
-This repository contains Cratebug, an open-source Marvel Rivals mod manager built with Go, Wails, React, and TypeScript.
+## How to work here
 
-## Operating principles
+- The user's request sets the scope. You do not need a roadmap phase, a task entry, or a decision record before starting work, and you should not ask for one.
+- The project docs record intent and history, and they can fall behind the code. If a request conflicts with them, say so once and do what the user asked. If the change makes a doc wrong, fix the doc in the same change.
+- Ask when a choice would materially change the result and the code cannot settle it. Otherwise pick a sensible option and say which one you picked.
+- Keep changes focused on the request. Skip drive-by refactors, formatting sweeps, and dependency upgrades unless asked.
+- Say when a premise looks wrong before building around it.
+- Never fabricate repository state, behavior, command output, screenshots, or test results.
 
-- Working code only. Verify before reporting completion.
-- Never fabricate repository state, behavior, files, command output, screenshots, or test results.
-- Prefer repository evidence, official documentation, and small experiments over assumptions.
-- Say when a premise appears incorrect before implementing around it.
-- Touch only what the active task requires.
-- Avoid drive-by refactors, dependency upgrades, formatting sweeps, and speculative abstractions.
-- Keep changes small, readable, and reviewable.
-- Compilation alone does not prove that behavior or UI is correct.
+## Where things are
 
-## Documentation routing
+- `README.md` and `CONTRIBUTING.md`: setup and development commands.
+- `CODING_GUIDELINES.md`: code, test, frontend, and CSS conventions. Follow these.
+- `SPEC.md`: what Cratebug does and the filesystem safety rules it keeps.
+- `docs/decisions/`: the reasoning behind non-obvious choices. Read the relevant record before reversing one of those choices.
+- `ROADMAP.md`: a log of what has shipped and ideas for later. It does not gate work.
+- `CHANGELOG.md`: user-facing release notes.
 
-Read only what the task requires:
+## Code
 
-- `SPEC.md` for product behavior and boundaries.
-- `ROADMAP.md` for phase order and review gates.
-- `TASKS.md` for the active numbered task and required validation.
-- `docs/decisions/` for accepted technical decisions.
-- `README.md` for canonical development commands.
-- `CODING_GUIDELINES.md` for language, test, frontend, and CSS conventions.
-
-Record phase progress in `ROADMAP.md` and `TASKS.md`.
-Store technical decisions in `docs/decisions/`. Do not create separate phase review documents.
-
-Before editing, identify the active task and confirm that the work belongs in the current roadmap phase. Do not implement later-phase work without approval.
-
-## Before editing
-
-- State the intended change and how it will be verified.
-- Read the files being changed and nearby code or tests that define their behavior.
-- Resolve uncertainty by inspecting code, fixtures, or official documentation when practical.
-- Ask only when multiple reasonable choices would materially change the result and repository evidence cannot resolve them.
-
-## Editing
-
-- Use the minimum change that completely solves the task.
-- Match established project structure, naming, and style.
-- Follow `CODING_GUIDELINES.md` for code, test, frontend, and CSS conventions.
+- Follow `CODING_GUIDELINES.md`. `./check.ps1` and `./check.sh` enforce most of it.
 - Keep Go domain and filesystem behavior independent of Wails and React.
 - Keep filesystem operations out of React components.
-- Do not add dependencies unless the active task requires them.
-- Do not upgrade pinned dependencies during unrelated work.
-- Use Bun for frontend dependencies and scripts.
-- Use oxfmt and oxlint for frontend formatting and linting.
-- Clean up unused code created by the current change, but do not remove unrelated existing code.
+- Use Bun for frontend dependencies and scripts, and oxfmt and oxlint for formatting and linting.
+- Add a dependency only when the change needs one. Do not upgrade pinned dependencies as a side effect.
+- Remove unused code your change creates, but leave unrelated existing code alone.
 
 ## Safety
 
 - Never test mutations against the user's real Marvel Rivals mod directory without explicit permission.
-- Use temporary directories and disposable fixtures by default. For manually driving the
-  running app (not automated Go tests, which use `t.TempDir()`), `C:\ModsFixtures` is the
-  standing fixture library — see "Driving and screenshotting the running app" below.
-- Never weaken a filesystem safety check merely to make a test pass.
+- Use temporary directories and disposable fixtures by default. Automated Go tests use `t.TempDir()`. For manually driving the running app, use `C:\ModsFixtures` (see below).
+- Never weaken a filesystem safety check to make a test pass.
 - Do not modify the BentoMod repository or its persisted state.
 - Treat BentoMod as a behavioral and visual reference, not an architectural template.
 
+## Decision records
+
+Decision records are optional. Write one when a choice would be easy to undo by mistake: a pinned external tool, a security or filesystem boundary, or an alternative rejected for a reason that is not obvious from the code. Routine work does not need one. If you are unsure, offer to write one, and never hold up work waiting for one.
+
+Name a record `docs/decisions/NNNN-short-name.md` with the next number. Give it a status, a date, the decision, and the reasoning, and keep it short. A record that replaces an earlier one names the record it replaces.
+
 ## Verification
 
-- Run the smallest meaningful checks during implementation.
-- Run all validation required by the active task before reporting completion.
+- Run the smallest meaningful checks while you work. Before reporting a code change as done, run `./check.ps1` on Windows or `./check.sh` on Linux.
 - Fix failing checks rather than skipping or weakening them.
-- Do not claim a command passed unless it was run successfully.
+- Do not claim a command passed unless you ran it and it passed.
+- Compilation alone does not prove behavior or UI is correct.
 
-For user-visible changes:
-
-1. Launch the application when possible.
-2. Navigate to the affected state.
-3. Capture a screenshot.
-4. Compare it with any available reference.
-5. Fix visible layout, clipping, spacing, typography, color, or state problems.
-
-If visual verification cannot be performed, say so clearly.
+For user-visible changes, launch the app, go to the affected state, take a screenshot, and fix any layout, clipping, spacing, typography, color, or state problems you see. If you cannot verify visually, say so.
 
 ### Driving and screenshotting the running app
 
@@ -104,21 +78,21 @@ live-sync, and DOM/CSS behavior can differ by window size and DPI. Say when a
 check ran in the browser only, and ask the person running the native window to
 verify anything size- or DPI-sensitive directly.
 
-- Save task verification screenshots as `.playwright-cli/screenshots/<phase>/task-<number>-<state>.png`.
+- Save verification screenshots under `.playwright-cli/screenshots/`, named for what they show.
   This directory is ignored by Git. Do not commit these screenshots.
   Track only the application screenshots used by `README.md`: `main.png` and the three Linux launch views.
 - Fixtures: `C:\ModsFixtures` is the standing library for manually driving the app —
   a small, varied set of classic and IoStore bundles (enabled, disabled via each
   recognized suffix, and one with a missing sidecar) across a few folders. Point the
-  app's mod root there instead of creating throwaway fixtures per task; add to it if
-  a task needs a shape it doesn't already cover, but don't delete what's there
+  app's mod root there instead of creating throwaway fixtures; add to it if
+  a change needs a shape it doesn't already cover, but don't delete what's there
   afterward. It is disposable, synthetic data, not a real Marvel Rivals installation,
-  so the real-mod-directory restriction above doesn't apply to it. If a task
+  so the real-mod-directory restriction above doesn't apply to it. If a change
   genuinely needs a real or complex library beyond what synthetic fixtures can
   represent, ask the user to point at one rather than fabricating something that
   pretends to be real data.
-- BentoMod can be launched the same way as a live comparison reference when a task
-  calls for it; see `archive/BentoMod/AGENTS.md`. A second playwright-cli session
+- BentoMod can be launched the same way as a live comparison reference when that
+  helps; see `archive/BentoMod/AGENTS.md`. A second playwright-cli session
   (`-s=<name>`) can hold it side by side with the Cratebug tab.
 - Close the dev process (and its Vite/bindings child processes) once verification
   is done.
@@ -129,16 +103,6 @@ verify anything size- or DPI-sensitive directly.
 - Do not commit, push, publish, tag, alter remotes, or discard user changes unless explicitly instructed.
 - Keep generated files, secrets, caches, logs, local paths, and build output out of version control.
 
-## Completion report
+## When you finish
 
-Report:
-
-- What changed
-- Files changed
-- Validation performed and results
-- Manual checks and screenshot paths
-- Known limitations or unverified behavior
-- Deferred findings outside the task
-- A concise suggested commit message
-
-Stop at review gates. Do not begin the next task or phase automatically.
+Tell the user what changed, how you verified it, and anything you could not verify. Mention problems you noticed outside the request instead of fixing them unasked. When there is something to commit, suggest a Conventional Commits message.

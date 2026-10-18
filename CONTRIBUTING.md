@@ -139,9 +139,9 @@ Follow [CODING_GUIDELINES.md](CODING_GUIDELINES.md). The short version:
 ## Project docs
 
 - [SPEC.md](SPEC.md) - product behavior and boundaries
-- [ROADMAP.md](ROADMAP.md) - phase order and status
+- [ROADMAP.md](ROADMAP.md) - what has shipped and ideas for later
 - [AGENTS.md](AGENTS.md) - contributor and AI-agent workflow rules
-- [docs/decisions/](docs/decisions/) - accepted technical decisions
+- [docs/decisions/](docs/decisions/) - the reasoning behind non-obvious technical choices. Write one when a choice would be easy to undo by mistake; routine changes don't need one.
 
 ## Commits and pull requests
 

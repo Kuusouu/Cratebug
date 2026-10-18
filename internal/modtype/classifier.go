@@ -1,9 +1,9 @@
 // Package modtype determines a coarse, UI-facing category for a mod without
 // routing through UAssetToolRivals's heavy archive-extraction actions. See
 // docs/decisions/0003-uassettoolrivals-boundary.md for why that heavy path
-// is avoided, and TASKS.md's task 6.7 for this package's scope: category
-// classification only. Hero and skin-name resolution is a separate,
-// external-data-dependent concern this package does not cover.
+// is avoided. This package covers category classification only. Hero and
+// skin-name resolution is a separate, external-data-dependent concern this
+// package does not cover.
 package modtype
 
 import "strings"

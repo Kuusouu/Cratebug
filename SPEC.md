@@ -1,7 +1,6 @@
 # Cratebug Product Specification
 
-**Status:** Draft v0.1  
-**Project:** Cratebug
+This describes what Cratebug does and the rules it keeps. It changes with the product: when a change makes something here wrong, update it in the same change.
 
 ## 1. Product overview
 
@@ -22,7 +21,7 @@ Cratebug should:
 - Report failures clearly instead of silently leaving partially modified mods.
 - Remain understandable and maintainable for a small open-source project.
 - Reuse and improve useful parts of BentoMod's frontend without inheriting its structure wholesale.
-- Ship as a conventional Windows application with an installer and uninstaller.
+- Ship as a conventional Windows application with an installer and uninstaller, and as a Linux AppImage.
 
 ## 3. Product principles
 
@@ -40,7 +39,7 @@ Cratebug should read relevant BentoMod formats, but it does not need to continue
 
 ### Small and inspectable
 
-The project should begin with simple boundaries and few abstractions. New layers must solve demonstrated problems.
+The project should keep simple boundaries and few abstractions. New layers must solve demonstrated problems.
 
 ### Honest recovery
 
@@ -48,9 +47,9 @@ Cratebug must not claim success unless the resulting filesystem state has been c
 
 ## 4. Platform and technology
 
-Cratebug is Windows-first and initially targets Windows 10 64-bit version 1909 or newer.
+Cratebug is Windows-first and targets Windows 10 64-bit version 1909 or newer. It also runs on Linux as an AppImage, managing the same Windows mod bundles that Marvel Rivals loads through Proton.
 
-The initial stack is:
+The stack is:
 
 - Go
 - Wails v2
@@ -58,12 +57,13 @@ The initial stack is:
 - TypeScript
 - Vite 8
 - Bun
+- Tailwind CSS and shadcn/ui on Base UI
 - oxlint
 - oxfmt
 
 The repository must pin stable, non-preview tool and dependency versions. Upgrades are deliberate maintenance work, not incidental feature changes.
 
-Cratebug begins in a fresh repository and initially uses GPL-3.0.
+Cratebug is licensed under GPL-3.0.
 
 ## 5. Core terminology
 
@@ -103,7 +103,7 @@ A mod represented by a primary file with associated `.utoc` and `.ucas` files.
 
 ### Incomplete bundle
 
-A related file group that appears to be missing a required member. Exact IoStore validity rules must be established through fixtures and UAssetToolRivals investigation before Cratebug mutates incomplete bundles.
+A related file group that appears to be missing a required member. Cratebug shows an incomplete IoStore bundle and can enable, disable, or delete it, because those operations touch only the files that exist. It refuses to rename, move, reprioritize, or encrypt one.
 
 ### Asset conflict
 
@@ -113,7 +113,7 @@ This is distinct from a destination filename collision, invalid bundle, or dupli
 
 ## 6. Core workflows
 
-Cratebug should eventually allow users to:
+Cratebug lets users:
 
 - Locate or configure the Marvel Rivals mod directory, including automatic detection of store-installed libraries through per-store providers.
 - Scan and display installed mods and physical folders.
@@ -124,7 +124,7 @@ Cratebug should eventually allow users to:
 - Move mods between folders.
 - Create, rename, and organize folders.
 - Open a folder or mod in File Explorer from its context menu.
-- Delete mods through a recoverable Windows deletion mechanism.
+- Delete mods recoverably, through the Windows Recycle Bin or the Linux desktop trash.
 - Install supported local archives.
 - Review installation collisions before replacement.
 - Inspect asset conflicts through UAssetToolRivals.
@@ -138,8 +138,8 @@ Cratebug should eventually allow users to:
 - Paste a personal Nexus Mods API key and connect or disconnect that account.
 - Install a Marvel Rivals mod from a Nexus Mods page URL or an `nxm://` download link, through the same staged preview as a local archive.
 - Register as the `nxm://` handler, asking before taking it from another application.
-
-The roadmap determines implementation order.
+- Back up the whole library to a zip file and restore it later.
+- Install and remove the UTOC signature bypass that Marvel Rivals needs to load mods.
 
 ## 7. Bundle behavior
 
@@ -230,7 +230,7 @@ An advanced override is deferred and must never be enabled by default.
 
 ## 12. Deletion
 
-Normal deletion must use the Windows Recycle Bin or another recoverable Windows shell operation.
+Normal deletion must use the Windows Recycle Bin, the Linux desktop trash, or another recoverable operation.
 
 The interface should retain a short deliberate delay before destructive confirmation. Users may turn that delay off in Settings; the confirmation itself always remains. This is an extra guard and does not replace backend validation.
 
@@ -249,7 +249,7 @@ Persisted data must:
 - Avoid machine-specific paths in portable mod metadata.
 - Tolerate malformed or outdated data without corrupting the library.
 
-The choice between JSON, SQLite, or another format is deferred until real access patterns are known.
+Settings and mod metadata are stored as versioned JSON in `metadata.json` under the user config directory.
 
 Tags and metadata must survive controlled renames and moves.
 
@@ -300,9 +300,9 @@ The Marvel Rivals AES key used to read and write obfuscated IoStore containers s
 
 Cratebug should preserve the useful information architecture of BentoMod rather than redesigning the application from scratch.
 
-The frontend begins from a clean React, TypeScript, and Vite project. BentoMod components, CSS, and assets may be migrated selectively and refactored as they are introduced.
+The frontend is a React, TypeScript, and Vite project styled with Tailwind CSS, with interactive primitives from shadcn/ui on Base UI. BentoMod components, CSS, and assets may still be borrowed selectively and refactored as they come in.
 
-Migrated code should:
+Frontend code should:
 
 - Use understandable component boundaries.
 - Separate rendering from application and filesystem operations.
@@ -311,8 +311,6 @@ Migrated code should:
 - Support keyboard navigation and common Windows scaling.
 - Support light, dark, and system appearance.
 - Preserve the playful identity without reducing usability.
-
-Reference screenshots and a standard viewport will be documented during frontend migration.
 
 ## 17. Responsiveness, security, and privacy
 
@@ -337,41 +335,26 @@ Premium accounts may request a download link from the Nexus API. Free accounts m
 
 Cratebug refuses to show or download a mod Nexus marks as adult when the connected account has adult content hidden. There is no in-app override; the user changes that on Nexus.
 
-## 18. Initial non-goals
+## 18. Not built yet
 
-The initial release does not require:
+Cratebug does not currently do any of the following. None of them is ruled out; see the ideas list in `ROADMAP.md`.
 
-- Cross-platform support
 - Game launching
-- Full mod-directory backup and restore
 - Crash monitoring
 - Browser-extension intake
-- Signature bypass tooling
 - VFX updating
 - Character database updating
 - Automatic recompression tools
 - Virtual collections
 - Permanent deletion
 - Perfect detection of external renames
+- An advanced override for the game-running lock, which must never be on by default
 
-## 19. Deferred decisions
+## 19. Release standard
 
-| Decision | Trigger |
-|---|---|
-| Exact patch versions | Repository initialization |
-| Persistent mod identity | Metadata and controlled rename work |
-| JSON versus SQLite | Persistence prototype |
-| Exact incomplete IoStore rules | Fixtures and UAssetToolRivals investigation |
-| FFI versus helper process | UAssetToolRivals prototype and external review |
-| Canonical UI screenshots and viewport | Frontend migration |
-| Installer branding and upgrades | First distributable build |
-| Advanced game-running override | Post-core safety review |
+A stable release should meet these:
 
-## 20. Initial release standard
-
-Cratebug is ready for an initial stable release when:
-
-- It installs and uninstalls conventionally on supported Windows systems.
+- It installs and uninstalls conventionally on supported Windows systems, and the AppImage launches on supported Linux distributions.
 - It discovers and displays a real Marvel Rivals mod library.
 - It recognizes native and supported legacy disabled formats.
 - Core mutations operate on complete recognized bundles.

@@ -116,7 +116,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for getting st
 - [User guide](docs/USER_GUIDE.md) - installing, finding your library, updating, and URL installs in detail
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - SmartScreen, WebView2, uninstalling, and other common problems
 - [Changelog](CHANGELOG.md)
-- [Roadmap](ROADMAP.md) - what is done and what is next
+- [Roadmap](ROADMAP.md) - what has shipped and ideas for later
 
 ## License
 
