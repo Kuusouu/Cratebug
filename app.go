@@ -36,8 +36,8 @@ type App struct {
 	companionMu           sync.Mutex
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
-	sigbypassTool         sigbypassToolkit
 	updates               *UpdateService
+	signatureBypass       *SignatureBypassService
 
 	secretStore secret.Store
 
@@ -103,13 +103,13 @@ func newApp(
 	return &App{
 		core:                  c,
 		updates:               newUpdateService(c),
+		signatureBypass:       newSignatureBypassService(c, defaultSigbypassToolkit()),
 		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
 		installSessionManager: installSessionManager,
 		restoreSessions:       backup.NewSessionManager(),
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 		companionCache:        mutation.NewCompanionCache(),
-		sigbypassTool:         defaultSigbypassToolkit(),
 	}
 }
 

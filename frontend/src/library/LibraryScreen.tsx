@@ -55,11 +55,11 @@ import {
 	SetModRoot,
 	SetSkipDestructiveDelay,
 	SetTheme,
-	SignatureBypassStatus,
 	StripCompanionPaks,
 	TakePendingNexusLink,
 	UnassignModTag,
 } from "../../wailsjs/go/main/App";
+import { SignatureBypassStatus } from "../../wailsjs/go/main/SignatureBypassService";
 import {
 	ApplyUpdate,
 	CheckForUpdate,

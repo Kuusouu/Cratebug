@@ -10,12 +10,14 @@ import {
 	CancelBackup,
 	CancelRestore,
 	DiscardRestorePreview,
-	InstallSignatureBypass,
-	RemoveSignatureBypass,
 	RestoreApply,
 	RestorePreview,
-	SignatureBypassStatus,
 } from "../../wailsjs/go/main/App";
+import {
+	InstallSignatureBypass,
+	RemoveSignatureBypass,
+	SignatureBypassStatus,
+} from "../../wailsjs/go/main/SignatureBypassService";
 import type { backup, sigbypass } from "../../wailsjs/go/models";
 import { BrowserOpenURL, EventsOn } from "../../wailsjs/runtime/runtime";
 import {

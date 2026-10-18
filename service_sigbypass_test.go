@@ -81,13 +81,13 @@ func TestSignatureBypassInstallAndRemoveRoundTrip(t *testing.T) {
 	app.detector = gamedetect.NewRegistry(staticSigbypassProvider{
 		detection: gamedetect.Detection{State: gamedetect.StateLibraryFound, PaksPath: paksPath},
 	})
-	app.sigbypassTool = sigbypassToolkit{
+	app.signatureBypass.sigbypassTool = sigbypassToolkit{
 		InstalledFiles: func() []sigbypass.PayloadFile { return payload.Files },
 		Payload:        func() (sigbypass.Payload, error) { return payload, nil },
 	}
 
 	// Act
-	installed, err := app.InstallSignatureBypass()
+	installed, err := app.signatureBypass.InstallSignatureBypass()
 
 	// Assert
 	if err != nil {
@@ -98,7 +98,7 @@ func TestSignatureBypassInstallAndRemoveRoundTrip(t *testing.T) {
 	}
 
 	// Act
-	removed, err := app.RemoveSignatureBypass()
+	removed, err := app.signatureBypass.RemoveSignatureBypass()
 
 	// Assert
 	if err != nil {
@@ -118,8 +118,8 @@ func TestSignatureBypassMutationsAreBlockedWhileTheGameRuns(t *testing.T) {
 	app := testApp(t, true)
 
 	// Act
-	_, installErr := app.InstallSignatureBypass()
-	_, removeErr := app.RemoveSignatureBypass()
+	_, installErr := app.signatureBypass.InstallSignatureBypass()
+	_, removeErr := app.signatureBypass.RemoveSignatureBypass()
 
 	// Assert
 	if !errors.Is(installErr, mutation.ErrGameRunning) {
@@ -137,13 +137,13 @@ func TestSignatureBypassStatusReportsGameNotFoundWithoutAnInstall(t *testing.T) 
 	app.detector = gamedetect.NewRegistry(staticSigbypassProvider{
 		detection: gamedetect.Detection{State: gamedetect.StateNotFound},
 	})
-	app.sigbypassTool = sigbypassToolkit{
+	app.signatureBypass.sigbypassTool = sigbypassToolkit{
 		InstalledFiles: func() []sigbypass.PayloadFile { return payload.Files },
 		Payload:        func() (sigbypass.Payload, error) { return payload, nil },
 	}
 
 	// Act
-	status, err := app.SignatureBypassStatus()
+	status, err := app.signatureBypass.SignatureBypassStatus()
 
 	// Assert
 	if err != nil {
@@ -164,7 +164,7 @@ func TestSignatureBypassStatusReportsAMissingPayload(t *testing.T) {
 	app.detector = gamedetect.NewRegistry(staticSigbypassProvider{
 		detection: gamedetect.Detection{State: gamedetect.StateLibraryFound, PaksPath: paksPath},
 	})
-	app.sigbypassTool = sigbypassToolkit{
+	app.signatureBypass.sigbypassTool = sigbypassToolkit{
 		InstalledFiles: sigbypass.InstalledFiles,
 		Payload: func() (sigbypass.Payload, error) {
 			return sigbypass.Payload{}, sigbypass.ErrPayloadNotFound
@@ -172,7 +172,7 @@ func TestSignatureBypassStatusReportsAMissingPayload(t *testing.T) {
 	}
 
 	// Act
-	status, err := app.SignatureBypassStatus()
+	status, err := app.signatureBypass.SignatureBypassStatus()
 
 	// Assert
 	if err != nil {

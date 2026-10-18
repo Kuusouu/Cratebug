@@ -66,6 +66,7 @@ func main() {
 		Bind: []interface{}{
 			app,
 			app.updates,
+			app.signatureBypass,
 		},
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,

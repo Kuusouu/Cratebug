@@ -13,6 +13,16 @@ type sigbypassToolkit struct {
 	Payload        func() (sigbypass.Payload, error)
 }
 
+// Signature bypass detection, install, and removal, bound to the frontend.
+type SignatureBypassService struct {
+	*core
+	sigbypassTool sigbypassToolkit
+}
+
+func newSignatureBypassService(c *core, tool sigbypassToolkit) *SignatureBypassService {
+	return &SignatureBypassService{core: c, sigbypassTool: tool}
+}
+
 func defaultSigbypassToolkit() sigbypassToolkit {
 	return sigbypassToolkit{
 		InstalledFiles: sigbypass.InstalledFiles,
@@ -21,19 +31,19 @@ func defaultSigbypassToolkit() sigbypassToolkit {
 }
 
 // Exists only so Wails emits the sigbypass.Status TypeScript model.
-func (a *App) SignatureBypassStatusType() sigbypass.Status {
+func (s *SignatureBypassService) SignatureBypassStatusType() sigbypass.Status {
 	return sigbypass.Status{}
 }
 
 // Reports the signature bypass state of the detected game installation, plus
 // whether this build carries a verified payload to install. Read-only.
-func (a *App) SignatureBypassStatus() (sigbypass.Status, error) {
+func (s *SignatureBypassService) SignatureBypassStatus() (sigbypass.Status, error) {
 	payloadAvailable := false
-	if payload, err := a.sigbypassTool.Payload(); err == nil {
+	if payload, err := s.sigbypassTool.Payload(); err == nil {
 		payloadAvailable = payload.Verify() == nil
 	}
 
-	detection, err := a.signatureBypassDetection()
+	detection, err := s.signatureBypassDetection()
 	if err != nil {
 		return sigbypass.Status{}, err
 	}
@@ -49,7 +59,7 @@ func (a *App) SignatureBypassStatus() (sigbypass.Status, error) {
 		return sigbypass.Status{State: sigbypass.StateGameNotFound, PayloadAvailable: payloadAvailable}, nil
 	}
 
-	status, err := sigbypass.Inspect(gameDir, a.sigbypassTool.InstalledFiles())
+	status, err := sigbypass.Inspect(gameDir, s.sigbypassTool.InstalledFiles())
 	if err != nil {
 		return sigbypass.Status{}, err
 	}
@@ -60,55 +70,55 @@ func (a *App) SignatureBypassStatus() (sigbypass.Status, error) {
 // Copies the verified bypass payload into the detected game installation.
 // Blocked while Marvel Rivals runs; a file Cratebug does not own is never
 // overwritten.
-func (a *App) InstallSignatureBypass() (sigbypass.Status, error) {
-	if err := a.requireGameNotRunning(); err != nil {
+func (s *SignatureBypassService) InstallSignatureBypass() (sigbypass.Status, error) {
+	if err := s.requireGameNotRunning(); err != nil {
 		return sigbypass.Status{}, err
 	}
 
-	gameDir, err := a.signatureBypassGameDir()
+	gameDir, err := s.signatureBypassGameDir()
 	if err != nil {
 		return sigbypass.Status{}, err
 	}
-	payload, err := a.sigbypassTool.Payload()
+	payload, err := s.sigbypassTool.Payload()
 	if err != nil {
 		return sigbypass.Status{}, err
 	}
 	if err := sigbypass.Install(gameDir, payload); err != nil {
 		return sigbypass.Status{}, err
 	}
-	return a.SignatureBypassStatus()
+	return s.SignatureBypassStatus()
 }
 
 // Removes the bypass payload from the detected game installation. Blocked
 // while Marvel Rivals runs; a different file at a payload path refuses the
 // removal.
-func (a *App) RemoveSignatureBypass() (sigbypass.Status, error) {
-	if err := a.requireGameNotRunning(); err != nil {
+func (s *SignatureBypassService) RemoveSignatureBypass() (sigbypass.Status, error) {
+	if err := s.requireGameNotRunning(); err != nil {
 		return sigbypass.Status{}, err
 	}
 
-	gameDir, err := a.signatureBypassGameDir()
+	gameDir, err := s.signatureBypassGameDir()
 	if err != nil {
 		return sigbypass.Status{}, err
 	}
-	if err := sigbypass.Remove(gameDir, a.sigbypassTool.InstalledFiles()); err != nil {
+	if err := sigbypass.Remove(gameDir, s.sigbypassTool.InstalledFiles()); err != nil {
 		return sigbypass.Status{}, err
 	}
-	return a.SignatureBypassStatus()
+	return s.SignatureBypassStatus()
 }
 
 // Detects the game installation through the provider the frontend library
 // detection uses, defaulting to Steam when no provider was chosen yet.
-func (a *App) signatureBypassDetection() (gamedetect.Detection, error) {
-	provider := a.meta.read().Settings.LibraryProvider
+func (s *SignatureBypassService) signatureBypassDetection() (gamedetect.Detection, error) {
+	provider := s.meta.read().Settings.LibraryProvider
 	if provider == "" {
 		provider = gamedetect.ProviderSteam
 	}
-	return a.detector.Detect(provider)
+	return s.detector.Detect(provider)
 }
 
-func (a *App) signatureBypassGameDir() (string, error) {
-	detection, err := a.signatureBypassDetection()
+func (s *SignatureBypassService) signatureBypassGameDir() (string, error) {
+	detection, err := s.signatureBypassDetection()
 	if err != nil {
 		return "", err
 	}

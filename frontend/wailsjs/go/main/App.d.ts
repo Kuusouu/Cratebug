@@ -9,7 +9,6 @@ import {mutation} from '../models';
 import {conflict} from '../models';
 import {metadata} from '../models';
 import {gamedetect} from '../models';
-import {sigbypass} from '../models';
 import {nexus} from '../models';
 
 export function ApplyInstall(arg1:string,arg2:string,arg3:Array<install.ApplyItem>):Promise<install.ApplyResult>;
@@ -70,8 +69,6 @@ export function FindModsNeedingEncryption(arg1:string):Promise<Array<string>>;
 
 export function FindUnsupportedCompanionPaks(arg1:string):Promise<Array<string>>;
 
-export function InstallSignatureBypass():Promise<sigbypass.Status>;
-
 export function IsFolderEmpty(arg1:string,arg2:string):Promise<boolean>;
 
 export function LoadMetadata():Promise<main.MetadataState>;
@@ -97,8 +94,6 @@ export function PrepareInstall(arg1:string,arg2:Array<string>,arg3:string):Promi
 export function PrepareNexusInstall(arg1:string,arg2:number,arg3:number,arg4:string):Promise<install.PreviewResult>;
 
 export function RegisterNexusProtocol(arg1:boolean):Promise<main.NexusProtocolState>;
-
-export function RemoveSignatureBypass():Promise<sigbypass.Status>;
 
 export function RenameFolder(arg1:string,arg2:string,arg3:string):Promise<mutation.Result>;
 
@@ -143,10 +138,6 @@ export function SetNexusAPIKey(arg1:string):Promise<main.NexusKeyState>;
 export function SetSkipDestructiveDelay(arg1:boolean):Promise<void>;
 
 export function SetTheme(arg1:string):Promise<void>;
-
-export function SignatureBypassStatus():Promise<sigbypass.Status>;
-
-export function SignatureBypassStatusType():Promise<sigbypass.Status>;
 
 export function StripCompanionPaks(arg1:string,arg2:Array<string>):Promise<mutation.CompanionCleanupResult>;
 
