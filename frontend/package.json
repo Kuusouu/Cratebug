@@ -11,7 +11,8 @@
 		"format:check": "oxfmt --check",
 		"lint": "oxlint --deny-warnings",
 		"typecheck": "tsc --noEmit",
-		"check": "bun run format:check && bun run lint && bun run build"
+		"test": "bun test",
+		"check": "bun run format:check && bun run lint && bun run test && bun run build"
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.9.0",

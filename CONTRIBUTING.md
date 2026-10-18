@@ -77,7 +77,7 @@ Run every required check before submitting anything:
 .\check.ps1
 ```
 
-That runs `gofmt`, oxfmt formatting and oxlint linting, the TypeScript typecheck, the Vite build, `go vet`, and the full Go test suite. Frontend scripts (run from `frontend`):
+That runs `gofmt`, oxfmt formatting and oxlint linting, the frontend tests, the TypeScript typecheck, the Vite build, `go vet`, and the full Go test suite. Linux uses `./check.sh` for the same checks. Both CI jobs invoke these scripts. Frontend scripts (run from `frontend`):
 
 | Command | Purpose |
 | --- | --- |
@@ -87,6 +87,7 @@ That runs `gofmt`, oxfmt formatting and oxlint linting, the TypeScript typecheck
 | `bun run format:check` | Check oxfmt formatting without changes |
 | `bun run lint` | Run oxlint lint rules |
 | `bun run typecheck` | Run TypeScript without emitting files |
+| `bun run test` | Run the frontend test suite |
 | `bun run check` | Run all frontend checks and the build |
 
 Canonical Go commands (repository root):
