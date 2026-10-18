@@ -26,6 +26,7 @@ Pin the following runtime and application-tool versions:
 | `@vitejs/plugin-react` | `6.0.4` |
 | oxfmt | `0.73.0` |
 | oxlint | `1.88.0` |
+| oxlint-tsgolint | `7.0.2004` |
 | `@types/react` | `19.2.17` |
 | `@types/react-dom` | `19.2.3` |
 

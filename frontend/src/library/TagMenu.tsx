@@ -91,6 +91,7 @@ export function TagMenu({
 		>
 			<PopoverTrigger
 				render={
+					// oxlint-disable-next-line jsx-a11y/control-has-associated-label -- Base UI renders the trigger's labelled children inside this button.
 					<button
 						type="button"
 						className={[
@@ -123,7 +124,9 @@ export function TagMenu({
 										>
 											<input
 												// Opening the rename form should hand focus to the field it exists for.
+												// oxlint-disable-next-line jsx-a11y/no-autofocus -- Focus follows the user's explicit rename action.
 												autoFocus
+												aria-label="Tag name"
 												value={editing.name}
 												disabled={isBusy}
 												onChange={(event) =>

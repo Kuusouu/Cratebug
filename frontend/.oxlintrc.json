@@ -1,5 +1,7 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y"],
+	"options": { "typeAware": true },
 	"categories": {
 		"correctness": "warn",
 		"nursery": "off",
@@ -14,6 +16,23 @@
 		"no-var": "error",
 		"prefer-const": "error",
 		"no-console": "off",
+		"react/rules-of-hooks": "error",
+		"react/exhaustive-deps": "error",
+		"react/jsx-key": "error",
+		"react/react-in-jsx-scope": "off",
+		"react/exhaustive-effect-dependencies": "off",
+		"react/memo-dependencies": "off",
+		"react/refs": "off",
+		"react/set-state-in-effect": "off",
+		"jsx-a11y/prefer-tag-over-role": "off",
+		"jsx-a11y/label-has-associated-control": ["error", { "depth": 3 }],
+		"typescript/no-floating-promises": "error",
+		"typescript/no-misused-promises": "error",
+		"typescript/await-thenable": "error",
+		"typescript/switch-exhaustiveness-check": "error",
+		"typescript/consistent-return": "off",
+		"typescript/no-misused-spread": "off",
+		"typescript/no-unsafe-type-assertion": "off",
 		"typescript/ban-ts-comment": [
 			"error",
 			{

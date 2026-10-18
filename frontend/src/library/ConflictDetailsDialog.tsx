@@ -97,7 +97,7 @@ export function ConflictDetailsDialog({
 	}, []);
 
 	const entriesByID = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
-	const groups = result.groups ?? [];
+	const groups = useMemo(() => result.groups ?? [], [result.groups]);
 	const unavailable = result.unavailable ?? [];
 
 	const characterBuckets = useMemo(

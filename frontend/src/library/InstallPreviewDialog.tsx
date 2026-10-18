@@ -163,7 +163,7 @@ export function InstallPreviewDialog({
 		};
 	}, [modRoot, source, defaultFolder]);
 
-	const items = previewResult?.items ?? [];
+	const items = useMemo(() => previewResult?.items ?? [], [previewResult?.items]);
 
 	// Partition and sort items: selected first, unselected at bottom
 	const sortedItems = useMemo(() => {

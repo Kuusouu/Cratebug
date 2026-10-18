@@ -483,7 +483,7 @@ export function LibraryScreen() {
 		() => tagIDsForScannerID(metadataDocument, selectedEntryID),
 		[metadataDocument, selectedEntryID],
 	);
-	const tagCatalog = metadataDocument?.tags ?? [];
+	const tagCatalog = useMemo(() => metadataDocument?.tags ?? [], [metadataDocument?.tags]);
 	const assignedTagsForSelection = useMemo(
 		() => tagCatalog.filter((tag) => assignedTagIDsForSelection.has(tag.id)),
 		[tagCatalog, assignedTagIDsForSelection],
@@ -557,8 +557,10 @@ export function LibraryScreen() {
 		() => (library?.entries ?? []).filter((entry) => checkedEntryIDs.has(entry.id)),
 		[library, checkedEntryIDs],
 	);
-	const dialogEntries =
-		dialogScope === "checked" ? checkedEntries : selectedEntry ? [selectedEntry] : [];
+	const dialogEntries = useMemo(
+		() => (dialogScope === "checked" ? checkedEntries : selectedEntry ? [selectedEntry] : []),
+		[dialogScope, checkedEntries, selectedEntry],
+	);
 	const dialogEntry = dialogEntries[0] ?? null;
 	const assignedTagIDsForDialog = useMemo(
 		() =>
@@ -624,7 +626,7 @@ export function LibraryScreen() {
 				if (installSourceRef.current) {
 					showMutationFeedback("error", "Finish or cancel the current install first.");
 					if (link.modId && link.fileId) {
-						DiscardNexusLink(link.modId, link.fileId);
+						await DiscardNexusLink(link.modId, link.fileId);
 					}
 					return;
 				}
@@ -991,7 +993,7 @@ export function LibraryScreen() {
 			// before this mutation (a moved, deleted, or newly-installed mod can
 			// change what overlaps), so a stale report can't be trusted anymore.
 			setConflictResult(null);
-			classify(requestRoot, result.entries);
+			void classify(requestRoot, result.entries);
 			return result;
 		} catch (error) {
 			if (activeLibraryRootRef.current === requestRoot) {
@@ -2454,97 +2456,108 @@ export function LibraryScreen() {
 	// Replaces the catalog only after a scan finishes successfully. Accepts an
 	// explicit root so the initial-launch scan of a persisted mod root does not
 	// have to wait a render cycle for the modRoot input's state to catch up.
-	async function scan(overrideRoot?: string) {
-		if (isMutationLocked) return;
+	const scan = useCallback(
+		async (overrideRoot?: string) => {
+			if (isMutationLocked) return;
 
-		const root = (overrideRoot ?? modRoot).trim();
-		if (!root) {
-			dismissedCompanionIDsRef.current.clear();
-			dismissedRequiredEncryptionIDsRef.current.clear();
-			activeLibraryRootRef.current = null;
-			setLibrary(null);
+			const root = (overrideRoot ?? modRoot).trim();
+			if (!root) {
+				dismissedCompanionIDsRef.current.clear();
+				dismissedRequiredEncryptionIDsRef.current.clear();
+				activeLibraryRootRef.current = null;
+				setLibrary(null);
+				setScanError("");
+				setMutationFeedback(null);
+				setSearch("");
+				setSelectedFolder("all");
+				setSelectedEntryID(null);
+				setCheckedEntryIDs(new Set());
+				setCheckAnchorID(null);
+				setActiveDialog(null);
+				setActiveFolderDialog(null);
+				setContextMenu(null);
+				setIdentitiesByEntryID({});
+				setConflictResult(null);
+				setRequiredEncryptionOpen(false);
+				setPendingRequiredEncryptionIDs([]);
+				setRequiredEncryptionIDs([]);
+				setCompanionOfferSettled(true);
+				setLibraryState("initial");
+				return;
+			}
+
+			if (activeLibraryRootRef.current !== root) {
+				dismissedCompanionIDsRef.current.clear();
+				dismissedRequiredEncryptionIDsRef.current.clear();
+			}
+			activeLibraryRootRef.current = root;
+			setLibraryState("loading");
 			setScanError("");
 			setMutationFeedback(null);
-			setSearch("");
-			setSelectedFolder("all");
-			setSelectedEntryID(null);
-			setCheckedEntryIDs(new Set());
-			setCheckAnchorID(null);
-			setActiveDialog(null);
-			setActiveFolderDialog(null);
-			setContextMenu(null);
-			setIdentitiesByEntryID({});
-			setConflictResult(null);
-			setRequiredEncryptionOpen(false);
-			setPendingRequiredEncryptionIDs([]);
-			setRequiredEncryptionIDs([]);
-			setCompanionOfferSettled(true);
-			setLibraryState("initial");
-			return;
-		}
-
-		if (activeLibraryRootRef.current !== root) {
-			dismissedCompanionIDsRef.current.clear();
-			dismissedRequiredEncryptionIDsRef.current.clear();
-		}
-		activeLibraryRootRef.current = root;
-		setLibraryState("loading");
-		setScanError("");
-		setMutationFeedback(null);
-		try {
-			const result = await ScanLibrary(root);
-			if (activeLibraryRootRef.current !== root) return;
-
-			setLibrary(result);
-			setIdentitiesByEntryID({});
-			setConflictResult(null);
-			setRequiredEncryptionOpen(false);
-			setPendingRequiredEncryptionIDs([]);
-			setRequiredEncryptionIDs([]);
-			void classify(root, result.entries).then(() => {
+			try {
+				const result = await ScanLibrary(root);
 				if (activeLibraryRootRef.current !== root) return;
-				if (result.entries.length === 0) return;
-				void maybeOfferRequiredEncryption(root);
-			});
-			if (result.entries.length > 0) {
-				setCompanionOfferSettled(false);
-				void maybeOfferCompanionCleanup(root);
-			} else {
-				setCompanionOfferSettled(true);
-			}
-			// A fresh catalog may not contain the previous selection.
-			setSelectedFolder("all");
-			setSelectedEntryID(null);
-			const presentIDs = new Set(result.entries.map((entry) => entry.id));
-			setCheckedEntryIDs((current) => retainCheckedIDs(current, presentIDs));
-			setCheckAnchorID((current) => (current && presentIDs.has(current) ? current : null));
-			setActiveDialog(null);
-			setActiveFolderDialog(null);
-			setContextMenu(null);
-			setLibraryState(result.entries.length === 0 ? "empty" : "populated");
-			// Best-effort: a failed save here does not affect the library that
-			// just loaded successfully, so it only surfaces as its own notice.
-			SetModRoot(root).catch((error) => {
-				if (activeLibraryRootRef.current !== root) return;
-				showMutationFeedback(
-					"warning",
-					`Could not remember this library folder for next launch: ${errorMessage(error)}`,
+
+				setLibrary(result);
+				setIdentitiesByEntryID({});
+				setConflictResult(null);
+				setRequiredEncryptionOpen(false);
+				setPendingRequiredEncryptionIDs([]);
+				setRequiredEncryptionIDs([]);
+				void classify(root, result.entries).then(() => {
+					if (activeLibraryRootRef.current !== root) return;
+					if (result.entries.length === 0) return;
+					void maybeOfferRequiredEncryption(root);
+				});
+				if (result.entries.length > 0) {
+					setCompanionOfferSettled(false);
+					void maybeOfferCompanionCleanup(root);
+				} else {
+					setCompanionOfferSettled(true);
+				}
+				// A fresh catalog may not contain the previous selection.
+				setSelectedFolder("all");
+				setSelectedEntryID(null);
+				const presentIDs = new Set(result.entries.map((entry) => entry.id));
+				setCheckedEntryIDs((current) => retainCheckedIDs(current, presentIDs));
+				setCheckAnchorID((current) =>
+					current && presentIDs.has(current) ? current : null,
 				);
-			});
-		} catch (error) {
-			if (activeLibraryRootRef.current !== root) return;
+				setActiveDialog(null);
+				setActiveFolderDialog(null);
+				setContextMenu(null);
+				setLibraryState(result.entries.length === 0 ? "empty" : "populated");
+				// Best-effort: a failed save here does not affect the library that
+				// just loaded successfully, so it only surfaces as its own notice.
+				SetModRoot(root).catch((error) => {
+					if (activeLibraryRootRef.current !== root) return;
+					showMutationFeedback(
+						"warning",
+						`Could not remember this library folder for next launch: ${errorMessage(error)}`,
+					);
+				});
+			} catch (error) {
+				if (activeLibraryRootRef.current !== root) return;
 
-			setScanError(errorMessage(error));
-			setLibraryState("error");
-		}
-	}
+				setScanError(errorMessage(error));
+				setLibraryState("error");
+			}
+		},
+		[
+			isMutationLocked,
+			modRoot,
+			classify,
+			maybeOfferRequiredEncryption,
+			maybeOfferCompanionCleanup,
+			showMutationFeedback,
+		],
+	);
 
 	// Runs once, even under StrictMode's double-invoked effects: restores the
 	// persisted mod root and scans it automatically, and surfaces a corrupt or
 	// recovered metadata file as a non-crashing warning instead of losing track
 	// of it. Fires after scan() so its own feedback reset cannot clear this
 	// warning immediately after it is shown.
-	// scan is a plain function recreated every render, not a useCallback; depending on it would rerun this effect on every render instead of once on mount.
 	useEffect(() => {
 		if (hasLoadedInitialMetadataRef.current) return;
 		hasLoadedInitialMetadataRef.current = true;
@@ -2573,7 +2586,7 @@ export function LibraryScreen() {
 				);
 			}
 		})();
-	}, [showMutationFeedback, applyMetadata]);
+	}, [showMutationFeedback, applyMetadata, scan]);
 
 	// Surfaces orphaned tag records once the scan and the metadata that might
 	// reference it are both loaded. Runs on every library or metadata change
@@ -2764,7 +2777,7 @@ export function LibraryScreen() {
 					<Button
 						type="button"
 						variant="secondary"
-						onClick={() => scan()}
+						onClick={() => void scan()}
 						disabled={libraryState === "loading" || isMutationLocked}
 					>
 						Refresh
@@ -2931,7 +2944,7 @@ export function LibraryScreen() {
 						isClassifying={isClassifying}
 						conflictedEntryIDs={conflictedEntryIDs}
 						draggedEntryID={draggedItem?.type === "mod" ? draggedItem.entry.id : null}
-						onSetEnabled={setModEnabled}
+						onSetEnabled={(entry) => void setModEnabled(entry)}
 						onContextMenu={openModContextMenu}
 						onRemoveTag={removeModTagFromCard}
 						onDragStartMod={startDragMod}
@@ -3138,7 +3151,7 @@ export function LibraryScreen() {
 					libraryProvider={libraryProvider}
 					skipConfirmDelay={skipConfirmDelay}
 					onClose={() => setSettingsOpen(false)}
-					onSelectTheme={selectTheme}
+					onSelectTheme={(value) => void selectTheme(value)}
 					onSelectAccentColor={selectAccentColor}
 					onSelectLibraryProvider={(provider) => void selectLibraryProvider(provider)}
 					onToggleSkipConfirmDelay={(skip) => void selectSkipConfirmDelay(skip)}
@@ -3232,13 +3245,29 @@ export function LibraryScreen() {
 					}}
 					onCancel={() => {
 						if (pendingNexusLink.modId && pendingNexusLink.fileId) {
-							DiscardNexusLink(pendingNexusLink.modId, pendingNexusLink.fileId);
+							void DiscardNexusLink(
+								pendingNexusLink.modId,
+								pendingNexusLink.fileId,
+							).catch((error) => {
+								showMutationFeedback(
+									"error",
+									`Could not discard the Nexus link: ${errorMessage(error)}`,
+								);
+							});
 						}
 						setPendingNexusLink(null);
 					}}
 					onOpenSettings={() => {
 						if (pendingNexusLink.modId && pendingNexusLink.fileId) {
-							DiscardNexusLink(pendingNexusLink.modId, pendingNexusLink.fileId);
+							void DiscardNexusLink(
+								pendingNexusLink.modId,
+								pendingNexusLink.fileId,
+							).catch((error) => {
+								showMutationFeedback(
+									"error",
+									`Could not discard the Nexus link: ${errorMessage(error)}`,
+								);
+							});
 						}
 						setPendingNexusLink(null);
 						setSettingsOpen(true);
@@ -3260,7 +3289,7 @@ export function LibraryScreen() {
 						setLibraryState(
 							result.reconciledLibrary.entries.length === 0 ? "empty" : "populated",
 						);
-						classify(libraryRoot, result.reconciledLibrary.entries);
+						void classify(libraryRoot, result.reconciledLibrary.entries);
 						showMutationFeedback(
 							"success",
 							result.installedEntryIDs.length === 1

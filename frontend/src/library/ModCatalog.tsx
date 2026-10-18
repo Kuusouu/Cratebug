@@ -406,6 +406,7 @@ const ModCard = memo(function ModCard({
 	if (viewMode === "list")
 		return (
 			// The dedicated card button remains the keyboard control; the row click only extends selection to its empty pointer area.
+			// oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- The nested selection button provides the same action to keyboard users.
 			<article
 				aria-busy={isMutating}
 				className={[
@@ -441,6 +442,7 @@ const ModCard = memo(function ModCard({
 		);
 	return (
 		// The dedicated card button remains the keyboard control; the card click only extends selection to its empty pointer area.
+		// oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- The nested selection button provides the same action to keyboard users.
 		<article
 			aria-busy={isMutating}
 			className={[
