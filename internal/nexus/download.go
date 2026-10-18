@@ -147,8 +147,14 @@ func download(ctx context.Context, link DownloadLink, file FileInfo, httpClient 
 				return "", nil, fmt.Errorf("nexus: write downloaded file %q: %w", destPath, writeErr)
 			}
 		}
-		if readErr == io.EOF {
-			break
+		if errors.Is(readErr, io.EOF) {
+			// A response can end cleanly in the same moment the caller
+			// cancels, so the read reports EOF instead of the cancellation.
+			// A cancelled download must still fail rather than reach staging.
+			readErr = ctx.Err()
+			if readErr == nil {
+				break
+			}
 		}
 		if readErr != nil {
 			cleanup()

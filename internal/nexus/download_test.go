@@ -363,6 +363,54 @@ func TestDownloadCallerCancellation(t *testing.T) {
 	}
 }
 
+// A transport that answers every request with body and no network.
+type stubTransport struct {
+	body io.ReadCloser
+}
+
+func (s stubTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, ContentLength: -1, Body: s.body, Request: req}, nil
+}
+
+// Returns a few bytes and cancels the caller on the first read, then ends
+// cleanly: the response finished in the same moment the caller cancelled.
+type cancelThenEOFBody struct {
+	cancel context.CancelFunc
+	read   bool
+}
+
+func (b *cancelThenEOFBody) Read(p []byte) (int, error) {
+	if b.read {
+		return 0, io.EOF
+	}
+	b.read = true
+	b.cancel()
+	return copy(p, "partial"), nil
+}
+
+func (b *cancelThenEOFBody) Close() error {
+	return nil
+}
+
+func TestDownloadCancelledAsResponseEndsIsAnError(t *testing.T) {
+	// Arrange
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := &http.Client{Transport: stubTransport{body: &cancelThenEOFBody{cancel: cancel}}}
+
+	// Act
+	_, cleanup, err := Download(ctx, DownloadLink{URI: "https://files.example.test/file"}, FileInfo{FileName: "Mod.zip"}, client, nil)
+
+	// Assert
+	if err == nil {
+		cleanup()
+		t.Fatal("Download() succeeded after the caller cancelled, want an error")
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+}
+
 func TestDownloadErrorsRedactQueryParameters(t *testing.T) {
 	// Arrange
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
