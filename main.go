@@ -39,7 +39,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if launchURL != "" {
-		app.setLaunchURL(launchURL)
+		app.nexusMods.setLaunchURL(launchURL)
 	}
 
 	window := defaultWindowSize()
@@ -61,7 +61,7 @@ func main() {
 		},
 		SingleInstanceLock: &options.SingleInstanceLock{
 			UniqueId:               singleInstanceID,
-			OnSecondInstanceLaunch: app.onSecondInstanceLaunch,
+			OnSecondInstanceLaunch: app.nexusMods.onSecondInstanceLaunch,
 		},
 		Bind: []interface{}{
 			app,
@@ -72,6 +72,8 @@ func main() {
 			app.organize,
 			app.library,
 			app.settings,
+			app.installs,
+			app.nexusMods,
 		},
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,

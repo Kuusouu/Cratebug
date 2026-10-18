@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/Kuusouu/Cratebug/internal/secret"
+	"github.com/Kuusouu/Cratebug/internal/urlscheme"
 )
 
 const nexusLinkEvent = "nexus:link"
@@ -19,10 +21,25 @@ const nexusLinkEvent = "nexus:link"
 // be decrypted as this value.
 var nexusKeyEntropy = []byte("Cratebug/nexus-api-key/v1")
 
-type pendingNexusInstall struct {
-	ModID   int
-	FileID  int
-	Version string
+// Nexus account, mod page, nxm:// link, and download bindings. Downloads
+// hand off to InstallService for staging and the install preview.
+type NexusService struct {
+	*core
+	installs    *InstallService
+	secretStore secret.Store
+
+	pendingURLMu sync.Mutex
+	pendingLink  *nexus.DownloadRequest
+	linkSecrets  map[string]nexus.DownloadSecrets
+	ctxReady     bool
+
+	nexusMu             sync.Mutex
+	nexusClient         *nexus.Client
+	nexusDownloadCancel context.CancelFunc
+	nexusBaseURL        string
+
+	protocol      *urlscheme.Registrar
+	allowProtocol bool
 }
 
 // Whether an API key file exists. The key itself is never returned.
@@ -76,61 +93,84 @@ const (
 	nexusFileCategoryOptional = "OPTIONAL"
 )
 
+func newNexusService(c *core, installs *InstallService, secretStore secret.Store) *NexusService {
+	return &NexusService{
+		core:        c,
+		installs:    installs,
+		secretStore: secretStore,
+		linkSecrets: make(map[string]nexus.DownloadSecrets),
+	}
+}
+
+// Marks the frontend ready, emits a link buffered before startup, and
+// claims nxm:// when nothing else owns it. The runtime context must already
+// be set, so a link that setLaunchURL sees as ready can always be emitted.
+func (s *NexusService) startup() {
+	s.pendingURLMu.Lock()
+	s.ctxReady = true
+	pending := s.pendingLink
+	s.pendingURLMu.Unlock()
+	if pending != nil {
+		s.emitNexusLink(*pending)
+	}
+	s.ensureNexusProtocol()
+}
+
 // Anchors nexus.DownloadRequest so Wails emits its TypeScript model.
-func (a *App) NexusDownloadRequestType() nexus.DownloadRequest {
+func (s *NexusService) NexusDownloadRequestType() nexus.DownloadRequest {
 	return nexus.DownloadRequest{}
 }
 
 // Reports whether a Nexus API key file is present, without decrypting it.
-func (a *App) NexusKeyState() NexusKeyState {
-	return NexusKeyState{Configured: a.secretStore.Configured()}
+func (s *NexusService) NexusKeyState() NexusKeyState {
+	return NexusKeyState{Configured: s.secretStore.Configured()}
 }
 
 // Validates key against the Nexus API and stores it only after the account
 // is confirmed. An unverified key is rejected and not written.
-func (a *App) SetNexusAPIKey(key string) (NexusKeyState, error) {
+func (s *NexusService) SetNexusAPIKey(key string) (NexusKeyState, error) {
 	if err := nexus.CheckAPIKey(key); err != nil {
-		return a.NexusKeyState(), err
+		return s.NexusKeyState(), err
 	}
 
-	client := a.newNexusClient(key)
-	if _, err := client.Validate(a.runtime.context()); err != nil {
-		return a.NexusKeyState(), err
+	client := s.newNexusClient(key)
+	if _, err := client.Validate(s.runtime.context()); err != nil {
+		return s.NexusKeyState(), err
 	}
-	if err := a.secretStore.Set(key); err != nil {
-		return a.NexusKeyState(), err
+	if err := s.secretStore.Set(key); err != nil {
+		return s.NexusKeyState(), err
 	}
 
-	a.nexusMu.Lock()
-	a.nexusClient = client
-	a.nexusMu.Unlock()
+	s.nexusMu.Lock()
+	s.nexusClient = client
+	s.nexusMu.Unlock()
 	return NexusKeyState{Configured: true}, nil
 }
 
 // Removes the stored API key and drops the cached client.
-func (a *App) ClearNexusAPIKey() (NexusKeyState, error) {
-	if err := a.secretStore.Clear(); err != nil {
-		return a.NexusKeyState(), err
+func (s *NexusService) ClearNexusAPIKey() (NexusKeyState, error) {
+	if err := s.secretStore.Clear(); err != nil {
+		return s.NexusKeyState(), err
 	}
-	a.nexusMu.Lock()
-	a.nexusClient = nil
-	a.nexusMu.Unlock()
+	s.nexusMu.Lock()
+	s.nexusClient = nil
+	s.nexusMu.Unlock()
 	return NexusKeyState{Configured: false}, nil
 }
 
 // Loads the connected account without exposing the API key. A file that
 // exists but cannot be decrypted is configured and unverified so Settings
 // can ask the user to re-enter the key.
-func (a *App) NexusAccount() NexusAccountState {
-	if !a.secretStore.Configured() {
+func (s *NexusService) NexusAccount() NexusAccountState {
+	if !s.secretStore.Configured() {
 		return NexusAccountState{}
 	}
 
-	client, err := a.requireNexusClient()
+	client, err := s.requireNexusClient()
 	if err != nil {
 		return NexusAccountState{Configured: true}
 	}
-	user, err := client.Validate(a.runtime.context())
+	user, err := client.Validate(s.runtime.context())
 	if err != nil {
 		return NexusAccountState{Configured: true}
 	}
@@ -148,12 +188,12 @@ func (a *App) NexusAccount() NexusAccountState {
 }
 
 // Parses a Nexus Mods site URL and fetches display metadata for it.
-func (a *App) ResolveNexusModPage(rawURL string) (NexusLink, error) {
+func (s *NexusService) ResolveNexusModPage(rawURL string) (NexusLink, error) {
 	page, err := nexus.ParseModPageURL(rawURL)
 	if err != nil {
 		return NexusLink{}, err
 	}
-	return a.resolveDownloadRequest(nexus.DownloadRequest{
+	return s.resolveDownloadRequest(nexus.DownloadRequest{
 		Game:    page.Game,
 		ModID:   page.ModID,
 		FileID:  page.FileID,
@@ -163,39 +203,39 @@ func (a *App) ResolveNexusModPage(rawURL string) (NexusLink, error) {
 
 // Drains the pending nxm:// buffer once. An empty buffer returns Present
 // false rather than an error so a mount-time pull is cheap.
-func (a *App) TakePendingNexusLink() (NexusLink, error) {
-	a.pendingURLMu.Lock()
-	req := a.pendingLink
-	a.pendingLink = nil
-	a.pendingURLMu.Unlock()
+func (s *NexusService) TakePendingNexusLink() (NexusLink, error) {
+	s.pendingURLMu.Lock()
+	req := s.pendingLink
+	s.pendingLink = nil
+	s.pendingURLMu.Unlock()
 	if req == nil {
 		return NexusLink{Present: false}, nil
 	}
-	return a.resolveDownloadRequest(*req)
+	return s.resolveDownloadRequest(*req)
 }
 
 // Drops signed nxm:// parameters for one mod/file pair.
-func (a *App) DiscardNexusLink(modID, fileID int) {
-	a.dropLinkSecrets(modID, fileID)
+func (s *NexusService) DiscardNexusLink(modID, fileID int) {
+	s.dropLinkSecrets(modID, fileID)
 }
 
 // Downloads a Nexus file through the API and stages it for the existing
 // install preview. Signed parameters are used when a matching nxm://
 // link stored them; otherwise the premium/keyless path is used.
-func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFolder string) (install.PreviewResult, error) {
-	client, err := a.requireNexusClient()
+func (s *NexusService) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFolder string) (install.PreviewResult, error) {
+	client, err := s.requireNexusClient()
 	if err != nil {
 		return install.PreviewResult{}, err
 	}
 
-	ctx, cancel := context.WithCancel(a.runtime.context())
-	a.nexusMu.Lock()
-	a.nexusDownloadCancel = cancel
-	a.nexusMu.Unlock()
+	ctx, cancel := context.WithCancel(s.runtime.context())
+	s.nexusMu.Lock()
+	s.nexusDownloadCancel = cancel
+	s.nexusMu.Unlock()
 	defer func() {
-		a.nexusMu.Lock()
-		a.nexusDownloadCancel = nil
-		a.nexusMu.Unlock()
+		s.nexusMu.Lock()
+		s.nexusDownloadCancel = nil
+		s.nexusMu.Unlock()
 		cancel()
 	}()
 
@@ -204,7 +244,7 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 		return install.PreviewResult{}, err
 	}
 	if err := client.CheckAdultContent(ctx, mod); err != nil {
-		a.dropLinkSecrets(modID, fileID)
+		s.dropLinkSecrets(modID, fileID)
 		return install.PreviewResult{}, err
 	}
 
@@ -213,7 +253,7 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 		return install.PreviewResult{}, err
 	}
 
-	secrets, _ := a.peekLinkSecrets(modID, fileID)
+	secrets, _ := s.peekLinkSecrets(modID, fileID)
 	links, err := client.DownloadLinks(ctx, modID, fileID, secrets)
 	if err != nil {
 		return install.PreviewResult{}, err
@@ -221,10 +261,10 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 	if len(links) == 0 {
 		return install.PreviewResult{}, fmt.Errorf("nexus: no download links")
 	}
-	a.dropLinkSecrets(modID, fileID)
+	s.dropLinkSecrets(modID, fileID)
 
 	onProgress := func(p install.Progress) {
-		a.runtime.emit("install:progress", p)
+		s.runtime.emit("install:progress", p)
 	}
 	downloadedPath, cleanup, err := nexus.Download(ctx, links[0], file, nil, onProgress)
 	if err != nil {
@@ -232,68 +272,62 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 	}
 	defer cleanup()
 
-	preview, err := a.stageAndPreview(modRoot, []string{downloadedPath}, defaultFolder)
-	if err != nil {
-		return preview, err
-	}
-
 	version := file.ModVersion
 	if version == "" {
 		version = file.Version
 	}
-	a.setPendingNexusSource(pendingNexusInstall{
+	return s.installs.stage(modRoot, []string{downloadedPath}, defaultFolder, &nexusSource{
 		ModID:   modID,
 		FileID:  fileID,
 		Version: version,
 	})
-	return preview, nil
 }
 
 // Stops an in-progress Nexus download. Idle calls are a no-op.
-func (a *App) CancelNexusDownload() {
-	a.nexusMu.Lock()
-	defer a.nexusMu.Unlock()
-	if a.nexusDownloadCancel != nil {
-		a.nexusDownloadCancel()
-		a.nexusDownloadCancel = nil
+func (s *NexusService) CancelNexusDownload() {
+	s.nexusMu.Lock()
+	defer s.nexusMu.Unlock()
+	if s.nexusDownloadCancel != nil {
+		s.nexusDownloadCancel()
+		s.nexusDownloadCancel = nil
 	}
 }
 
 // Stores a cold-start or second-instance nxm:// URL. Signing parameters
 // stay in Go. Not exported: Wails would otherwise bind it.
-func (a *App) setLaunchURL(rawURL string) {
+func (s *NexusService) setLaunchURL(rawURL string) {
 	req, secrets, err := nexus.ParseDownloadURL(rawURL)
 	if err != nil {
 		return
 	}
 
-	a.pendingURLMu.Lock()
-	a.pendingLink = &req
-	if a.linkSecrets == nil {
-		a.linkSecrets = make(map[string]nexus.DownloadSecrets)
+	s.pendingURLMu.Lock()
+	s.pendingLink = &req
+	if s.linkSecrets == nil {
+		s.linkSecrets = make(map[string]nexus.DownloadSecrets)
 	}
 	if secrets.Key != "" || secrets.Expires != "" {
-		a.linkSecrets[linkSecretKey(req.ModID, req.FileID)] = secrets
+		s.linkSecrets[linkSecretKey(req.ModID, req.FileID)] = secrets
 	}
-	ready := a.ctxReady
-	a.pendingURLMu.Unlock()
+	ready := s.ctxReady
+	s.pendingURLMu.Unlock()
 
 	if ready {
-		a.emitNexusLink(req)
+		s.emitNexusLink(req)
 	}
 }
 
-func (a *App) emitNexusLink(req nexus.DownloadRequest) {
-	a.pendingURLMu.Lock()
-	ready := a.ctxReady
-	a.pendingURLMu.Unlock()
+func (s *NexusService) emitNexusLink(req nexus.DownloadRequest) {
+	s.pendingURLMu.Lock()
+	ready := s.ctxReady
+	s.pendingURLMu.Unlock()
 	if !ready {
 		return
 	}
-	a.runtime.emit(nexusLinkEvent, req)
+	s.runtime.emit(nexusLinkEvent, req)
 }
 
-func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, error) {
+func (s *NexusService) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, error) {
 	link := NexusLink{
 		Present: true,
 		Game:    req.Game,
@@ -302,7 +336,7 @@ func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, erro
 		Premium: req.Premium,
 	}
 
-	client, err := a.requireNexusClient()
+	client, err := s.requireNexusClient()
 	if err != nil {
 		if errors.Is(err, nexus.ErrNoAPIKey) {
 			return link, nil
@@ -310,13 +344,13 @@ func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, erro
 		return NexusLink{}, err
 	}
 
-	ctx := a.runtime.context()
+	ctx := s.runtime.context()
 	mod, err := client.Mod(ctx, req.ModID)
 	if err != nil {
 		return NexusLink{}, err
 	}
 	if err := client.CheckAdultContent(ctx, mod); err != nil {
-		a.dropLinkSecrets(req.ModID, req.FileID)
+		s.dropLinkSecrets(req.ModID, req.FileID)
 		return NexusLink{}, err
 	}
 	link.ModName = mod.Name
@@ -346,14 +380,14 @@ func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, erro
 
 	user, userErr := client.Validate(ctx)
 	if userErr == nil {
-		_, hasSecrets := a.peekLinkSecrets(req.ModID, req.FileID)
+		_, hasSecrets := s.peekLinkSecrets(req.ModID, req.FileID)
 		link.NeedsWebsite = !user.IsPremium && !hasSecrets
 	}
 	return link, nil
 }
 
-func (a *App) requireNexusClient() (*nexus.Client, error) {
-	key, err := a.secretStore.Get()
+func (s *NexusService) requireNexusClient() (*nexus.Client, error) {
+	key, err := s.secretStore.Get()
 	if errors.Is(err, secret.ErrNotConfigured) {
 		return nil, nexus.ErrNoAPIKey
 	}
@@ -364,56 +398,35 @@ func (a *App) requireNexusClient() (*nexus.Client, error) {
 		return nil, err
 	}
 
-	a.nexusMu.Lock()
-	defer a.nexusMu.Unlock()
-	if a.nexusClient != nil && a.nexusClient.APIKey == key {
-		return a.nexusClient, nil
+	s.nexusMu.Lock()
+	defer s.nexusMu.Unlock()
+	if s.nexusClient != nil && s.nexusClient.APIKey == key {
+		return s.nexusClient, nil
 	}
-	client := a.newNexusClient(key)
-	a.nexusClient = client
+	client := s.newNexusClient(key)
+	s.nexusClient = client
 	return client, nil
 }
 
-func (a *App) newNexusClient(key string) *nexus.Client {
+func (s *NexusService) newNexusClient(key string) *nexus.Client {
 	client := nexus.NewClient(key, AppVersion)
-	if a.nexusBaseURL != "" {
-		client.BaseURL = a.nexusBaseURL
+	if s.nexusBaseURL != "" {
+		client.BaseURL = s.nexusBaseURL
 	}
 	return client
 }
 
-func (a *App) peekLinkSecrets(modID, fileID int) (nexus.DownloadSecrets, bool) {
-	a.pendingURLMu.Lock()
-	defer a.pendingURLMu.Unlock()
-	secrets, ok := a.linkSecrets[linkSecretKey(modID, fileID)]
+func (s *NexusService) peekLinkSecrets(modID, fileID int) (nexus.DownloadSecrets, bool) {
+	s.pendingURLMu.Lock()
+	defer s.pendingURLMu.Unlock()
+	secrets, ok := s.linkSecrets[linkSecretKey(modID, fileID)]
 	return secrets, ok
 }
 
-func (a *App) dropLinkSecrets(modID, fileID int) {
-	a.pendingURLMu.Lock()
-	defer a.pendingURLMu.Unlock()
-	delete(a.linkSecrets, linkSecretKey(modID, fileID))
-}
-
-func (a *App) setPendingNexusSource(source pendingNexusInstall) {
-	a.nexusMu.Lock()
-	copy := source
-	a.pendingNexusSource = &copy
-	a.nexusMu.Unlock()
-}
-
-func (a *App) takePendingNexusSource() *pendingNexusInstall {
-	a.nexusMu.Lock()
-	defer a.nexusMu.Unlock()
-	source := a.pendingNexusSource
-	a.pendingNexusSource = nil
-	return source
-}
-
-func (a *App) clearPendingNexusSource() {
-	a.nexusMu.Lock()
-	a.pendingNexusSource = nil
-	a.nexusMu.Unlock()
+func (s *NexusService) dropLinkSecrets(modID, fileID int) {
+	s.pendingURLMu.Lock()
+	defer s.pendingURLMu.Unlock()
+	delete(s.linkSecrets, linkSecretKey(modID, fileID))
 }
 
 func linkSecretKey(modID, fileID int) string {

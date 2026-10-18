@@ -67,7 +67,7 @@ func TestSetNexusAPIKeyRejectsInvalidKeys(t *testing.T) {
 			app := testApp(t, false)
 
 			// Act
-			state, err := app.SetNexusAPIKey(test.key)
+			state, err := app.nexusMods.SetNexusAPIKey(test.key)
 
 			// Assert
 			if err == nil {
@@ -76,7 +76,7 @@ func TestSetNexusAPIKeyRejectsInvalidKeys(t *testing.T) {
 			if state.Configured {
 				t.Fatal("Configured = true after a rejected key, want false")
 			}
-			if app.NexusKeyState().Configured {
+			if app.nexusMods.NexusKeyState().Configured {
 				t.Fatal("NexusKeyState().Configured = true after a rejected key, want false")
 			}
 		})
@@ -87,29 +87,29 @@ func TestNexusKeyStateTracksConfiguration(t *testing.T) {
 	// Arrange
 	server := newNexusValidateServer(t, true)
 	app := testApp(t, false)
-	app.nexusBaseURL = server.URL
+	app.nexusMods.nexusBaseURL = server.URL
 
-	if app.NexusKeyState().Configured {
+	if app.nexusMods.NexusKeyState().Configured {
 		t.Fatal("NexusKeyState().Configured = true on a fresh store, want false")
 	}
 
 	// Act
-	if _, err := app.SetNexusAPIKey("valid-test-key"); err != nil {
+	if _, err := app.nexusMods.SetNexusAPIKey("valid-test-key"); err != nil {
 		t.Fatalf("SetNexusAPIKey() = %v", err)
 	}
 
 	// Assert
-	if !app.NexusKeyState().Configured {
+	if !app.nexusMods.NexusKeyState().Configured {
 		t.Fatal("NexusKeyState().Configured = false after Set, want true")
 	}
 
 	// Act
-	if _, err := app.ClearNexusAPIKey(); err != nil {
+	if _, err := app.nexusMods.ClearNexusAPIKey(); err != nil {
 		t.Fatalf("ClearNexusAPIKey() = %v", err)
 	}
 
 	// Assert
-	if app.NexusKeyState().Configured {
+	if app.nexusMods.NexusKeyState().Configured {
 		t.Fatal("NexusKeyState().Configured = true after Clear, want false")
 	}
 }
@@ -121,10 +121,10 @@ func TestSetNexusAPIKeyRejectsUnverifiedKeys(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	app := testApp(t, false)
-	app.nexusBaseURL = server.URL
+	app.nexusMods.nexusBaseURL = server.URL
 
 	// Act
-	state, err := app.SetNexusAPIKey("looks-valid-but-rejected")
+	state, err := app.nexusMods.SetNexusAPIKey("looks-valid-but-rejected")
 
 	// Assert
 	if !errors.Is(err, nexus.ErrInvalidKey) {
@@ -138,14 +138,14 @@ func TestSetNexusAPIKeyRejectsUnverifiedKeys(t *testing.T) {
 func TestTakePendingNexusLinkIsTakeOnce(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	app.setLaunchURL("nxm://marvelrivals/mods/12/files/34")
+	app.nexusMods.setLaunchURL("nxm://marvelrivals/mods/12/files/34")
 
 	// Act
-	first, err := app.TakePendingNexusLink()
+	first, err := app.nexusMods.TakePendingNexusLink()
 	if err != nil {
 		t.Fatalf("first TakePendingNexusLink() = %v", err)
 	}
-	second, err := app.TakePendingNexusLink()
+	second, err := app.nexusMods.TakePendingNexusLink()
 	if err != nil {
 		t.Fatalf("second TakePendingNexusLink() = %v", err)
 	}
@@ -173,18 +173,18 @@ func TestPendingNexusLinkConcurrentSetAndTake(t *testing.T) {
 	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
-			app.setLaunchURL("nxm://marvelrivals/mods/1/files/2?key=k&expires=1")
+			app.nexusMods.setLaunchURL("nxm://marvelrivals/mods/1/files/2?key=k&expires=1")
 		}()
 		go func() {
 			defer wg.Done()
-			_, _ = app.TakePendingNexusLink()
+			_, _ = app.nexusMods.TakePendingNexusLink()
 		}()
 	}
 	wg.Wait()
 
 	// Assert — drain whatever the last writer left; the race detector is
 	// the real check that Set/Take do not share unsynchronised state.
-	if _, err := app.TakePendingNexusLink(); err != nil {
+	if _, err := app.nexusMods.TakePendingNexusLink(); err != nil {
 		t.Fatalf("final TakePendingNexusLink() = %v", err)
 	}
 }
@@ -192,23 +192,23 @@ func TestPendingNexusLinkConcurrentSetAndTake(t *testing.T) {
 func TestNexusLinkPayloadOmitsSecrets(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	app.setLaunchURL("nxm://marvelrivals/mods/1/files/2?key=SENTINEL&expires=SENTINEL")
+	app.nexusMods.setLaunchURL("nxm://marvelrivals/mods/1/files/2?key=SENTINEL&expires=SENTINEL")
 
 	// Act
-	app.pendingURLMu.Lock()
-	if app.pendingLink == nil {
-		app.pendingURLMu.Unlock()
+	app.nexusMods.pendingURLMu.Lock()
+	if app.nexusMods.pendingLink == nil {
+		app.nexusMods.pendingURLMu.Unlock()
 		t.Fatal("pendingLink is nil after setLaunchURL")
 	}
-	pendingJSON, err := json.Marshal(app.pendingLink)
+	pendingJSON, err := json.Marshal(app.nexusMods.pendingLink)
 	if err != nil {
-		app.pendingURLMu.Unlock()
+		app.nexusMods.pendingURLMu.Unlock()
 		t.Fatal(err)
 	}
-	secrets := app.linkSecrets[linkSecretKey(1, 2)]
-	app.pendingURLMu.Unlock()
+	secrets := app.nexusMods.linkSecrets[linkSecretKey(1, 2)]
+	app.nexusMods.pendingURLMu.Unlock()
 
-	link, err := app.TakePendingNexusLink()
+	link, err := app.nexusMods.TakePendingNexusLink()
 	if err != nil {
 		t.Fatalf("TakePendingNexusLink() = %v", err)
 	}
@@ -233,13 +233,13 @@ func TestNexusAccountReportsVerifiedPremiumUser(t *testing.T) {
 	// Arrange
 	server := newNexusValidateServer(t, true)
 	app := testApp(t, false)
-	app.nexusBaseURL = server.URL
-	if _, err := app.SetNexusAPIKey("valid-test-key"); err != nil {
+	app.nexusMods.nexusBaseURL = server.URL
+	if _, err := app.nexusMods.SetNexusAPIKey("valid-test-key"); err != nil {
 		t.Fatalf("SetNexusAPIKey() = %v", err)
 	}
 
 	// Act
-	account := app.NexusAccount()
+	account := app.nexusMods.NexusAccount()
 
 	// Assert
 	if !account.Configured || !account.Verified {
@@ -258,7 +258,7 @@ func TestPrepareNexusInstallRequiresAPIKey(t *testing.T) {
 	app := testApp(t, false)
 
 	// Act
-	_, err := app.PrepareNexusInstall(t.TempDir(), 1, 2, "")
+	_, err := app.nexusMods.PrepareNexusInstall(t.TempDir(), 1, 2, "")
 
 	// Assert
 	if !errors.Is(err, nexus.ErrNoAPIKey) {
@@ -271,7 +271,7 @@ func TestNexusAccountWithoutKeyIsEmpty(t *testing.T) {
 	app := testApp(t, false)
 
 	// Act
-	account := app.NexusAccount()
+	account := app.nexusMods.NexusAccount()
 
 	// Assert
 	if account != (NexusAccountState{}) {
@@ -296,7 +296,7 @@ func TestNexusAccountUnreadableKeyIsUnverified(t *testing.T) {
 	)
 
 	// Act
-	account := app.NexusAccount()
+	account := app.nexusMods.NexusAccount()
 
 	// Assert
 	if !account.Configured {
@@ -386,7 +386,7 @@ func TestResolveNexusModPageAdultGate(t *testing.T) {
 			app := connectedNexusApp(t, api.URL)
 
 			// Act
-			link, err := app.ResolveNexusModPage(pageURL)
+			link, err := app.nexusMods.ResolveNexusModPage(pageURL)
 
 			// Assert
 			if !errors.Is(err, test.wantErr) {
@@ -457,10 +457,10 @@ func TestTakePendingNexusLinkAdultGate(t *testing.T) {
 				gqlHTTP:   test.gqlHTTP,
 			})
 			app := connectedNexusApp(t, api.URL)
-			app.setLaunchURL(nxmURL)
+			app.nexusMods.setLaunchURL(nxmURL)
 
 			// Act
-			link, err := app.TakePendingNexusLink()
+			link, err := app.nexusMods.TakePendingNexusLink()
 
 			// Assert
 			if !errors.Is(err, test.wantErr) {
@@ -474,7 +474,7 @@ func TestTakePendingNexusLinkAdultGate(t *testing.T) {
 			if api.file != test.wantFile || api.download != 0 {
 				t.Fatalf("hits file=%d download=%d, want file=%d download=0", api.file, api.download, test.wantFile)
 			}
-			_, hasSecrets := app.peekLinkSecrets(adultFixtureModID, adultFixtureFileID)
+			_, hasSecrets := app.nexusMods.peekLinkSecrets(adultFixtureModID, adultFixtureFileID)
 			if hasSecrets != test.keepKey {
 				t.Fatalf("secrets present = %v, want %v", hasSecrets, test.keepKey)
 			}
@@ -545,7 +545,7 @@ func TestPrepareNexusInstallAdultGate(t *testing.T) {
 			app := connectedNexusApp(t, api.URL)
 
 			// Act
-			_, err := app.PrepareNexusInstall(t.TempDir(), adultFixtureModID, adultFixtureFileID, "")
+			_, err := app.nexusMods.PrepareNexusInstall(t.TempDir(), adultFixtureModID, adultFixtureFileID, "")
 
 			// Assert
 			if test.wantErr != nil {
@@ -684,8 +684,8 @@ func marshalJSON(t *testing.T, value any) string {
 func connectedNexusApp(t *testing.T, baseURL string) *App {
 	t.Helper()
 	app := testApp(t, false)
-	app.nexusBaseURL = baseURL
-	if _, err := app.SetNexusAPIKey("valid-test-key"); err != nil {
+	app.nexusMods.nexusBaseURL = baseURL
+	if _, err := app.nexusMods.SetNexusAPIKey("valid-test-key"); err != nil {
 		t.Fatalf("SetNexusAPIKey() = %v", err)
 	}
 	return app

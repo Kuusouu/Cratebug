@@ -20,13 +20,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-import {
-	ApplyInstall,
-	CancelInstall,
-	CancelNexusDownload,
-	PrepareInstall,
-	PrepareNexusInstall,
-} from "../../wailsjs/go/main/App";
+import { ApplyInstall, CancelInstall, PrepareInstall } from "../../wailsjs/go/main/InstallService";
+import { CancelNexusDownload, PrepareNexusInstall } from "../../wailsjs/go/main/NexusService";
 import { type discovery, install } from "../../wailsjs/go/models";
 import {
 	categorySlug,

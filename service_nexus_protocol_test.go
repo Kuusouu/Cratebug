@@ -10,10 +10,10 @@ import (
 func TestRegisterNexusProtocolRejectedWhenNotAllowed(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
+	app.nexusMods.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
 
 	// Act
-	_, err := app.RegisterNexusProtocol(false)
+	_, err := app.nexusMods.RegisterNexusProtocol(false)
 
 	// Assert
 	if err == nil {
@@ -26,7 +26,7 @@ func TestRegisterNexusProtocolPersistsADisplacedOwner(t *testing.T) {
 	selfExe := `C:\Apps\Cratebug\Cratebug.exe`
 	otherExe := `C:\Apps\Vortex\Vortex.exe`
 	app := testApp(t, false)
-	app.allowProtocol = true
+	app.nexusMods.allowProtocol = true
 	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
 		return path == selfExe || path == otherExe
 	})
@@ -43,10 +43,10 @@ func TestRegisterNexusProtocolPersistsADisplacedOwner(t *testing.T) {
 	if err := registrar.Unregister(foreign); err != nil {
 		t.Fatal(err)
 	}
-	app.protocol = registrar
+	app.nexusMods.protocol = registrar
 
 	// Act
-	state, err := app.RegisterNexusProtocol(true)
+	state, err := app.nexusMods.RegisterNexusProtocol(true)
 
 	// Assert
 	if err != nil {
@@ -70,7 +70,7 @@ func TestPersistProtocolSnapshotPreservesDesktopFile(t *testing.T) {
 		Command:     "flatpak run --branch=stable org.vortex.App %u",
 		DesktopFile: "org.vortex.App.desktop",
 	}
-	if err := app.persistProtocolSnapshot(want); err != nil {
+	if err := app.nexusMods.persistProtocolSnapshot(want); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +86,7 @@ func TestRegisterNexusProtocolRollsBackWhenSnapshotCannotBeSaved(t *testing.T) {
 	selfExe := filepath.Join(dir, "Cratebug.exe")
 	otherExe := filepath.Join(dir, "Vortex.exe")
 	app := testApp(t, false)
-	app.allowProtocol = true
+	app.nexusMods.allowProtocol = true
 	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
 		return path == selfExe || path == otherExe
 	})
@@ -101,17 +101,17 @@ func TestRegisterNexusProtocolRollsBackWhenSnapshotCannotBeSaved(t *testing.T) {
 	if err := registrar.Unregister(foreign); err != nil {
 		t.Fatal(err)
 	}
-	app.protocol = registrar
+	app.nexusMods.protocol = registrar
 	app.meta = newMetadataGate(failingMetadataStore(t))
 
 	// Act
-	_, err := app.RegisterNexusProtocol(true)
+	_, err := app.nexusMods.RegisterNexusProtocol(true)
 
 	// Assert
 	if err == nil {
 		t.Fatal("RegisterNexusProtocol() succeeded, want an error when the displaced owner cannot be recorded")
 	}
-	state, statusErr := app.NexusProtocolStatus()
+	state, statusErr := app.nexusMods.NexusProtocolStatus()
 	if statusErr != nil {
 		t.Fatalf("NexusProtocolStatus() = %v", statusErr)
 	}
@@ -129,15 +129,15 @@ func TestUnregisterNexusProtocolRestoresThePersistedOwner(t *testing.T) {
 	selfExe := filepath.Join(dir, "Cratebug.exe")
 	otherExe := filepath.Join(dir, "Vortex.exe")
 	app := testApp(t, false)
-	app.allowProtocol = true
+	app.nexusMods.allowProtocol = true
 	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
 		return path == selfExe || path == otherExe
 	})
-	app.protocol = registrar
-	if _, err := app.RegisterNexusProtocol(false); err != nil {
+	app.nexusMods.protocol = registrar
+	if _, err := app.nexusMods.RegisterNexusProtocol(false); err != nil {
 		t.Fatal(err)
 	}
-	if err := app.persistProtocolSnapshot(urlscheme.Snapshot{
+	if err := app.nexusMods.persistProtocolSnapshot(urlscheme.Snapshot{
 		Command:     `"` + otherExe + `" "%1"`,
 		Icon:        `"` + otherExe + `"`,
 		Description: "URL:cratebug-test-app Protocol",
@@ -146,7 +146,7 @@ func TestUnregisterNexusProtocolRestoresThePersistedOwner(t *testing.T) {
 	}
 
 	// Act
-	state, err := app.UnregisterNexusProtocol()
+	state, err := app.nexusMods.UnregisterNexusProtocol()
 
 	// Assert
 	if err != nil {
@@ -169,14 +169,14 @@ func TestUnregisterNexusProtocolRestoresThePersistedOwner(t *testing.T) {
 func TestEnsureNexusProtocolRegistersWhenNothingOwnsTheScheme(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	app.allowProtocol = true
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
+	app.nexusMods.allowProtocol = true
+	app.nexusMods.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
 
 	// Act
 	app.startup(t.Context())
 
 	// Assert
-	state, err := app.NexusProtocolStatus()
+	state, err := app.nexusMods.NexusProtocolStatus()
 	if err != nil {
 		t.Fatalf("NexusProtocolStatus() = %v", err)
 	}
@@ -190,7 +190,7 @@ func TestEnsureNexusProtocolDoesNotTakeOverAnotherOwner(t *testing.T) {
 	selfExe := `C:\Apps\Cratebug\Cratebug.exe`
 	otherExe := `C:\Apps\Vortex\Vortex.exe`
 	app := testApp(t, false)
-	app.allowProtocol = true
+	app.nexusMods.allowProtocol = true
 	registrar := urlscheme.NewForTest("cratebug-test-app", selfExe, func(path string) bool {
 		return path == selfExe || path == otherExe
 	})
@@ -205,13 +205,13 @@ func TestEnsureNexusProtocolDoesNotTakeOverAnotherOwner(t *testing.T) {
 	if err := registrar.Unregister(foreign); err != nil {
 		t.Fatal(err)
 	}
-	app.protocol = registrar
+	app.nexusMods.protocol = registrar
 
 	// Act
 	app.startup(t.Context())
 
 	// Assert
-	state, err := app.NexusProtocolStatus()
+	state, err := app.nexusMods.NexusProtocolStatus()
 	if err != nil {
 		t.Fatalf("NexusProtocolStatus() = %v", err)
 	}
@@ -223,20 +223,20 @@ func TestEnsureNexusProtocolDoesNotTakeOverAnotherOwner(t *testing.T) {
 func TestEnsureNexusProtocolSkipsAfterUnregister(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	app.allowProtocol = true
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
-	if _, err := app.RegisterNexusProtocol(false); err != nil {
+	app.nexusMods.allowProtocol = true
+	app.nexusMods.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
+	if _, err := app.nexusMods.RegisterNexusProtocol(false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := app.UnregisterNexusProtocol(); err != nil {
+	if _, err := app.nexusMods.UnregisterNexusProtocol(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Act
-	app.ensureNexusProtocol()
+	app.nexusMods.ensureNexusProtocol()
 
 	// Assert
-	state, err := app.NexusProtocolStatus()
+	state, err := app.nexusMods.NexusProtocolStatus()
 	if err != nil {
 		t.Fatalf("NexusProtocolStatus() = %v", err)
 	}
@@ -248,13 +248,13 @@ func TestEnsureNexusProtocolSkipsAfterUnregister(t *testing.T) {
 func TestEnsureNexusProtocolSkipsDevBuilds(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	app.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
+	app.nexusMods.protocol = urlscheme.NewForTest("cratebug-test-app", `C:\Apps\Cratebug\Cratebug.exe`, nil)
 
 	// Act
-	app.ensureNexusProtocol()
+	app.nexusMods.ensureNexusProtocol()
 
 	// Assert
-	state, err := app.NexusProtocolStatus()
+	state, err := app.nexusMods.NexusProtocolStatus()
 	if err != nil {
 		t.Fatalf("NexusProtocolStatus() = %v", err)
 	}
@@ -268,7 +268,7 @@ func TestNexusProtocolStatusWithoutRegistrar(t *testing.T) {
 	app := testApp(t, false)
 
 	// Act
-	state, err := app.NexusProtocolStatus()
+	state, err := app.nexusMods.NexusProtocolStatus()
 
 	// Assert
 	if err != nil {

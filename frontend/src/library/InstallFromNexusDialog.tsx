@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-import { NexusAccount, ResolveNexusModPage } from "../../wailsjs/go/main/App";
+import { NexusAccount, ResolveNexusModPage } from "../../wailsjs/go/main/NexusService";
 import type { main } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import {

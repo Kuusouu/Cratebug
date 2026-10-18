@@ -19,11 +19,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 
-import {
-	DiscardNexusLink,
-	SelectFilesForInstall,
-	TakePendingNexusLink,
-} from "../../wailsjs/go/main/App";
+import { SelectFilesForInstall } from "../../wailsjs/go/main/InstallService";
 import {
 	ClassifyLibrary,
 	CreateLibrary,
@@ -35,6 +31,7 @@ import {
 	SetLibraryWatcherSuspended,
 	SetModRoot,
 } from "../../wailsjs/go/main/LibraryService";
+import { DiscardNexusLink, TakePendingNexusLink } from "../../wailsjs/go/main/NexusService";
 import {
 	CreateFolder,
 	DeleteFolder,

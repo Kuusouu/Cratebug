@@ -43,17 +43,17 @@ func TestParseLaunchArgs(t *testing.T) {
 func TestOnSecondInstanceLaunchBuffersWhenContextIsNotReady(t *testing.T) {
 	// Arrange
 	app := testApp(t, false)
-	if app.ctxReady {
+	if app.nexusMods.ctxReady {
 		t.Fatal("ctxReady = true on a fresh test app, want false")
 	}
 
 	// Act
-	app.onSecondInstanceLaunch(options.SecondInstanceData{
+	app.nexusMods.onSecondInstanceLaunch(options.SecondInstanceData{
 		Args: []string{`nxm://marvelrivals/mods/9/files/8?key=SENTINEL&expires=SENTINEL`},
 	})
 
 	// Assert
-	link, err := app.TakePendingNexusLink()
+	link, err := app.nexusMods.TakePendingNexusLink()
 	if err != nil {
 		t.Fatalf("TakePendingNexusLink() = %v", err)
 	}

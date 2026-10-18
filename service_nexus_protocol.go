@@ -28,81 +28,81 @@ type NexusProtocolState struct {
 }
 
 // Reports who owns nxm:// without writing the registry.
-func (a *App) NexusProtocolStatus() (NexusProtocolState, error) {
-	registrar, err := a.protocolRegistrar()
+func (s *NexusService) NexusProtocolStatus() (NexusProtocolState, error) {
+	registrar, err := s.protocolRegistrar()
 	if err != nil {
-		return NexusProtocolState{CanRegister: a.allowProtocol}, nil
+		return NexusProtocolState{CanRegister: s.allowProtocol}, nil
 	}
 	status, err := registrar.Status()
 	if err != nil {
-		return NexusProtocolState{CanRegister: a.allowProtocol}, err
+		return NexusProtocolState{CanRegister: s.allowProtocol}, err
 	}
-	return a.protocolState(status), nil
+	return s.protocolState(status), nil
 }
 
 // Registers Cratebug as the per-user nxm:// handler. takeOver must be
 // true when another application currently owns the scheme.
-func (a *App) RegisterNexusProtocol(takeOver bool) (NexusProtocolState, error) {
-	if !a.allowProtocol {
-		state, _ := a.NexusProtocolStatus()
+func (s *NexusService) RegisterNexusProtocol(takeOver bool) (NexusProtocolState, error) {
+	if !s.allowProtocol {
+		state, _ := s.NexusProtocolStatus()
 		return state, fmt.Errorf("dev builds do not register as the nxm:// handler")
 	}
-	registrar, err := a.protocolRegistrar()
+	registrar, err := s.protocolRegistrar()
 	if err != nil {
 		return NexusProtocolState{CanRegister: true}, err
 	}
 	displaced, err := registrar.Register(takeOver)
 	if err != nil {
-		state, _ := a.NexusProtocolStatus()
+		state, _ := s.NexusProtocolStatus()
 		return state, err
 	}
-	if err := a.persistHandlerEnabled(displaced); err != nil {
+	if err := s.persistHandlerEnabled(displaced); err != nil {
 		if !displaced.Empty() {
 			if rollbackErr := registrar.Unregister(displaced); rollbackErr != nil {
-				return a.mustProtocolStatus(), fmt.Errorf("record previous nxm handler: %w (restore previous owner: %v)", err, rollbackErr)
+				return s.mustProtocolStatus(), fmt.Errorf("record previous nxm handler: %w (restore previous owner: %v)", err, rollbackErr)
 			}
 		}
-		return a.mustProtocolStatus(), fmt.Errorf("record nxm handler: %w", err)
+		return s.mustProtocolStatus(), fmt.Errorf("record nxm handler: %w", err)
 	}
-	return a.mustProtocolStatus(), nil
+	return s.mustProtocolStatus(), nil
 }
 
 // Restores the previous nxm:// handler when we own the scheme.
-func (a *App) UnregisterNexusProtocol() (NexusProtocolState, error) {
-	registrar, err := a.protocolRegistrar()
+func (s *NexusService) UnregisterNexusProtocol() (NexusProtocolState, error) {
+	registrar, err := s.protocolRegistrar()
 	if err != nil {
-		return NexusProtocolState{CanRegister: a.allowProtocol}, err
+		return NexusProtocolState{CanRegister: s.allowProtocol}, err
 	}
 	// Persist opt-out before touching the registry so a later crash cannot
 	// silently reclaim nxm:// on the next launch.
-	if err := a.persistProtocolOptOut(true); err != nil {
-		return a.mustProtocolStatus(), err
+	if err := s.persistProtocolOptOut(true); err != nil {
+		return s.mustProtocolStatus(), err
 	}
-	previous := a.meta.read().Settings.NexusProtocol
+	previous := s.meta.read().Settings.NexusProtocol
 	if err := registrar.Unregister(urlscheme.Snapshot{
 		Command:     previous.Command,
 		Icon:        previous.Icon,
 		Description: previous.Description,
 		DesktopFile: previous.DesktopFile,
 	}); err != nil {
-		return a.mustProtocolStatus(), err
+		return s.mustProtocolStatus(), err
 	}
-	if err := a.persistProtocolSnapshot(urlscheme.Snapshot{}); err != nil {
-		return a.mustProtocolStatus(), err
+	if err := s.persistProtocolSnapshot(urlscheme.Snapshot{}); err != nil {
+		return s.mustProtocolStatus(), err
 	}
-	return a.mustProtocolStatus(), nil
+	return s.mustProtocolStatus(), nil
 }
 
 // Claims nxm:// when the setting defaults on and nothing else owns it.
 // Takeover of another app stays behind the Settings prompt.
-func (a *App) ensureNexusProtocol() {
-	if !a.allowProtocol {
+func (s *NexusService) ensureNexusProtocol() {
+	if !s.allowProtocol {
 		return
 	}
-	if a.meta.read().Settings.NexusProtocolOptOut {
+	if s.meta.read().Settings.NexusProtocolOptOut {
 		return
 	}
-	registrar, err := a.protocolRegistrar()
+	registrar, err := s.protocolRegistrar()
 	if err != nil {
 		return
 	}
@@ -112,18 +112,18 @@ func (a *App) ensureNexusProtocol() {
 	}
 	switch status.Ownership {
 	case urlscheme.OwnershipNone, urlscheme.OwnershipSelf, urlscheme.OwnershipSelfStale:
-		_, _ = a.RegisterNexusProtocol(false)
+		_, _ = s.RegisterNexusProtocol(false)
 	}
 }
 
-func (a *App) protocolRegistrar() (*urlscheme.Registrar, error) {
-	if a.protocol != nil {
-		return a.protocol, nil
+func (s *NexusService) protocolRegistrar() (*urlscheme.Registrar, error) {
+	if s.protocol != nil {
+		return s.protocol, nil
 	}
 	return nil, fmt.Errorf("protocol registrar is not available")
 }
 
-func (a *App) protocolState(status urlscheme.Status) NexusProtocolState {
+func (s *NexusService) protocolState(status urlscheme.Status) NexusProtocolState {
 	ownerName := ""
 	if status.OwnerPath != "" {
 		ownerName = filepath.Base(status.OwnerPath)
@@ -134,21 +134,21 @@ func (a *App) protocolState(status urlscheme.Status) NexusProtocolState {
 		OwnerPath:   status.OwnerPath,
 		UserChoice:  status.UserChoice,
 		MachineWide: status.MachineWide,
-		CanRegister: a.allowProtocol,
+		CanRegister: s.allowProtocol,
 		Enabled:     status.Ownership == urlscheme.OwnershipSelf,
 	}
 }
 
-func (a *App) mustProtocolStatus() NexusProtocolState {
-	state, err := a.NexusProtocolStatus()
+func (s *NexusService) mustProtocolStatus() NexusProtocolState {
+	state, err := s.NexusProtocolStatus()
 	if err != nil {
-		state.CanRegister = a.allowProtocol
+		state.CanRegister = s.allowProtocol
 	}
 	return state
 }
 
-func (a *App) persistProtocolSnapshot(snapshot urlscheme.Snapshot) error {
-	return a.meta.update(func(doc *metadata.Document) error {
+func (s *NexusService) persistProtocolSnapshot(snapshot urlscheme.Snapshot) error {
+	return s.meta.update(func(doc *metadata.Document) error {
 		return doc.SetNexusProtocol(metadata.NexusProtocolSnapshot{
 			Command:     snapshot.Command,
 			Icon:        snapshot.Icon,
@@ -158,15 +158,15 @@ func (a *App) persistProtocolSnapshot(snapshot urlscheme.Snapshot) error {
 	})
 }
 
-func (a *App) persistProtocolOptOut(optOut bool) error {
-	return a.meta.update(func(doc *metadata.Document) error {
+func (s *NexusService) persistProtocolOptOut(optOut bool) error {
+	return s.meta.update(func(doc *metadata.Document) error {
 		doc.SetNexusProtocolOptOut(optOut)
 		return nil
 	})
 }
 
-func (a *App) persistHandlerEnabled(displaced urlscheme.Snapshot) error {
-	return a.meta.update(func(doc *metadata.Document) error {
+func (s *NexusService) persistHandlerEnabled(displaced urlscheme.Snapshot) error {
+	return s.meta.update(func(doc *metadata.Document) error {
 		if !displaced.Empty() {
 			if err := doc.SetNexusProtocol(metadata.NexusProtocolSnapshot{
 				Command:     displaced.Command,
@@ -182,16 +182,16 @@ func (a *App) persistHandlerEnabled(displaced urlscheme.Snapshot) error {
 	})
 }
 
-func (a *App) onSecondInstanceLaunch(data options.SecondInstanceData) {
+func (s *NexusService) onSecondInstanceLaunch(data options.SecondInstanceData) {
 	// Store and return. Network, registry, and staging belong on the
 	// UI thread after TakePendingNexusLink, not on this callback.
 	if raw := nexus.FirstDownloadURL(data.Args); raw != "" {
-		a.setLaunchURL(raw)
+		s.setLaunchURL(raw)
 	}
-	a.pendingURLMu.Lock()
-	ready := a.ctxReady
-	a.pendingURLMu.Unlock()
-	ctx := a.runtime.current()
+	s.pendingURLMu.Lock()
+	ready := s.ctxReady
+	s.pendingURLMu.Unlock()
+	ctx := s.runtime.current()
 	if !ready || ctx == nil {
 		return
 	}

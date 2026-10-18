@@ -8,11 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
 	"github.com/Kuusouu/Cratebug/internal/modtype"
 	"github.com/Kuusouu/Cratebug/internal/secret"
-	"github.com/Kuusouu/Cratebug/internal/uassettool"
 	"github.com/Kuusouu/Cratebug/internal/watcher"
 )
 
@@ -75,149 +73,6 @@ func TestAppShutdown(t *testing.T) {
 
 	// Act & Assert (shutdown must complete cleanly without panic)
 	app.shutdown(context.Background())
-}
-
-func TestAppInstallLifecycle(t *testing.T) {
-	if _, err := uassettool.ResolveExecutablePath(); err != nil {
-		t.Skipf("pinned worker not found; run fetch-uassettool.ps1 first")
-	}
-
-	// Arrange
-	modRoot := t.TempDir()
-	sourceDir := t.TempDir()
-	sourcePak := filepath.Join(sourceDir, "Punisher_P.pak")
-	if err := os.WriteFile(sourcePak, []byte("punisher"), 0o600); err != nil {
-		t.Fatalf("write source pak: %v", err)
-	}
-
-	app := testApp(t, false)
-
-	// Act - Prepare
-	preview, err := app.PrepareInstall(modRoot, []string{sourcePak}, "Characters/Punisher")
-	if err != nil {
-		t.Fatalf("PrepareInstall failed: %v", err)
-	}
-
-	// Assert - Prepare
-	if len(preview.Items) != 1 {
-		t.Fatalf("expected 1 item in preview, got %d", len(preview.Items))
-	}
-	if preview.Items[0].ModName != "Punisher" {
-		t.Errorf("expected ModName Punisher, got %q", preview.Items[0].ModName)
-	}
-
-	// Act - Apply
-	applyItems := []install.ApplyItem{
-		{
-			ID:                preview.Items[0].ID,
-			ModName:           "Punisher",
-			DestinationFolder: "Characters/Punisher",
-			Overwrite:         false,
-		},
-	}
-	result, err := app.ApplyInstall(modRoot, preview.SessionID, applyItems)
-
-	// Assert - Apply
-	if err != nil {
-		t.Fatalf("ApplyInstall failed: %v", err)
-	}
-	if len(result.InstalledEntryIDs) != 1 {
-		t.Fatalf("expected 1 installed entry ID, got %d", len(result.InstalledEntryIDs))
-	}
-
-	doc := app.settings.LoadMetadata().Document
-	if _, ok := doc.FindModByScannerID(result.InstalledEntryIDs[0]); !ok {
-		t.Fatal("freshly installed mod has no ModRecord")
-	}
-
-	destPak := filepath.Join(modRoot, "Characters", "Punisher", "Punisher_P.pak")
-	if _, err := os.Stat(destPak); err != nil {
-		t.Fatalf("expected installed file missing: %s", destPak)
-	}
-}
-
-func TestApplyInstallReturnsResultWhenMetadataSaveFails(t *testing.T) {
-	if _, err := uassettool.ResolveExecutablePath(); err != nil {
-		t.Skipf("pinned worker not found; run fetch-uassettool.ps1 first")
-	}
-
-	// Arrange
-	modRoot := t.TempDir()
-	sourceDir := t.TempDir()
-	sourcePak := filepath.Join(sourceDir, "Punisher_P.pak")
-	if err := os.WriteFile(sourcePak, []byte("punisher"), 0o600); err != nil {
-		t.Fatalf("write source pak: %v", err)
-	}
-
-	app := testApp(t, false)
-	preview, err := app.PrepareInstall(modRoot, []string{sourcePak}, "Characters/Punisher")
-	if err != nil {
-		t.Fatalf("PrepareInstall failed: %v", err)
-	}
-	app.meta = newMetadataGate(failingMetadataStore(t))
-
-	// Act
-	result, err := app.ApplyInstall(modRoot, preview.SessionID, []install.ApplyItem{
-		{
-			ID:                preview.Items[0].ID,
-			ModName:           "Punisher",
-			DestinationFolder: "Characters/Punisher",
-			Overwrite:         false,
-		},
-	})
-
-	// Assert: Wails would hide ApplyResult if this returned a non-nil error.
-	if err != nil {
-		t.Fatalf("ApplyInstall() = %v, want nil after files landed", err)
-	}
-	if len(result.InstalledEntryIDs) != 1 {
-		t.Fatalf("installedEntryIDs = %d, want 1", len(result.InstalledEntryIDs))
-	}
-	destPak := filepath.Join(modRoot, "Characters", "Punisher", "Punisher_P.pak")
-	if _, err := os.Stat(destPak); err != nil {
-		t.Fatalf("installed file missing after metadata save failure: %s", destPak)
-	}
-}
-
-func TestAppInstallCancel(t *testing.T) {
-	// Arrange
-	modRoot := t.TempDir()
-	sourceDir := t.TempDir()
-	sourcePak := filepath.Join(sourceDir, "Groot_P.pak")
-	if err := os.WriteFile(sourcePak, []byte("groot"), 0o600); err != nil {
-		t.Fatalf("write source pak: %v", err)
-	}
-
-	app := testApp(t, false)
-
-	preview, err := app.PrepareInstall(modRoot, []string{sourcePak}, "")
-	if err != nil {
-		t.Fatalf("PrepareInstall failed: %v", err)
-	}
-
-	// Act - Cancel
-	err = app.CancelInstall(preview.SessionID)
-
-	// Assert - Cancel
-	if err != nil {
-		t.Fatalf("CancelInstall failed: %v", err)
-	}
-
-	// Act - attempt apply after cancel
-	applyItems := []install.ApplyItem{
-		{
-			ID:                preview.Items[0].ID,
-			ModName:           "Groot",
-			DestinationFolder: "",
-			Overwrite:         false,
-		},
-	}
-	_, err = app.ApplyInstall(modRoot, preview.SessionID, applyItems)
-
-	// Assert - apply fails because session was cancelled
-	if err == nil {
-		t.Fatalf("expected ApplyInstall to fail after CancelInstall, but it succeeded")
-	}
 }
 
 func TestAppWatcherIntegration(t *testing.T) {

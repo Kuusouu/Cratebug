@@ -11,7 +11,7 @@ import {
 	RegisterNexusProtocol,
 	SetNexusAPIKey,
 	UnregisterNexusProtocol,
-} from "../../wailsjs/go/main/App";
+} from "../../wailsjs/go/main/NexusService";
 import type { main } from "../../wailsjs/go/models";
 import { BrowserOpenURL } from "../../wailsjs/runtime/runtime";
 import {
