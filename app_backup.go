@@ -10,7 +10,6 @@ import (
 
 	"github.com/Kuusouu/Cratebug/internal/backup"
 	"github.com/Kuusouu/Cratebug/internal/metadata"
-	"github.com/Kuusouu/Cratebug/internal/mutation"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -38,11 +37,12 @@ func (a *App) BackupType() backup.Result {
 // watcher suppression. Emits backup:progress events. A cancelled save dialog
 // returns a cancelled result, not an error, so the frontend stays silent.
 func (a *App) BackupLibrary(modRoot string) (backup.Result, error) {
-	if a.ctx == nil {
+	runtimeCtx := a.runtime.current()
+	if runtimeCtx == nil {
 		return backup.Result{}, fmt.Errorf("application runtime context is not available")
 	}
 
-	destPath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+	destPath, err := wailsRuntime.SaveFileDialog(runtimeCtx, wailsRuntime.SaveDialogOptions{
 		Title:           "Save Library Backup",
 		DefaultFilename: "CratebugBackup-" + time.Now().Format(backupFilenameTimestampLayout) + ".zip",
 		Filters: []wailsRuntime.FileFilter{
@@ -67,11 +67,7 @@ func (a *App) BackupLibrary(modRoot string) (backup.Result, error) {
 		return backup.Result{}, fmt.Errorf("resolve metadata location: %w", err)
 	}
 
-	base := a.ctx
-	if base == nil {
-		base = context.Background()
-	}
-	ctx, stop := context.WithCancel(base)
+	ctx, stop := context.WithCancel(runtimeCtx)
 	backupMu.Lock()
 	backupCancel = stop
 	backupMu.Unlock()
@@ -82,9 +78,7 @@ func (a *App) BackupLibrary(modRoot string) (backup.Result, error) {
 	}()
 
 	result, err := backup.Create(ctx, modRoot, metadataPath, destPath, func(progress backup.Progress) {
-		if a.ctx != nil {
-			wailsRuntime.EventsEmit(a.ctx, "backup:progress", progress)
-		}
+		a.runtime.emit("backup:progress", progress)
 	})
 	if err != nil {
 		return backup.Result{}, err
@@ -117,11 +111,12 @@ func (a *App) RestoreResultType() backup.RestoreResult {
 // dismissed open dialog returns a cancelled preview, not an error, so the
 // frontend stays silent.
 func (a *App) RestorePreview() (backup.Preview, error) {
-	if a.ctx == nil {
+	runtimeCtx := a.runtime.current()
+	if runtimeCtx == nil {
 		return backup.Preview{}, fmt.Errorf("application runtime context is not available")
 	}
 
-	zipPath, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+	zipPath, err := wailsRuntime.OpenFileDialog(runtimeCtx, wailsRuntime.OpenDialogOptions{
 		Title: "Select Library Backup",
 		Filters: []wailsRuntime.FileFilter{
 			{
@@ -137,26 +132,16 @@ func (a *App) RestorePreview() (backup.Preview, error) {
 		return backup.Preview{Cancelled: true}, nil
 	}
 
-	base := a.ctx
-	if base == nil {
-		base = context.Background()
-	}
-	return a.restoreSessions.Preview(base, zipPath)
+	return a.restoreSessions.Preview(runtimeCtx, zipPath)
 }
 
 // Replaces the mod-root tree with a staged preview's contents and restores
 // its metadata. Blocked while Marvel Rivals runs. Emits restore:progress
 // events as entries move into place.
 func (a *App) RestoreApply(modRoot, token string) (backup.RestoreResult, error) {
-	return suppressWatcherResult(a, func() (backup.RestoreResult, error) {
-		if a.gameRunningChecker != nil {
-			running, err := a.gameRunningChecker.IsGameRunning()
-			if err != nil {
-				return backup.RestoreResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
-			}
-			if running {
-				return backup.RestoreResult{}, mutation.ErrGameRunning
-			}
+	return suppressWatcherResult(a.core, func() (backup.RestoreResult, error) {
+		if err := a.requireGameNotRunning(); err != nil {
+			return backup.RestoreResult{}, err
 		}
 
 		metadataPath, err := metadata.DefaultPath()
@@ -164,11 +149,7 @@ func (a *App) RestoreApply(modRoot, token string) (backup.RestoreResult, error) 
 			return backup.RestoreResult{}, fmt.Errorf("resolve metadata location: %w", err)
 		}
 
-		base := a.ctx
-		if base == nil {
-			base = context.Background()
-		}
-		ctx, stop := context.WithCancel(base)
+		ctx, stop := context.WithCancel(a.runtime.context())
 		restoreMu.Lock()
 		if restoreCancel != nil {
 			restoreMu.Unlock()
@@ -185,9 +166,7 @@ func (a *App) RestoreApply(modRoot, token string) (backup.RestoreResult, error) 
 		}()
 
 		return a.restoreSessions.Apply(ctx, modRoot, metadataPath, token, func(progress backup.Progress) {
-			if a.ctx != nil {
-				wailsRuntime.EventsEmit(a.ctx, "restore:progress", progress)
-			}
+			a.runtime.emit("restore:progress", progress)
 		})
 	})
 }

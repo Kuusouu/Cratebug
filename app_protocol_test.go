@@ -102,7 +102,7 @@ func TestRegisterNexusProtocolRollsBackWhenSnapshotCannotBeSaved(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.protocol = registrar
-	app.metadataStore = failingMetadataStore(t)
+	app.meta = newMetadataGate(failingMetadataStore(t))
 
 	// Act
 	_, err := app.RegisterNexusProtocol(true)

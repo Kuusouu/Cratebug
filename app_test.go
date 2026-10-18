@@ -708,7 +708,7 @@ func TestApplyInstallReturnsResultWhenMetadataSaveFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrepareInstall failed: %v", err)
 	}
-	app.metadataStore = failingMetadataStore(t)
+	app.meta = newMetadataGate(failingMetadataStore(t))
 
 	// Act
 	result, err := app.ApplyInstall(modRoot, preview.SessionID, []install.ApplyItem{

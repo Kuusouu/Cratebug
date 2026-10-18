@@ -54,7 +54,7 @@ func TestToolsWatcherSuspensionAllowsRestoreAndRescan(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cancelled, err := suppressWatcherResult(app, func() (backup.RestoreResult, error) {
+	cancelled, err := suppressWatcherResult(app.core, func() (backup.RestoreResult, error) {
 		return app.restoreSessions.Apply(ctx, root, "", preview.Token, func(backup.Progress) {
 			cancel()
 		})

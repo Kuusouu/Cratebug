@@ -78,7 +78,7 @@ func (a *App) UnregisterNexusProtocol() (NexusProtocolState, error) {
 	if err := a.persistProtocolOptOut(true); err != nil {
 		return a.mustProtocolStatus(), err
 	}
-	previous := a.loadMetadataDocument().Settings.NexusProtocol
+	previous := a.meta.read().Settings.NexusProtocol
 	if err := registrar.Unregister(urlscheme.Snapshot{
 		Command:     previous.Command,
 		Icon:        previous.Icon,
@@ -99,7 +99,7 @@ func (a *App) ensureNexusProtocol() {
 	if !a.allowProtocol {
 		return
 	}
-	if a.loadMetadataDocument().Settings.NexusProtocolOptOut {
+	if a.meta.read().Settings.NexusProtocolOptOut {
 		return
 	}
 	registrar, err := a.protocolRegistrar()
@@ -148,38 +148,38 @@ func (a *App) mustProtocolStatus() NexusProtocolState {
 }
 
 func (a *App) persistProtocolSnapshot(snapshot urlscheme.Snapshot) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.SetNexusProtocol(metadata.NexusProtocolSnapshot{
-		Command:     snapshot.Command,
-		Icon:        snapshot.Icon,
-		Description: snapshot.Description,
-		DesktopFile: snapshot.DesktopFile,
-	}); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.SetNexusProtocol(metadata.NexusProtocolSnapshot{
+			Command:     snapshot.Command,
+			Icon:        snapshot.Icon,
+			Description: snapshot.Description,
+			DesktopFile: snapshot.DesktopFile,
+		})
+	})
 }
 
 func (a *App) persistProtocolOptOut(optOut bool) error {
-	doc := a.loadMetadataDocument()
-	doc.SetNexusProtocolOptOut(optOut)
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		doc.SetNexusProtocolOptOut(optOut)
+		return nil
+	})
 }
 
 func (a *App) persistHandlerEnabled(displaced urlscheme.Snapshot) error {
-	doc := a.loadMetadataDocument()
-	if !displaced.Empty() {
-		if err := doc.SetNexusProtocol(metadata.NexusProtocolSnapshot{
-			Command:     displaced.Command,
-			Icon:        displaced.Icon,
-			Description: displaced.Description,
-			DesktopFile: displaced.DesktopFile,
-		}); err != nil {
-			return err
+	return a.meta.update(func(doc *metadata.Document) error {
+		if !displaced.Empty() {
+			if err := doc.SetNexusProtocol(metadata.NexusProtocolSnapshot{
+				Command:     displaced.Command,
+				Icon:        displaced.Icon,
+				Description: displaced.Description,
+				DesktopFile: displaced.DesktopFile,
+			}); err != nil {
+				return err
+			}
 		}
-	}
-	doc.SetNexusProtocolOptOut(false)
-	return a.metadataStore.Save(doc)
+		doc.SetNexusProtocolOptOut(false)
+		return nil
+	})
 }
 
 func (a *App) onSecondInstanceLaunch(data options.SecondInstanceData) {
@@ -190,8 +190,8 @@ func (a *App) onSecondInstanceLaunch(data options.SecondInstanceData) {
 	}
 	a.pendingURLMu.Lock()
 	ready := a.ctxReady
-	ctx := a.ctx
 	a.pendingURLMu.Unlock()
+	ctx := a.runtime.current()
 	if !ready || ctx == nil {
 		return
 	}

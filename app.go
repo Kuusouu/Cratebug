@@ -41,23 +41,16 @@ const (
 
 // Exposes the small backend surface used by the frontend.
 type App struct {
-	ctx                   context.Context
-	gameRunningChecker    mutation.GameRunningChecker
+	*core
+
 	mutationExecutor      mutation.Executor
-	metadataStore         metadata.Store
-	classifier            *modtype.SessionClassifier
 	installSessionManager *install.SessionManager
-	detector              *gamedetect.Registry
-	tableMu               sync.Mutex
-	characterTable        modtype.CharacterTable
-	tableLoaded           bool
 	encryptMu             sync.Mutex
 	encryptCancel         chan struct{}
 	restoreSessions       *backup.SessionManager
 	companionMu           sync.Mutex
 	companionCancel       chan struct{}
 	companionCache        *mutation.CompanionCache
-	watcher               *watcher.Watcher
 	sigbypassTool         sigbypassToolkit
 
 	secretStore secret.Store
@@ -114,46 +107,34 @@ func newApp(
 	if installSessionManager == nil {
 		installSessionManager = install.NewSessionManager()
 	}
-	app := &App{
-		gameRunningChecker:    gameRunningChecker,
+	return &App{
+		core: &core{
+			runtime:  &runtimeHost{},
+			game:     gameRunningChecker,
+			meta:     newMetadataGate(metadataStore),
+			catalog:  newCatalog(classifier, characterTable),
+			detector: gamedetect.NewDefaultRegistry(),
+		},
 		mutationExecutor:      mutation.NewExecutor(gameRunningChecker),
-		metadataStore:         metadataStore,
-		classifier:            classifier,
 		installSessionManager: installSessionManager,
-		detector:              gamedetect.NewDefaultRegistry(),
 		restoreSessions:       backup.NewSessionManager(),
 		secretStore:           secretStore,
 		linkSecrets:           make(map[string]nexus.DownloadSecrets),
 		companionCache:        mutation.NewCompanionCache(),
 		sigbypassTool:         defaultSigbypassToolkit(),
 	}
-	if characterTable != nil {
-		app.characterTable = *characterTable
-		app.tableLoaded = true
-	}
-	return app
 }
 
 func (a *App) initWatcher() {
 	w, err := watcher.New(watcher.Options{
 		Debounce: 300 * time.Millisecond,
 		OnChange: func() {
-			if a.ctx != nil {
-				wailsRuntime.EventsEmit(a.ctx, "library:fs-changed")
-			}
+			a.runtime.emit("library:fs-changed")
 		},
 	})
 	if err == nil {
 		a.watcher = w
 	}
-}
-
-func suppressWatcherResult[T any](a *App, fn func() (T, error)) (T, error) {
-	if a != nil && a.watcher != nil {
-		a.watcher.Pause()
-		defer a.watcher.Resume()
-	}
-	return fn()
 }
 
 // Releases library directory handles while the Tools menu is open.
@@ -199,8 +180,7 @@ func (a *App) ScanLibrary(modRoot string) (discovery.Library, error) {
 
 // ClassifyLibrary determines the category and hero/skin identity for discovered entries.
 func (a *App) ClassifyLibrary(modRoot string, entries []discovery.Entry) (map[string]modtype.Identity, error) {
-	table := a.getCharacterTable()
-	return a.classifier.Classify(modRoot, entries, table)
+	return a.catalog.classify(modRoot, entries)
 }
 
 // ConflictType anchors conflict.Result so Wails emits its TypeScript model into models.ts.
@@ -215,8 +195,7 @@ func (a *App) ConflictType() conflict.Result {
 // UAssetToolRivals call), then reuses each enabled mod's retained path
 // listing from that same cache rather than resolving it a second time.
 func (a *App) DetectConflicts(modRoot string, entries []discovery.Entry) (conflict.Result, error) {
-	table := a.getCharacterTable()
-	if _, err := a.classifier.Classify(modRoot, entries, table); err != nil {
+	if _, err := a.catalog.classify(modRoot, entries); err != nil {
 		return conflict.Result{}, err
 	}
 
@@ -225,27 +204,12 @@ func (a *App) DetectConflicts(modRoot string, entries []discovery.Entry) (confli
 		if entry.State != discovery.StateEnabled {
 			continue
 		}
-		if resolved, ok := a.classifier.PathsForEntry(modRoot, entry); ok {
+		if resolved, ok := a.catalog.pathsFor(modRoot, entry); ok {
 			paths[entry.ID] = resolved
 		}
 	}
 
 	return conflict.Detect(entries, paths), nil
-}
-
-func (a *App) getCharacterTable() modtype.CharacterTable {
-	a.tableMu.Lock()
-	defer a.tableMu.Unlock()
-
-	if a.tableLoaded {
-		return a.characterTable
-	}
-
-	cachePath, _ := modtype.DefaultCharacterTableCachePath()
-	table := modtype.LoadCharacterTable(context.Background(), cachePath, modtype.DefaultCharacterTableMaxAge)
-	a.characterTable = table
-	a.tableLoaded = true
-	return a.characterTable
 }
 
 // UpdateType anchors update.Release so Wails emits its TypeScript model into models.ts.
@@ -277,7 +241,7 @@ func (a *App) CheckForUpdate() (UpdateCheckResult, error) {
 		return UpdateCheckResult{}, nil
 	}
 
-	release, err := a.updateClient().Latest(a.updateContext())
+	release, err := a.updateClient().Latest(a.runtime.context())
 	if err != nil {
 		if errors.Is(err, update.ErrNoRelease) {
 			return UpdateCheckResult{}, nil
@@ -303,23 +267,27 @@ func (a *App) CheckWhatsNew() (UpdateCheckResult, error) {
 		return UpdateCheckResult{}, nil
 	}
 
-	doc := a.loadMetadataDocument()
-	if doc.Settings.LastSeenVersion == current.Tag {
+	if a.meta.read().Settings.LastSeenVersion == current.Tag {
 		return UpdateCheckResult{}, nil
 	}
 
-	release, err := a.updateClient().Tag(a.updateContext(), current.Tag)
+	markSeen := func(doc *metadata.Document) error {
+		doc.SetLastSeenVersion(current.Tag)
+		return nil
+	}
+
+	// The release lookup runs outside the metadata lock so a slow network
+	// call cannot hold up other settings writes.
+	release, err := a.updateClient().Tag(a.runtime.context(), current.Tag)
 	if err != nil {
 		// Best-effort: a missing or unreachable release for the running tag
 		// (offline, or a build that was never actually published) should not
 		// block startup or repeat every launch, so it's still marked seen.
-		doc.SetLastSeenVersion(current.Tag)
-		_ = a.metadataStore.Save(doc)
+		_ = a.meta.update(markSeen)
 		return UpdateCheckResult{}, nil
 	}
 
-	doc.SetLastSeenVersion(current.Tag)
-	if saveErr := a.metadataStore.Save(doc); saveErr != nil {
+	if saveErr := a.meta.update(markSeen); saveErr != nil {
 		return UpdateCheckResult{}, fmt.Errorf("record the shown changelog version: %w", saveErr)
 	}
 	return UpdateCheckResult{Available: true, Release: release}, nil
@@ -331,14 +299,12 @@ func (a *App) CheckWhatsNew() (UpdateCheckResult, error) {
 func (a *App) DownloadUpdate(release update.Release) (string, error) {
 	destDir := filepath.Join(os.TempDir(), updateDownloadDirName)
 	onProgress := func(downloaded, total int64) {
-		if a.ctx != nil {
-			wailsRuntime.EventsEmit(a.ctx, "update:downloadProgress", UpdateDownloadProgress{
-				Downloaded: downloaded,
-				Total:      total,
-			})
-		}
+		a.runtime.emit("update:downloadProgress", UpdateDownloadProgress{
+			Downloaded: downloaded,
+			Total:      total,
+		})
 	}
-	return a.updateClient().Download(a.updateContext(), release.Asset, destDir, onProgress)
+	return a.updateClient().Download(a.runtime.context(), release.Asset, destDir, onProgress)
 }
 
 // ApplyUpdate launches the detached helper that installs the update
@@ -370,8 +336,8 @@ func (a *App) ApplyUpdate(installerPath string) error {
 	if err := update.ApplyUpdate(installerPath); err != nil {
 		return err
 	}
-	if a.ctx != nil {
-		wailsRuntime.Quit(a.ctx)
+	if ctx := a.runtime.current(); ctx != nil {
+		wailsRuntime.Quit(ctx)
 	}
 	return nil
 }
@@ -387,17 +353,10 @@ func (a *App) updateClient() *update.Client {
 	return &update.Client{Owner: updateRepoOwner, Repo: updateRepoName}
 }
 
-func (a *App) updateContext() context.Context {
-	if a.ctx != nil {
-		return a.ctx
-	}
-	return context.Background()
-}
-
 // Changes one current scanner entry to the requested enabled state.
 // The entry ID is scanner-issued, never an arbitrary filesystem path.
 func (a *App) SetModEnabled(modRoot, entryID string, enabled bool) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		operation := mutation.NewSetEnabledOperation(modRoot, entryID, enabled)
 		return a.mutationExecutor.Execute(operation)
 	})
@@ -412,15 +371,9 @@ func (a *App) EncryptionType() mutation.EncryptionBatchResult {
 // The Marvel Rivals AES key stays in Go. The frontend receives only the
 // encrypted flag after the next classify. Emits encrypt:progress events.
 func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) (mutation.EncryptionBatchResult, error) {
-	return suppressWatcherResult(a, func() (mutation.EncryptionBatchResult, error) {
-		if a.gameRunningChecker != nil {
-			running, err := a.gameRunningChecker.IsGameRunning()
-			if err != nil {
-				return mutation.EncryptionBatchResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
-			}
-			if running {
-				return mutation.EncryptionBatchResult{}, mutation.ErrGameRunning
-			}
+	return suppressWatcherResult(a.core, func() (mutation.EncryptionBatchResult, error) {
+		if err := a.requireGameNotRunning(); err != nil {
+			return mutation.EncryptionBatchResult{}, err
 		}
 
 		a.encryptMu.Lock()
@@ -442,9 +395,7 @@ func (a *App) SetModEncryption(modRoot string, entryIDs []string, encrypt bool) 
 		}
 
 		return mutation.SetModEncryptionPooled(modRoot, entryIDs, encrypt, launch, func(progress mutation.EncryptionProgress) {
-			if a.ctx != nil {
-				wailsRuntime.EventsEmit(a.ctx, "encrypt:progress", progress)
-			}
+			a.runtime.emit("encrypt:progress", progress)
 		}, cancel)
 	})
 }
@@ -470,14 +421,13 @@ func (a *App) FindModsNeedingEncryption(modRoot string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("scan mod library before required-encryption check: %w", err)
 	}
-	table := a.getCharacterTable()
-	identities, err := a.classifier.Classify(modRoot, library.Entries, table)
+	identities, err := a.catalog.classify(modRoot, library.Entries)
 	if err != nil {
 		return nil, fmt.Errorf("classify library before required-encryption check: %w", err)
 	}
 	paths := make(map[string][]string, len(library.Entries))
 	for _, entry := range library.Entries {
-		if listing, ok := a.classifier.PathsForEntry(modRoot, entry); ok {
+		if listing, ok := a.catalog.pathsFor(modRoot, entry); ok {
 			paths[entry.ID] = listing
 		}
 	}
@@ -520,15 +470,9 @@ func (a *App) FindUnsupportedCompanionPaks(modRoot string) ([]string, error) {
 
 // Rewrites each dirty companion PAK one at a time. Emits companion:progress.
 func (a *App) StripCompanionPaks(modRoot string, entryIDs []string) (mutation.CompanionCleanupResult, error) {
-	return suppressWatcherResult(a, func() (mutation.CompanionCleanupResult, error) {
-		if a.gameRunningChecker != nil {
-			running, err := a.gameRunningChecker.IsGameRunning()
-			if err != nil {
-				return mutation.CompanionCleanupResult{}, fmt.Errorf("check whether Marvel Rivals is running: %w", err)
-			}
-			if running {
-				return mutation.CompanionCleanupResult{}, mutation.ErrGameRunning
-			}
+	return suppressWatcherResult(a.core, func() (mutation.CompanionCleanupResult, error) {
+		if err := a.requireGameNotRunning(); err != nil {
+			return mutation.CompanionCleanupResult{}, err
 		}
 
 		worker, err := uassettool.NewWriteWorker(nil)
@@ -550,9 +494,7 @@ func (a *App) StripCompanionPaks(modRoot string, entryIDs []string) (mutation.Co
 		}()
 
 		return mutation.StripCompanionPaks(modRoot, entryIDs, worker, func(progress mutation.CompanionCleanupProgress) {
-			if a.ctx != nil {
-				wailsRuntime.EventsEmit(a.ctx, "companion:progress", progress)
-			}
+			a.runtime.emit("companion:progress", progress)
 		}, cancel)
 	})
 }
@@ -587,7 +529,7 @@ func (a *App) MoveMod(modRoot, entryID, destinationFolder string) (mutation.Resu
 
 // Creates one folder beneath the root or an existing scanner-known folder.
 func (a *App) CreateFolder(modRoot, parentFolder, name string) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		operation := mutation.NewCreateFolderOperation(modRoot, parentFolder, name)
 		return a.mutationExecutor.Execute(operation)
 	})
@@ -595,7 +537,7 @@ func (a *App) CreateFolder(modRoot, parentFolder, name string) (mutation.Result,
 
 // Renames one scanner-known physical folder.
 func (a *App) RenameFolder(modRoot, folder, name string) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		operation := mutation.NewRenameFolderOperation(modRoot, folder, name)
 		return a.mutationExecutor.Execute(operation)
 	})
@@ -603,7 +545,7 @@ func (a *App) RenameFolder(modRoot, folder, name string) (mutation.Result, error
 
 // Moves one scanner-known physical folder beneath the root or another scanner-known folder.
 func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		operation := mutation.NewMoveFolderOperation(modRoot, folder, destinationParent)
 		return a.mutationExecutor.Execute(operation)
 	})
@@ -611,7 +553,7 @@ func (a *App) MoveFolder(modRoot, folder, destinationParent string) (mutation.Re
 
 // Deletes one current scanner entry through the Windows Recycle Bin.
 func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		operation := mutation.NewDeleteModOperation(modRoot, entryID, confirmed)
 		return a.mutationExecutor.Execute(operation)
 	})
@@ -619,7 +561,7 @@ func (a *App) DeleteMod(modRoot, entryID string, confirmed bool) (mutation.Resul
 
 // Deletes one scanner-known physical folder and its contents through the Windows Recycle Bin.
 func (a *App) DeleteFolder(modRoot, folder string, confirmed bool) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		operation := mutation.NewDeleteFolderOperation(modRoot, folder, confirmed)
 		return a.mutationExecutor.Execute(operation)
 	})
@@ -639,7 +581,7 @@ func (a *App) IsFolderEmpty(modRoot, folder string) (bool, error) {
 // per-mod ID pair, so those operations call the executor directly instead of
 // this helper. These operations do not reconcile metadata for mods in the folder.
 func (a *App) executeAndReconcile(operation mutation.Operation) (mutation.Result, error) {
-	return suppressWatcherResult(a, func() (mutation.Result, error) {
+	return suppressWatcherResult(a.core, func() (mutation.Result, error) {
 		result, err := a.mutationExecutor.Execute(operation)
 		if err != nil {
 			return result, err
@@ -648,11 +590,13 @@ func (a *App) executeAndReconcile(operation mutation.Operation) (mutation.Result
 			return result, nil
 		}
 
-		doc := a.loadMetadataDocument()
-		if !doc.ReconcileMod(result.PreviousID, result.ID) {
-			return result, nil
-		}
-		if err := a.metadataStore.Save(doc); err != nil {
+		err = a.meta.update(func(doc *metadata.Document) error {
+			if !doc.ReconcileMod(result.PreviousID, result.ID) {
+				return errMetadataUnchanged
+			}
+			return nil
+		})
+		if err != nil {
 			return result, fmt.Errorf("reconcile mod metadata: %w", err)
 		}
 		return result, nil
@@ -670,7 +614,7 @@ type MetadataState struct {
 
 // Returns the persisted settings, tag catalog, and per-mod tag assignments.
 func (a *App) LoadMetadata() MetadataState {
-	doc, recovery := a.metadataStore.Load()
+	doc, recovery := a.meta.load()
 	state := MetadataState{Document: doc, Recovered: recovery.Recovered}
 	if recovery.Cause != nil {
 		state.RecoveryReason = recovery.Cause.Error()
@@ -678,22 +622,16 @@ func (a *App) LoadMetadata() MetadataState {
 	return state
 }
 
-// Loads the persisted document for an operation that only needs to read or
-// mutate it, discarding recovery details that LoadMetadata reports instead.
-func (a *App) loadMetadataDocument() metadata.Document {
-	doc, _ := a.metadataStore.Load()
-	return doc
-}
-
 // Persists the selected mod root so the library does not need to be
 // reselected the next time Cratebug launches.
 func (a *App) SetModRoot(modRoot string) error {
-	doc := a.loadMetadataDocument()
-	doc.Settings.ModRoot = modRoot
 	if a.watcher != nil {
 		_ = a.watcher.SetRoot(modRoot)
 	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		doc.Settings.ModRoot = modRoot
+		return nil
+	})
 }
 
 // DetectLibrary locates the named store provider's Marvel Rivals
@@ -713,56 +651,50 @@ func (a *App) CreateLibrary(provider string) (string, error) {
 
 // Persists which store provider library auto-detection targets.
 func (a *App) SetLibraryProvider(provider string) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.SetLibraryProvider(provider); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.SetLibraryProvider(provider)
+	})
 }
 
 // Persists the appearance theme (system, light, or dark).
 func (a *App) SetTheme(theme string) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.SetTheme(theme); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.SetTheme(theme)
+	})
 }
 
 // Persists the view mode Cratebug opens to on the next launch.
 func (a *App) SetDefaultViewMode(mode string) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.SetDefaultViewMode(mode); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.SetDefaultViewMode(mode)
+	})
 }
 
 // Persists the accent choice: a preset id, a custom hex color, or empty for
 // the default preset.
 func (a *App) SetAccentColor(color string) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.SetAccentColor(color); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.SetAccentColor(color)
+	})
 }
 
 // Persists whether destructive confirmation dialogs skip their countdown.
 func (a *App) SetSkipDestructiveDelay(skip bool) error {
-	doc := a.loadMetadataDocument()
-	doc.SetSkipDestructiveDelay(skip)
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		doc.SetSkipDestructiveDelay(skip)
+		return nil
+	})
 }
 
 // Adds a new tag to the persisted catalog.
 func (a *App) CreateTag(name string) (metadata.Tag, error) {
-	doc := a.loadMetadataDocument()
-	tag, err := doc.CreateTag(name)
+	var tag metadata.Tag
+	err := a.meta.update(func(doc *metadata.Document) error {
+		created, err := doc.CreateTag(name)
+		tag = created
+		return err
+	})
 	if err != nil {
-		return metadata.Tag{}, err
-	}
-	if err := a.metadataStore.Save(doc); err != nil {
 		return metadata.Tag{}, err
 	}
 	return tag, nil
@@ -770,54 +702,48 @@ func (a *App) CreateTag(name string) (metadata.Tag, error) {
 
 // Renames an existing tag in the persisted catalog.
 func (a *App) RenameTag(id, name string) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.RenameTag(id, name); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.RenameTag(id, name)
+	})
 }
 
 // Removes a tag from the catalog and every mod it was assigned to.
 func (a *App) DeleteTag(id string) error {
-	doc := a.loadMetadataDocument()
-	if err := doc.DeleteTag(id); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		return doc.DeleteTag(id)
+	})
 }
 
 // Assigns an existing catalog tag to one current scanner entry, establishing
 // the entry's persistent identity first if this is the first metadata
 // recorded for it.
 func (a *App) AssignModTag(entryID, tagID string) error {
-	doc := a.loadMetadataDocument()
-	modID, err := doc.EnsureMod(entryID)
-	if err != nil {
-		return err
-	}
-	if err := doc.AssignTag(modID, tagID); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		modID, err := doc.EnsureMod(entryID)
+		if err != nil {
+			return err
+		}
+		return doc.AssignTag(modID, tagID)
+	})
 }
 
 // Removes a tag assignment from one current scanner entry.
 func (a *App) UnassignModTag(entryID, tagID string) error {
-	doc := a.loadMetadataDocument()
-	modID, err := doc.EnsureMod(entryID)
-	if err != nil {
-		return err
-	}
-	if err := doc.UnassignTag(modID, tagID); err != nil {
-		return err
-	}
-	return a.metadataStore.Save(doc)
+	return a.meta.update(func(doc *metadata.Document) error {
+		modID, err := doc.EnsureMod(entryID)
+		if err != nil {
+			return err
+		}
+		return doc.UnassignTag(modID, tagID)
+	})
 }
 
 // startup is called by Wails when the application is launched, saving the runtime context.
 func (a *App) startup(ctx context.Context) {
+	// The context is in place before ctxReady flips, so a link that
+	// setLaunchURL sees as ready can always be emitted.
+	a.runtime.set(ctx)
 	a.pendingURLMu.Lock()
-	a.ctx = ctx
 	a.ctxReady = true
 	pending := a.pendingLink
 	a.pendingURLMu.Unlock()
@@ -825,19 +751,20 @@ func (a *App) startup(ctx context.Context) {
 		a.emitNexusLink(*pending)
 	}
 	a.ensureNexusProtocol()
-	doc := a.loadMetadataDocument()
-	if doc.Settings.ModRoot != "" && a.watcher != nil {
-		_ = a.watcher.SetRoot(doc.Settings.ModRoot)
+	modRoot := a.meta.read().Settings.ModRoot
+	if modRoot != "" && a.watcher != nil {
+		_ = a.watcher.SetRoot(modRoot)
 	}
 }
 
 // SelectFilesForInstall opens a native multiple-file dialog to select mod archives or direct bundles.
 func (a *App) SelectFilesForInstall() ([]string, error) {
-	if a.ctx == nil {
+	ctx := a.runtime.current()
+	if ctx == nil {
 		return nil, fmt.Errorf("application runtime context is not available")
 	}
 
-	paths, err := wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+	paths, err := wailsRuntime.OpenMultipleFilesDialog(ctx, wailsRuntime.OpenDialogOptions{
 		Title: "Select Mods to Install",
 		Filters: []wailsRuntime.FileFilter{
 			{
@@ -878,17 +805,10 @@ func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder 
 	}
 
 	onProgress := func(p install.Progress) {
-		if a.ctx != nil {
-			wailsRuntime.EventsEmit(a.ctx, "install:progress", p)
-		}
+		a.runtime.emit("install:progress", p)
 	}
 
-	ctx := a.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	if err := session.StageFiles(ctx, onProgress); err != nil {
+	if err := session.StageFiles(a.runtime.context(), onProgress); err != nil {
 		_ = a.installSessionManager.RemoveSession(session.ID)
 		return install.PreviewResult{}, err
 	}
@@ -906,7 +826,7 @@ func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder 
 	}
 	// Classification only enriches the preview with hero/category labels; a failure here
 	// must not block installation, so the error is intentionally not propagated.
-	identities, _ := a.classifier.Classify(session.Dir, entries, a.getCharacterTable())
+	identities, _ := a.catalog.classify(session.Dir, entries)
 
 	if worker, err := uassettool.NewWriteWorker(nil); err == nil {
 		markStagedCompanionPaks(session, worker)
@@ -924,7 +844,7 @@ func (a *App) stageAndPreview(modRoot string, filePaths []string, defaultFolder 
 
 // ApplyInstall applies the approved installation items and cleans up the staging session.
 func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.ApplyItem) (install.ApplyResult, error) {
-	return suppressWatcherResult(a, func() (install.ApplyResult, error) {
+	return suppressWatcherResult(a.core, func() (install.ApplyResult, error) {
 		session := a.installSessionManager.GetSession(sessionID)
 		if session == nil {
 			return install.ApplyResult{}, fmt.Errorf("install staging session %q not found or expired", sessionID)
@@ -933,10 +853,7 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 			_ = a.installSessionManager.RemoveSession(sessionID)
 		}()
 
-		ctx := a.ctx
-		if ctx == nil {
-			ctx = context.Background()
-		}
+		ctx := a.runtime.context()
 
 		worker, err := uassettool.NewWriteWorker(nil)
 		if err != nil {
@@ -946,9 +863,7 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 			_ = worker.Close() // Worker.Close waits for shutdown and always returns nil.
 		}()
 		onProgress := func(p install.Progress) {
-			if a.ctx != nil {
-				wailsRuntime.EventsEmit(a.ctx, "install:progress", p)
-			}
+			a.runtime.emit("install:progress", p)
 		}
 		if err := install.EncryptStagedMods(ctx, session, items, worker, onProgress); err != nil {
 			return install.ApplyResult{}, err
@@ -958,7 +873,7 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 		}
 
 		onProgress(install.Progress{Phase: "applying", Message: "Install mods..."})
-		result, err := install.Apply(ctx, modRoot, session, items, a.gameRunningChecker)
+		result, err := install.Apply(ctx, modRoot, session, items, a.game)
 		if err != nil {
 			return result, err
 		}
@@ -974,20 +889,22 @@ func (a *App) ApplyInstall(modRoot string, sessionID string, items []install.App
 }
 
 func (a *App) recordInstalledModMetadata(result install.ApplyResult) error {
-	doc := a.loadMetadataDocument()
 	source := a.takePendingNexusSource()
-	for _, entryID := range result.InstalledEntryIDs {
-		modID, err := doc.EnsureMod(entryID)
-		if err != nil {
-			return fmt.Errorf("ensure installed mod metadata: %w", err)
-		}
-		if source != nil {
-			if err := doc.SetModNexusSource(modID, source.ModID, source.FileID, source.Version); err != nil {
-				return fmt.Errorf("record nexus source: %w", err)
+	err := a.meta.update(func(doc *metadata.Document) error {
+		for _, entryID := range result.InstalledEntryIDs {
+			modID, err := doc.EnsureMod(entryID)
+			if err != nil {
+				return fmt.Errorf("ensure installed mod metadata: %w", err)
+			}
+			if source != nil {
+				if err := doc.SetModNexusSource(modID, source.ModID, source.FileID, source.Version); err != nil {
+					return fmt.Errorf("record nexus source: %w", err)
+				}
 			}
 		}
-	}
-	if err := a.metadataStore.Save(doc); err != nil {
+		return nil
+	})
+	if err != nil {
 		return fmt.Errorf("save installed mod metadata: %w", err)
 	}
 	return nil
@@ -1006,8 +923,8 @@ func (a *App) shutdown(_ context.Context) {
 		_ = a.watcher.Close()
 	}
 	a.CancelNexusDownload()
-	if a.classifier != nil {
-		_ = a.classifier.Close()
+	if a.catalog != nil {
+		_ = a.catalog.close()
 	}
 	if a.installSessionManager != nil {
 		_ = a.installSessionManager.CleanupAll()

@@ -11,7 +11,6 @@ import (
 	"github.com/Kuusouu/Cratebug/internal/install"
 	"github.com/Kuusouu/Cratebug/internal/nexus"
 	"github.com/Kuusouu/Cratebug/internal/secret"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const nexusLinkEvent = "nexus:link"
@@ -95,7 +94,7 @@ func (a *App) SetNexusAPIKey(key string) (NexusKeyState, error) {
 	}
 
 	client := a.newNexusClient(key)
-	if _, err := client.Validate(a.requestContext()); err != nil {
+	if _, err := client.Validate(a.runtime.context()); err != nil {
 		return a.NexusKeyState(), err
 	}
 	if err := a.secretStore.Set(key); err != nil {
@@ -131,7 +130,7 @@ func (a *App) NexusAccount() NexusAccountState {
 	if err != nil {
 		return NexusAccountState{Configured: true}
 	}
-	user, err := client.Validate(a.requestContext())
+	user, err := client.Validate(a.runtime.context())
 	if err != nil {
 		return NexusAccountState{Configured: true}
 	}
@@ -189,7 +188,7 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 		return install.PreviewResult{}, err
 	}
 
-	ctx, cancel := context.WithCancel(a.requestContext())
+	ctx, cancel := context.WithCancel(a.runtime.context())
 	a.nexusMu.Lock()
 	a.nexusDownloadCancel = cancel
 	a.nexusMu.Unlock()
@@ -225,7 +224,7 @@ func (a *App) PrepareNexusInstall(modRoot string, modID, fileID int, defaultFold
 	a.dropLinkSecrets(modID, fileID)
 
 	onProgress := func(p install.Progress) {
-		a.emitInstallProgress(p)
+		a.runtime.emit("install:progress", p)
 	}
 	downloadedPath, cleanup, err := nexus.Download(ctx, links[0], file, nil, onProgress)
 	if err != nil {
@@ -287,12 +286,11 @@ func (a *App) setLaunchURL(rawURL string) {
 func (a *App) emitNexusLink(req nexus.DownloadRequest) {
 	a.pendingURLMu.Lock()
 	ready := a.ctxReady
-	ctx := a.ctx
 	a.pendingURLMu.Unlock()
-	if !ready || ctx == nil {
+	if !ready {
 		return
 	}
-	wailsRuntime.EventsEmit(ctx, nexusLinkEvent, req)
+	a.runtime.emit(nexusLinkEvent, req)
 }
 
 func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, error) {
@@ -312,7 +310,7 @@ func (a *App) resolveDownloadRequest(req nexus.DownloadRequest) (NexusLink, erro
 		return NexusLink{}, err
 	}
 
-	ctx := a.requestContext()
+	ctx := a.runtime.context()
 	mod, err := client.Mod(ctx, req.ModID)
 	if err != nil {
 		return NexusLink{}, err
@@ -382,25 +380,6 @@ func (a *App) newNexusClient(key string) *nexus.Client {
 		client.BaseURL = a.nexusBaseURL
 	}
 	return client
-}
-
-func (a *App) requestContext() context.Context {
-	a.pendingURLMu.Lock()
-	ctx := a.ctx
-	a.pendingURLMu.Unlock()
-	if ctx == nil {
-		return context.Background()
-	}
-	return ctx
-}
-
-func (a *App) emitInstallProgress(p install.Progress) {
-	a.pendingURLMu.Lock()
-	ctx := a.ctx
-	a.pendingURLMu.Unlock()
-	if ctx != nil {
-		wailsRuntime.EventsEmit(ctx, "install:progress", p)
-	}
 }
 
 func (a *App) peekLinkSecrets(modID, fileID int) (nexus.DownloadSecrets, bool) {

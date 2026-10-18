@@ -1,10 +1,7 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/Kuusouu/Cratebug/internal/gamedetect"
-	"github.com/Kuusouu/Cratebug/internal/mutation"
 	"github.com/Kuusouu/Cratebug/internal/sigbypass"
 )
 
@@ -100,24 +97,10 @@ func (a *App) RemoveSignatureBypass() (sigbypass.Status, error) {
 	return a.SignatureBypassStatus()
 }
 
-func (a *App) requireGameNotRunning() error {
-	if a.gameRunningChecker == nil {
-		return nil
-	}
-	running, err := a.gameRunningChecker.IsGameRunning()
-	if err != nil {
-		return fmt.Errorf("check whether Marvel Rivals is running: %w", err)
-	}
-	if running {
-		return mutation.ErrGameRunning
-	}
-	return nil
-}
-
 // Detects the game installation through the provider the frontend library
 // detection uses, defaulting to Steam when no provider was chosen yet.
 func (a *App) signatureBypassDetection() (gamedetect.Detection, error) {
-	provider := a.loadMetadataDocument().Settings.LibraryProvider
+	provider := a.meta.read().Settings.LibraryProvider
 	if provider == "" {
 		provider = gamedetect.ProviderSteam
 	}

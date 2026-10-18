@@ -41,11 +41,12 @@ type core struct {
 ```
 
 **Metadata race (a real bug).** Every metadata write is an unguarded load,
-modify, save. If Wails runs binding calls concurrently, two overlapping writes
-lose one of them: for example `AssignModTag` overlapping `SetTheme`, or
-`ApplyInstall`'s `recordInstalledModMetadata` overlapping a tag edit. Confirm
-how Wails v2 dispatches binding calls, then route every write through
-`metadataGate.update`.
+modify, save. Wails v2.13.0 runs each binding call in its own goroutine on
+Windows (`go f.dispatchMessage(message)` in
+`internal/frontend/desktop/windows/frontend.go`) and in the dev server, so two
+overlapping writes lose one of them: for example `AssignModTag` overlapping
+`SetTheme`, or `ApplyInstall`'s `recordInstalledModMetadata` overlapping a tag
+edit. Every write goes through `metadataGate.update`.
 
 ## Services
 
@@ -119,11 +120,23 @@ nxm link, claims nxm, points the watcher at the saved root), and `shutdown`.
 
 ## Order
 
+One step at a time, one commit each, in this checkout. Every extraction edits
+the same places (`main.go`'s `Bind` list, the `App` struct and `newApp`,
+`app_test.go`, the regenerated `frontend/wailsjs` output, and the binding
+imports in `LibraryScreen.tsx`), and checking each step needs `wails dev` on
+port 34115, so parallel worktrees would mostly produce merge conflicts.
+
 1. Core, alone. `App` stays the only bound struct. Includes the `metadataGate` race fix.
-2. In parallel: UpdateService, SignatureBypassService, BackupService.
-3. InstallService, then NexusService.
-4. In parallel: PakRepairService, OrganizeService, LibraryService, SettingsService.
+2. UpdateService, SignatureBypassService, BackupService.
+3. PakRepairService, OrganizeService, LibraryService, SettingsService.
+4. InstallService and NexusService together, since that is where the coupling is untangled.
 5. Cleanup: `*Type()` anchors, `App` reduced to the composition root, delete this file.
+
+Steps 2 and 3 are mostly moving code. Each goes to a Sonnet subagent at high
+effort, working in the foreground with that service's section of this file as
+its brief. Never run two at once. The main session reviews the diff, runs
+`./check.ps1`, checks the feature in the running app, and commits. Steps 1, 4,
+and 5 involve design work and stay in the main session.
 
 ## Rules for each extraction
 
