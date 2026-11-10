@@ -11,6 +11,24 @@ Each version's section below is what the release workflow copies into that
 version's GitHub release notes, so write entries for what a user would
 actually notice, not internal refactors.
 
+## [2026.11.09]
+
+### Added
+
+- **Game patch updater.** When a Marvel Rivals patch changes how the game reads mod assets, Cratebug can update affected IoStore mods while preserving their asset values.
+- Check one mod from its right-click menu, selected mods from the batch menu, or the whole library from the toolbar wand. The check reads package headers first to skip unnecessary work and leaves your files untouched.
+- Choose which mods to update. Cratebug verifies each rebuilt mod and saves the original files before replacing it. Open **Originals** to find the saved files. Mods that need changes from their authors are flagged and left alone.
+
+### Changed
+
+- Menus, dialogs, and tooltips use more consistent controls across the app.
+
+### Fixed
+
+- Cancelling a Nexus download just as it finishes now stops it from being staged for installation.
+- Fixed a Windows file watcher issue that could interrupt writes when switching libraries or pausing live updates.
+- On Linux, moving a file to Trash reports a failure if the copy cannot finish writing.
+
 ## [2026.10.12]
 
 ### Added
