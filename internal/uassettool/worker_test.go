@@ -21,9 +21,9 @@ const testSourceRevision = "test-revision-abc123"
 func installFakeWorker(t *testing.T, mode string) {
 	t.Helper()
 
-	build := func(args []string) *exec.Cmd {
+	build := func(ctx context.Context, args []string) *exec.Cmd {
 		helperArgs := append([]string{"-test.run=^TestHelperProcess$", "--"}, args...)
-		cmd := exec.Command(os.Args[0], helperArgs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], helperArgs...)
 		cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1", "UASSETTOOL_TEST_MODE="+mode)
 		return cmd
 	}
@@ -31,10 +31,10 @@ func installFakeWorker(t *testing.T, mode string) {
 	originalCommand := execCommand
 	originalCommandContext := execCommandContext
 	execCommand = func(name string, args ...string) *exec.Cmd {
-		return build(args)
+		return build(context.Background(), args)
 	}
-	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd {
-		return build(args)
+	execCommandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return build(ctx, args)
 	}
 	t.Cleanup(func() {
 		execCommand = originalCommand
@@ -60,9 +60,12 @@ func TestHelperProcess(t *testing.T) {
 	mode := os.Getenv("UASSETTOOL_TEST_MODE")
 
 	if len(args) > 0 && args[0] == "--version" {
-		if mode == "version-mismatch" {
+		switch mode {
+		case "version-mismatch":
 			fmt.Println("UAssetTool v1.0.0+wrong-revision")
-		} else {
+		case "patch-check":
+			fmt.Printf("UAssetTool v1.0.0+%s\n", PinnedSourceRevision)
+		default:
 			fmt.Printf("UAssetTool v1.0.0+%s\n", testSourceRevision)
 		}
 		return
@@ -80,6 +83,11 @@ func TestHelperProcess(t *testing.T) {
 		switch mode {
 		case "crash-on-call":
 			os.Exit(1)
+		case "patch-check":
+			if err := os.WriteFile(filepath.Join(os.TempDir(), "check-started"), nil, 0o600); err != nil {
+				os.Exit(1)
+			}
+			time.Sleep(time.Hour)
 		case "hang-on-call":
 			// A bare select{} here would trip Go's own deadlock detector
 			// (no other goroutine could ever wake this process), killing it
@@ -90,6 +98,52 @@ func TestHelperProcess(t *testing.T) {
 		default:
 			fmt.Println(`{"success":true,"message":"ok","data":{"echo":true}}`)
 		}
+	}
+}
+
+func TestPatchCheckWorkerCancelsInFlightRequest(t *testing.T) {
+	// Arrange
+	installFakeWorker(t, "patch-check")
+	t.Setenv(EnvWorkerPath, os.Args[0])
+	scratch := t.TempDir()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	worker, err := NewPatchCheckWorker(ctx, scratch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := worker.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	done := make(chan error, 1)
+	go func() {
+		done <- worker.Call("check_iostore_patch", nil, nil)
+	}()
+	started := filepath.Join(scratch, "check-started")
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("patch check did not start in its private scratch directory")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Act
+	cancel()
+
+	// Assert
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrWorkerCrashed) || worker.Alive() {
+			t.Errorf("cancelled call error = %v, worker alive = %t", err, worker.Alive())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("patch check did not stop after cancellation")
 	}
 }
 

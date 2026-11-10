@@ -1033,6 +1033,158 @@ export namespace mutation {
 		}
 	}
 	
+	export class PatchUpdateAsset {
+	    path: string;
+	    outcome: string;
+	    fromBuild?: number;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchUpdateAsset(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.outcome = source["outcome"];
+	        this.fromBuild = source["fromBuild"];
+	        this.reason = source["reason"];
+	    }
+	}
+	export class PatchUpdateMod {
+	    entryID: string;
+	    displayName: string;
+	    relativeFolder: string;
+	    enabled: boolean;
+	    status: string;
+	    detail?: string;
+	    updated: number;
+	    fromBuilds?: number[];
+	    blocked?: string[];
+	    ambiguous?: string[];
+	    assets?: PatchUpdateAsset[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchUpdateMod(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entryID = source["entryID"];
+	        this.displayName = source["displayName"];
+	        this.relativeFolder = source["relativeFolder"];
+	        this.enabled = source["enabled"];
+	        this.status = source["status"];
+	        this.detail = source["detail"];
+	        this.updated = source["updated"];
+	        this.fromBuilds = source["fromBuilds"];
+	        this.blocked = source["blocked"];
+	        this.ambiguous = source["ambiguous"];
+	        this.assets = this.convertValues(source["assets"], PatchUpdateAsset);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchUpdatePlan {
+	    gameBuild: number;
+	    gamePaks: string;
+	    mods: PatchUpdateMod[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchUpdatePlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.gameBuild = source["gameBuild"];
+	        this.gamePaks = source["gamePaks"];
+	        this.mods = this.convertValues(source["mods"], PatchUpdateMod);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchUpdateResult {
+	    gameBuild: number;
+	    originalsDir: string;
+	    mods: PatchUpdateMod[];
+	    cancelled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchUpdateResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.gameBuild = source["gameBuild"];
+	        this.originalsDir = source["originalsDir"];
+	        this.mods = this.convertValues(source["mods"], PatchUpdateMod);
+	        this.cancelled = source["cancelled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class PatchUpdateTarget {
+	    entryID: string;
+	    displayName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PatchUpdateTarget(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entryID = source["entryID"];
+	        this.displayName = source["displayName"];
+	    }
+	}
 	export class Result {
 	    id: string;
 	    previousID?: string;

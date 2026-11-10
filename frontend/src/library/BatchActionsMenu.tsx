@@ -20,6 +20,7 @@ type BatchActionsMenuProps = {
 	onEnable: () => void;
 	onEncrypt: () => void;
 	onMove: () => void;
+	onPatchCheck: () => void;
 	onTags: () => void;
 };
 
@@ -37,6 +38,7 @@ export function BatchActionsMenu({
 	onEnable,
 	onEncrypt,
 	onMove,
+	onPatchCheck,
 	onTags,
 }: BatchActionsMenuProps) {
 	const empty = selectedCount === 0;
@@ -70,6 +72,9 @@ export function BatchActionsMenu({
 				</DropdownMenuItem>
 				<DropdownMenuItem disabled={isBusy || empty} onClick={onTags}>
 					Tags...
+				</DropdownMenuItem>
+				<DropdownMenuItem disabled={isBusy || empty} onClick={onPatchCheck}>
+					Check for patch updates
 				</DropdownMenuItem>
 				<DropdownMenuItem
 					disabled={encryptDisabled}

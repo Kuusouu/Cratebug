@@ -294,6 +294,8 @@ A complete unencrypted IoStore whose internal listing includes any path outside 
 
 As of 3 September 2026, companion `.pak` entries named `chunknames` or `patched_files` cause anti-cheat crashes. Cratebug must detect those names with `list_pak`, warn on the first populated load of a library in a session, and rewrite only the `.pak`. Install preview must warn. Apply must rewrite the staged `.pak` before copy. `.utoc` and `.ucas` must not be rebuilt for this cleanup.
 
+Cratebug may carry a complete IoStore mod across a game patch that moved its unversioned property layout. It checks first without changing any file and reports which mods an earlier layout affects. A check covers one mod, a selection, or the whole library. It reads package headers before any full asset work, so a bundle with no unversioned properties is cleared without reading every asset; a bundle that has them is extracted in full for the check. The user selects which of those to carry forward. Applying identifies the earlier layout each selected asset was cooked with from published mappings files, renumbers the asset's stored property headers to the current layout without changing any value, and keeps the result only when it reads back with the same values. The rebuilt container must extract back to byte-identical payload files before it replaces the live bundle, and the live originals are copied aside first. The check is a light plan: a mod it says can be carried may still fail the full rebuild during apply, in which case the live files stay untouched and the apply result is authoritative. See `docs/decisions/0012-game-patch-updater.md`.
+
 The Marvel Rivals AES key used to read and write obfuscated IoStore containers stays in the Go backend. The frontend may receive an `encrypted` boolean. It must not receive the key.
 
 ## 16. User interface direction
@@ -342,7 +344,7 @@ Cratebug does not currently do any of the following. None of them is ruled out; 
 - Game launching
 - Crash monitoring
 - Browser-extension intake
-- VFX updating
+- Updating mod content that a patch changed beyond its property layout
 - Character database updating
 - Automatic recompression tools
 - Virtual collections

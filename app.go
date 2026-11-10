@@ -29,6 +29,7 @@ type App struct {
 	settings        *SettingsService
 	installs        *InstallService
 	nexusMods       *NexusService
+	patchUpdates    *PatchUpdateService
 }
 
 // Creates the application and its services.
@@ -87,6 +88,7 @@ func newApp(
 		settings:        newSettingsService(c),
 		installs:        installs,
 		nexusMods:       newNexusService(c, installs, secretStore),
+		patchUpdates:    newPatchUpdateService(c),
 	}
 }
 

@@ -15,10 +15,10 @@ Set-StrictMode -Version Latest
 
 $repositoryRoot = $PSScriptRoot
 $releaseRepo = "mewclouds/UAssetToolRivals"
-$releaseTag = "v1.5.10"
+$releaseTag = "v1.6.0"
 $assetName = "UAssetTool-win-x64.zip"
-$expectedSha256 = "75fe43c2adafc27029c0318887f49ed819957dfe7082d49bf17d069aaa78b518"
-$expectedSourceRevision = "c137d9abc4a7509d25f89ca9c6c0be3b7a87da23"
+$expectedSha256 = "82096dedebe8b5c1760b7da401341c2a7d141ed46328600f8b87180c8c546f8b"
+$expectedSourceRevision = "e266253f0040dcb0f9160dc74e6789c7998f1b3f"
 
 $downloadUrl = "https://github.com/$releaseRepo/releases/download/$releaseTag/$assetName"
 $targetDir = Join-Path $repositoryRoot "build\uassettool"

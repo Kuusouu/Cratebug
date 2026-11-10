@@ -16,8 +16,8 @@ import (
 
 const (
 	// PinnedSourceRevision is the Git commit hash of the pinned UAssetToolRivals release.
-	// Kept in sync with docs/decisions/0004-pin-uassettool-worker.md and fetch-uassettool.ps1.
-	PinnedSourceRevision = "c137d9abc4a7509d25f89ca9c6c0be3b7a87da23"
+	// Kept in sync with the fetch scripts and docs/decisions/0004-pin-uassettool-worker.md.
+	PinnedSourceRevision = "e266253f0040dcb0f9160dc74e6789c7998f1b3f"
 
 	// EnvWorkerPath is the environment variable override for locating the worker binary.
 	EnvWorkerPath = "CRATEBUG_UASSETTOOL_PATH"
@@ -148,6 +148,22 @@ func NewWriteWorker(logger *log.Logger) (*Worker, error) {
 	})
 }
 
+// Starts a worker for one library check. The caller owns tempDir and removes
+// it after the process exits, including when cancellation interrupts extraction.
+func NewPatchCheckWorker(ctx context.Context, tempDir string) (*Worker, error) {
+	exePath, err := ResolveExecutablePath()
+	if err != nil {
+		return nil, err
+	}
+	cmd := execCommandContext(ctx, exePath)
+	cmd.Env = append(cmd.Environ(), "TMPDIR="+tempDir, "TMP="+tempDir, "TEMP="+tempDir)
+	return startWorker(ctx, cmd, WorkerConfig{
+		ExecutablePath:         exePath,
+		ExpectedSourceRevision: PinnedSourceRevision,
+		CallTimeout:            DefaultWriteCallTimeout,
+	})
+}
+
 // Configures how a Worker launches and supervises the pinned UAssetTool.exe process.
 type WorkerConfig struct {
 	// Path to the pinned worker executable; see fetch-uassettool.ps1 and
@@ -189,11 +205,14 @@ type Worker struct {
 // contain config.ExpectedSourceRevision, and ErrWorkerLaunchFailed if the
 // executable cannot be started at all.
 func NewWorker(config WorkerConfig) (*Worker, error) {
-	if err := verifyWorkerVersion(config.ExecutablePath, config.ExpectedSourceRevision); err != nil {
+	return startWorker(context.Background(), execCommand(config.ExecutablePath), config)
+}
+
+func startWorker(ctx context.Context, cmd *exec.Cmd, config WorkerConfig) (*Worker, error) {
+	if err := verifyWorkerVersion(ctx, config.ExecutablePath, config.ExpectedSourceRevision); err != nil {
 		return nil, err
 	}
 
-	cmd := execCommand(config.ExecutablePath)
 	setHideWindow(cmd)
 	cmd.Stderr = &stderrLogWriter{logger: config.Logger}
 
@@ -239,8 +258,8 @@ func NewWorker(config WorkerConfig) (*Worker, error) {
 
 // Runs "--version" as a one-shot process, independent of the interactive
 // worker, and confirms it names the pinned source revision.
-func verifyWorkerVersion(executablePath, expectedSourceRevision string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), versionCheckTimeout)
+func verifyWorkerVersion(ctx context.Context, executablePath, expectedSourceRevision string) error {
+	ctx, cancel := context.WithTimeout(ctx, versionCheckTimeout)
 	defer cancel()
 
 	cmd := execCommandContext(ctx, executablePath, "--version")

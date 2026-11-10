@@ -43,6 +43,10 @@ The early work was organized as numbered phases. The numbers are kept so that ol
 - **Midnight Iris palette.** New light and dark themes and six accent presets.
 - **Toolchain and UI foundation.** Moved from Biome to oxlint and oxfmt, adopted Tailwind CSS and shadcn/ui on Base UI, and enforced the coding guidelines through lint and CI checks.
 
+### November 2026
+
+- **Game patch updater.** Checks which mods an older layout affects, lets the user select which to carry forward, then renumbers their unversioned property headers using published mappings, with byte-level verification and kept originals. See [0012](docs/decisions/0012-game-patch-updater.md).
+
 ## Ideas for later
 
 Nothing here is committed or ordered.
@@ -51,7 +55,7 @@ Nothing here is committed or ordered.
 - Importing BentoMod or Repak-X state.
 - Game launching and crash monitoring.
 - Character data updates.
-- Recompression and VFX updating.
+- Recompression.
 - Virtual collections.
 - Permanent deletion.
 - Better reconciliation of external renames.

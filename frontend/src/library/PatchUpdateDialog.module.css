@@ -1,0 +1,318 @@
+.patch-update-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 1rem;
+	padding-bottom: 0.5rem;
+}
+
+.patch-status-state {
+	display: grid;
+	place-items: center;
+	padding: 2.5rem 1rem;
+	gap: 0.8rem;
+	text-align: center;
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+
+.patch-status-state.error {
+	color: var(--bad);
+}
+
+.patch-status-state.error svg {
+	width: 2rem;
+	height: 2rem;
+}
+
+.patch-status-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.65rem;
+}
+
+.patch-summary {
+	margin: 0;
+	color: var(--text);
+	font-size: 0.84rem;
+	line-height: 1.45;
+}
+
+.patch-game-path {
+	margin: 0;
+	overflow: hidden;
+	color: var(--muted);
+	font-family: monospace;
+	font-size: 0.72rem;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.patch-update-list {
+	display: grid;
+	flex: 1 1 auto;
+	align-content: start;
+	min-height: 0;
+	gap: 1rem;
+	padding: 0.5rem 0.4rem 0.5rem 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.patch-current-note {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.78rem;
+}
+
+.patch-group {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.patch-group-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 0.75rem;
+}
+
+.patch-group-header h3 {
+	margin: 0;
+	font-size: 0.88rem;
+	font-weight: 800;
+}
+
+.patch-group-header p {
+	margin: 0.2rem 0 0;
+	color: var(--muted);
+	font-size: 0.76rem;
+	line-height: 1.4;
+}
+
+.patch-group-list {
+	display: grid;
+	gap: 0.6rem;
+}
+
+.patch-mod-card {
+	display: grid;
+	gap: 0.5rem;
+	padding: 0.75rem;
+	border: 1px solid var(--line);
+	border-radius: 0.6rem;
+	background: color-mix(in srgb, var(--panel), transparent 40%);
+	transition:
+		opacity 0.15s ease,
+		background 0.15s ease;
+}
+
+.patch-mod-card.unselected {
+	opacity: 0.55;
+	background: color-mix(in srgb, var(--panel), transparent 80%);
+	border-color: color-mix(in srgb, var(--line), transparent 60%);
+}
+
+.patch-mod-card.locked {
+	background: color-mix(in srgb, var(--panel), transparent 62%);
+}
+
+.patch-mod-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 0.75rem;
+}
+
+.patch-mod-heading {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.55rem;
+	min-width: 0;
+}
+
+.patch-mod-heading h4 {
+	margin: 0;
+	font-size: 0.87rem;
+	font-weight: 750;
+	overflow-wrap: anywhere;
+}
+
+.patch-mod-heading p {
+	margin: 0.15rem 0 0;
+	color: var(--muted);
+	font-size: 0.74rem;
+	overflow-wrap: anywhere;
+}
+
+.patch-mod-select {
+	display: flex;
+	align-items: center;
+	padding-top: 0.05rem;
+}
+
+.patch-mod-select input {
+	width: 1.05rem;
+	height: 1.05rem;
+	accent-color: var(--accent);
+	cursor: pointer;
+}
+
+.patch-mod-badges {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.4rem;
+}
+
+.patch-mod-build,
+.patch-mod-warning {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.15rem 0.45rem;
+	border-radius: 0.35rem;
+	font-size: 0.7rem;
+	font-weight: 700;
+	line-height: 1.2;
+	white-space: nowrap;
+}
+
+.patch-mod-build {
+	color: var(--muted);
+	background: color-mix(in srgb, var(--muted), transparent 88%);
+	border: 1px solid var(--line);
+}
+
+.patch-mod-warning {
+	color: var(--warn);
+	background: color-mix(in srgb, var(--warn), transparent 90%);
+	border: 1px solid color-mix(in srgb, var(--warn), transparent 65%);
+}
+
+.patch-mod-warning svg {
+	width: 0.8rem;
+	height: 0.8rem;
+}
+
+.patch-mod-line {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.78rem;
+	line-height: 1.4;
+}
+
+.patch-mod-details {
+	display: grid;
+	gap: 0.3rem;
+}
+
+.patch-mod-details summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	justify-self: start;
+	color: var(--muted);
+	font-size: 0.72rem;
+	font-weight: 650;
+	cursor: pointer;
+	list-style: none;
+}
+
+.patch-mod-details summary::-webkit-details-marker {
+	display: none;
+}
+
+.patch-mod-details summary svg {
+	width: 0.85rem;
+	height: 0.85rem;
+	transition: transform 0.15s ease;
+}
+
+.patch-mod-details[open] summary svg {
+	transform: rotate(180deg);
+}
+
+.patch-mod-details ul {
+	display: grid;
+	gap: 0.3rem;
+	max-height: 9rem;
+	margin: 0;
+	padding: 0.45rem 0.65rem;
+	overflow-y: auto;
+	border: 1px solid var(--line);
+	border-radius: 0.4rem;
+	background: color-mix(in srgb, var(--page), transparent 30%);
+	list-style: none;
+}
+
+.patch-mod-details li {
+	display: grid;
+	gap: 0.1rem;
+	line-height: 1.35;
+}
+
+.patch-asset-path {
+	color: var(--muted);
+	font-family: monospace;
+	font-size: 0.7rem;
+	overflow-wrap: anywhere;
+}
+
+.patch-asset-note {
+	color: var(--muted);
+	font-size: 0.7rem;
+}
+
+.patch-originals-note,
+.patch-footer-note,
+.patch-footer-error {
+	margin: 0;
+	color: var(--muted);
+	font-size: 0.78rem;
+	line-height: 1.4;
+}
+
+.patch-originals-note span {
+	font-family: monospace;
+	overflow-wrap: anywhere;
+}
+
+.patch-footer-error {
+	color: var(--bad);
+}
+
+.patch-update-footer {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.75rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--line);
+	margin-top: 0.5rem;
+}
+
+.patch-footer-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.65rem;
+}
+
+@media (max-width: 640px) {
+	.patch-update-footer {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.patch-footer-actions {
+		justify-content: stretch;
+	}
+
+	.patch-footer-actions > button {
+		flex: 1 1 auto;
+	}
+}

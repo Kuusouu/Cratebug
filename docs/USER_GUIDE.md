@@ -117,3 +117,13 @@ The first time Cratebug finishes classifying a library in a session, it offers t
 As of 3 September 2026, leftover `chunknames` and `patched_files` entries inside a companion `.pak` crash Marvel Rivals anti-cheat. The first time Cratebug loads a library in a session, it lists those files and asks to rewrite the affected `.pak` files. The IoStore `.utoc` and `.ucas` stay as they are. You can decline for this session. A later Refresh does not ask again.
 
 Install preview shows the same warning. Installing still proceeds, and Cratebug rewrites those staged `.pak` files before they land in the library. Close the game first. A failed rewrite leaves that one mod as it was.
+
+## Updating mods after a game patch
+
+Some game patches move how cooked assets are laid out. Mods made before such a patch, most often material and effect mods, then crash the game. The wand button in the library toolbar checks the whole library. To check one mod, right-click it and choose Check for patch updates. To check several, select them and choose Check for patch updates from the batch menu.
+
+It reads the game build from the Paks folder above your mod library. If the library is somewhere else, such as a backup or staging folder, it uses the Marvel Rivals install for the store selected in Settings. Then it downloads the matching mappings file from the community depot (`SpaceDepot/rivals-depot`), plus a few earlier ones it uses to recognize what each mod was made for. Mappings for a new patch usually appear within a day. Until then the updater says they are not published yet.
+
+Checking changes nothing. It lists the complete IoStore mods an older layout affects, along with the ones it cannot update safely. Select the mods to carry forward, then update. Only the selected mods are rewritten, in place, and only when the updated copy reads back with exactly the same values. Each mod's original files are kept first, and Originals opens that folder. Mods that need an update Cratebug cannot make safely are listed as needing their author, and they stay as they were. Close Marvel Rivals before updating.
+
+Checks read package headers first. Bundles without unversioned assets can be cleared from their headers. Check time depends on how many bundles need a closer look.

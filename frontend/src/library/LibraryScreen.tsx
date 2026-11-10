@@ -6,6 +6,7 @@ import {
 	PanelsTopLeft,
 	Settings as SettingsIcon,
 	ShieldAlert,
+	Wand2,
 	Wrench,
 } from "lucide-react";
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -139,6 +140,8 @@ import {
 	type InstallProgressView,
 	isAdultContentBlockedError,
 } from "./nexusPresentation";
+import { PatchUpdateDialog } from "./PatchUpdateDialog";
+import { patchUpdateScopeLabel } from "./patchUpdatePresentation";
 import { SelectedModPanel } from "./SelectedModPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { providerLogos } from "./StoreLogos";
@@ -433,6 +436,8 @@ export function LibraryScreen() {
 	const [viewMode, setViewMode] = useState<ViewMode>("compact");
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [toolsOpen, setToolsOpen] = useState(false);
+	const [patchUpdateOpen, setPatchUpdateOpen] = useState(false);
+	const [patchUpdateTargets, setPatchUpdateTargets] = useState<mutation.PatchUpdateTarget[]>([]);
 	const [initialBypassStatus, setInitialBypassStatus] = useState<sigbypass.Status | null>(null);
 	const [metadataDocument, setMetadataDocument] = useState<metadata.Document | null>(null);
 	const [tagFilterIDs, setTagFilterIDs] = useState<ReadonlySet<string>>(new Set());
@@ -1038,6 +1043,37 @@ export function LibraryScreen() {
 		await SetLibraryWatcherSuspended(false);
 		setToolsOpen(false);
 		void reloadLibrary();
+	}
+
+	// Empty entries mean the whole library, which is what the toolbar button
+	// asks for. The context menu passes its one entry and the batch menu passes
+	// the checked set.
+	const openPatchUpdateFor = useCallback(
+		async (entries: discovery.Entry[]) => {
+			if (!libraryRoot) return;
+			try {
+				await SetLibraryWatcherSuspended(true);
+				setPatchUpdateTargets(
+					entries.map((entry) => ({
+						entryID: entry.id,
+						displayName: entry.displayName,
+					})),
+				);
+				setPatchUpdateOpen(true);
+			} catch (error) {
+				showMutationFeedback(
+					"error",
+					`Could not open the patch updater: ${errorMessage(error)}`,
+				);
+			}
+		},
+		[libraryRoot, showMutationFeedback],
+	);
+
+	async function closePatchUpdate(reload: boolean) {
+		await SetLibraryWatcherSuspended(false);
+		setPatchUpdateOpen(false);
+		if (reload) void reloadLibrary();
 	}
 
 	// Tags live in Cratebug's own persisted metadata, not the scanned library, so
@@ -2145,6 +2181,12 @@ export function LibraryScreen() {
 						void openModInExplorer(entry.id);
 					},
 				},
+				{
+					label: "Check for patch updates",
+					onSelect: () => {
+						void openPatchUpdateFor([entry]);
+					},
+				},
 			];
 			if (organizable) {
 				items.push(
@@ -2183,7 +2225,7 @@ export function LibraryScreen() {
 				items,
 			});
 		},
-		[checkedEntryIDs, openModInExplorer],
+		[checkedEntryIDs, openModInExplorer, openPatchUpdateFor],
 	);
 
 	// Runs one auto-detection attempt against the active provider and routes
@@ -2718,6 +2760,16 @@ export function LibraryScreen() {
 					<Button
 						variant="secondary"
 						size="icon"
+						onClick={() => void openPatchUpdateFor([])}
+						disabled={!libraryRoot || libraryState === "loading" || isMutationLocked}
+						aria-label="Update mods for a game patch"
+						title="Check which mods were built for an older game patch and update only the ones you select"
+					>
+						<Wand2 aria-hidden="true" />
+					</Button>
+					<Button
+						variant="secondary"
+						size="icon"
 						onClick={() => void openTools()}
 						aria-label="Tools"
 						title="Tools"
@@ -2896,6 +2948,7 @@ export function LibraryScreen() {
 									onMove={() => openCheckedDialog("move")}
 									onTags={() => openCheckedDialog("tags")}
 									onEncrypt={() => openCheckedDialog("encrypt")}
+									onPatchCheck={() => void openPatchUpdateFor(checkedEntries)}
 									onDelete={() => openCheckedDialog("delete")}
 								/>
 							</div>
@@ -3175,6 +3228,14 @@ export function LibraryScreen() {
 					libraryEntryCount={library?.entries.length ?? 0}
 					onRestored={handleRestored}
 					initialBypassStatus={initialBypassStatus}
+				/>
+			)}
+			{patchUpdateOpen && libraryRoot && (
+				<PatchUpdateDialog
+					libraryRoot={libraryRoot}
+					targets={patchUpdateTargets}
+					scopeLabel={patchUpdateScopeLabel(patchUpdateTargets.length)}
+					onClose={closePatchUpdate}
 				/>
 			)}
 			{detectionDialog && (

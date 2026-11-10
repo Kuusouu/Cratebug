@@ -26,6 +26,18 @@ func OpenFolder(modRoot, folder string) error {
 	return openPath(target)
 }
 
+// Opens an existing absolute directory that Cratebug itself owns, such as
+// a folder under its configuration directory.
+func OpenDirectory(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("folder path %q is not absolute", path)
+	}
+	if err := requireDirectory(path, "folder"); err != nil {
+		return err
+	}
+	return openPath(Target{Path: filepath.Clean(path)})
+}
+
 // Opens File Explorer with the scanned mod selected, or its folder if no file exists.
 func OpenMod(modRoot, entryID string) error {
 	target, err := ResolveMod(modRoot, entryID)

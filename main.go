@@ -73,6 +73,7 @@ func main() {
 			app.settings,
 			app.installs,
 			app.nexusMods,
+			app.patchUpdates,
 		},
 		Debug: options.Debug{
 			OpenInspectorOnStartup: true,
